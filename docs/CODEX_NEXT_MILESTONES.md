@@ -149,7 +149,7 @@ Goal:
 
 Run the locked Web Request handler through a native Node development server and proxy `/api` from Vite to the server-only runtime without exposing credentials.
 
-## R1-B3B.2 — apps/web Product Evidence UI
+## R1-B3B.2 — apps/web Product Evidence UI (PASS)
 
 Prerequisites:
 
@@ -157,9 +157,9 @@ Prerequisites:
 
 Goal:
 
-Connect apps/web to the trusted relative `/api/product-evidence` path. This milestone is NOT STARTED.
+Connect apps/web to the trusted relative `/api/product-evidence` path. The browser sends only ProductInput plus runtime reference files, validates the returned ProductEvidence before display, and keeps factual evidence separate from creative direction.
 
-## R1 Application Path Complete
+## R1 Application Path Complete (IMPLEMENTED)
 
 Prerequisites:
 
@@ -167,7 +167,7 @@ Prerequisites:
 
 Goal:
 
-Confirm the Product Evidence application path is integrated and preserves factual/creative separation.
+The Product Evidence application path is integrated and preserves factual/creative separation. It awaits the separately deferred live runtime validation.
 
 ## Deferred Live Runtime Validation
 
@@ -175,6 +175,8 @@ Prerequisites:
 
 - R1 Application Path Complete
 - separately authorized server runtime prerequisites
+
+Status: NOT RUN.
 
 Goal:
 

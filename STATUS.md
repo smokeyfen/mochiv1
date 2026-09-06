@@ -2,17 +2,17 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `242cc9b16cecb7a967330b2e20b840f63e4c882c`
+- Current verified implementation commit: `e236d02f2a994684dee23f5b8c372ac67a261f86`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B3B.1 HTTP Runtime Adapter
-- Milestone status: PASS — native Node development runtime adapter and Vite proxy verified
-- Next application milestone: R1-B3B.2 apps/web Product Evidence UI — NOT STARTED
+- Current milestone: R1-B3B.2 apps/web Product Evidence UI
+- Milestone status: PASS — provider-neutral web analysis client and Product Evidence UI verified with mocks
+- Application path: IMPLEMENTED — awaiting deferred live runtime validation
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. R1-B3B.2 apps/web Product Evidence UI is NOT STARTED; live runtime validation remains deferred.
+- Next action: STOP. Deferred Live Runtime Validation is NOT RUN. R2 Product Truth / Blueprint is NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -46,3 +46,5 @@ R1-B2.1 diagnostics correction at `7cfd1dfe360dd35d04bf08169f5a5111690b075c`: Ev
 R1-B2.2 Flexible Product Reference Intake at `a806ac485732510aa90185fac80d428b12d619be`: `PRODUCT_REFERENCE` is a provider-neutral logical AssetRole for arbitrary user-supplied factual references. The web intake assigns it automatically to every upload and no longer renders a manual per-image role selector. Evidence instructions handle arbitrary order, packaging, text-heavy, in-hand, multi-product, and unrelated-background images conservatively, with uncertainty for ambiguous target attribution. Verification: `npm run typecheck` PASS; `npm test` PASS (69 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0. Live runtime validation is deferred until the R1 application milestone is complete.
 R1-B3A Server HTTP Analysis Boundary at `8ab8e002b246b689ba3d80fed074f306b279e20c`: `POST /api/product-evidence` accepts strict multipart ProductInput JSON plus one image per logical asset. Untrusted JSON is decoded into only canonical ProductInput fields; undeclared properties are rejected. Multipart media is mapped to runtime base64 only after exact asset, image, nonempty, and MIME checks. The injected service is called once at most, and responses expose only sanitized ProductEvidence or stable error codes. Verification: `npm run typecheck` PASS; `npm test` PASS (76 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0. Live runtime validation remains deferred.
 R1-B3B.1 HTTP Runtime Adapter at `242cc9b16cecb7a967330b2e20b840f63e4c882c`: native `node:http` now translates Node requests to the locked Web Request handler and writes the resulting Web Response back without logging request bodies or credentials. It preserves method, path, query, headers, multipart bytes, response status, headers, and body, with a bounded 10 MiB development body limit. `npm run dev -w @mochi/server` composes server-only provider configuration, the locked HTTP handler, and adapter on `127.0.0.1:8787` with an optional `MOCHI_SERVER_PORT` override. Vite proxies `/api` to that local server without exposing credentials. Verification: `npm run typecheck` PASS; `npm test` PASS (78 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
+
+R1-B3B.2 apps/web Product Evidence UI at `e236d02f2a994684dee23f5b8c372ac67a261f86`: apps/web posts only factual `ProductInput` and exact browser `File` values to the relative `/api/product-evidence` endpoint. It validates files locally, never sends creative direction or project data, decodes the response into the explicit ProductEvidence contract, and runs final contract validation before rendering factual analysis sections. Factual changes abort and invalidate evidence immediately; creative changes preserve evidence while still invalidating the canonical project preview. Verification: `npm run typecheck` PASS; `npm test` PASS (86 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live runtime validation was not run. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
