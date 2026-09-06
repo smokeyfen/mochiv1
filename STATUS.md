@@ -2,18 +2,18 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`
+- Current verified implementation commit: `7c5f93c34ce89ee2c63d2ce538fbfd43f79ad26d`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-LIVE runtime validation
-- Milestone status: PASS — completed end-to-end Product Evidence runtime validation
+- Current milestone: RUBRIC-0 benchmark scoring contract
+- Milestone status: PASS / LOCKED — deterministic versioned human-review verdict contract
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. RUBRIC-0 is NEXT and NOT STARTED. R2 Product Truth / Blueprint is NOT STARTED.
+- Next action: STOP. F0 Manual Omni Confirmatory Canary is NEXT and NOT STARTED. R2-A Product Truth is the next reasoning milestone and NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -21,7 +21,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 → R2 Product Truth / Blueprint → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 PASS / LOCKED → F0 Manual Omni Confirmatory Canary → R2-A Product Truth → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 
@@ -52,4 +52,6 @@ R1-B3B.2 apps/web Product Evidence UI at `e236d02f2a994684dee23f5b8c372ac67a261f
 
 R1-B3B.2.1 Claim Allowed-State UI at `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`: every Product Analysis claim now shows its contract-provided source and direct `ALLOWED` or `NOT ALLOWED` state. Reference-evidence claims show only the count of supporting references; logical asset IDs remain absent from the user-facing claim display. Verification: `npm run typecheck` PASS; `npm test` PASS (87 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. R1 Application Path is COMPLETE and ready for the separately authorized deferred live runtime validation, which remains NOT RUN. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
 
-R1-LIVE runtime validation: PASS, recorded from the completed controlled run. The observed path was apps/web → relative `POST /api/product-evidence` → apps/server → Gemini 3.5 Flash → validated ProductEvidence → Product Analysis UI. The backend ran on `127.0.0.1:8787`; the frontend ran on `localhost:5173`; exactly one request returned HTTP 200 and reached `PRODUCT_ANALYSIS_READY`. Identity, geometry, colors, packaging, visible labels, claims with source and allowed state, uncertainties, contradictions, and prohibited inferences rendered. Creative mutations preserved ProductEvidence without a second request; a Product Name mutation immediately cleared it and did not re-run analysis. Gemini live calls: 1. Flow calls, video generation, and action promotions: 0. All physical ActionIds remain `UNTESTED`. R1 Application Path and R1 Product Evidence are FINAL LOCKED. RUBRIC-0 is NEXT; R2 Product Truth / Blueprint is NOT STARTED.
+R1-LIVE runtime validation: PASS, recorded from the completed controlled run. The observed path was apps/web → relative `POST /api/product-evidence` → apps/server → Gemini 3.5 Flash → validated ProductEvidence → Product Analysis UI. The backend ran on `127.0.0.1:8787`; the frontend ran on `localhost:5173`; exactly one request returned HTTP 200 and reached `PRODUCT_ANALYSIS_READY`. Identity, geometry, colors, packaging, visible labels, claims with source and allowed state, uncertainties, contradictions, and prohibited inferences rendered. Creative mutations preserved ProductEvidence without a second request; a Product Name mutation immediately cleared it and did not re-run analysis. Gemini live calls: 1. Flow calls, video generation, and action promotions: 0. All physical ActionIds remain `UNTESTED`. R1 Application Path and R1 Product Evidence are FINAL LOCKED. RUBRIC-0 is PASS / LOCKED; R2-A Product Truth is NOT STARTED.
+
+RUBRIC-0 at `7c5f93c34ce89ee2c63d2ce538fbfd43f79ad26d`: BenchmarkObservation now records `rubricVersion: RUBRIC_0`. The deterministic verdict is PASS only when every required existing benchmark dimension passes; missing, duplicate, malformed, version-mismatched, or manually inconsistent results fail validation. Critical-failure fail-closed behavior and the locked capability promotion thresholds remain unchanged. Human reviewer guidance is recorded in `docs/quality/RUBRIC_0.md`; it evaluates one generated benchmark scene and does not introduce cross-scene continuity into F0. Verification: `npm run typecheck` PASS; `npm test` PASS (95 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. RUBRIC-0 is PASS / LOCKED. No new Gemini calls occurred (historical total remains 1); Flow calls, video generation, and action promotions remain 0. F0 Manual Omni Confirmatory Canary is NEXT / NOT STARTED. R2-A Product Truth is the next reasoning milestone / NOT STARTED.
