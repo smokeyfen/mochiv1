@@ -1,5 +1,23 @@
 import type { GeneratedCandidate, SceneProductionContract } from '@mochi/contracts';
 
+export {
+  IntelligenceProviderError,
+  type IntelligenceMediaInput,
+  type IntelligenceProvider,
+  type IntelligenceProviderErrorCode,
+  type StructuredIntelligenceRequest,
+  type StructuredIntelligenceResult,
+  type StructuredOutputSchema
+} from './intelligence.ts';
+export {
+  GEMINI_3_5_FLASH_MODEL,
+  Gemini35FlashIntelligenceProvider,
+  createGemini35FlashIntelligenceProviderFromEnv,
+  type GeminiIntelligenceTransport,
+  type GeminiIntelligenceTransportFactory,
+  type GeminiStructuredTransportRequest
+} from './gemini-3-5-flash-intelligence.ts';
+
 export interface VideoProviderCapabilities {
   referenceToVideo: boolean;
   firstFrame: boolean;

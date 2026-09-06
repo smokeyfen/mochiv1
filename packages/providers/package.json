@@ -4,7 +4,16 @@
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
-  "scripts": {"typecheck": "tsc --noEmit -p tsconfig.json"},
-  "dependencies": {"@mochi/contracts": "*"},
-  "devDependencies": {"typescript": "^5.7.3"}
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "@mochi/contracts": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^5.7.3"
+  }
 }
