@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "tsx src/dev-server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "smoke:evidence": "tsx src/smoke-evidence.ts"
