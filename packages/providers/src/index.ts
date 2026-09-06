@@ -52,3 +52,5 @@ export class CapabilityUnavailableError extends Error {
 
 export { VoiceProviderError, validateVoiceSynthesisRequest, type VoiceProvider, type VoiceSynthesisRequest, type VoiceSynthesisResult, type VoiceProviderErrorCode } from './voice.ts';
 export { SaydiBrowserVoiceProvider, createSaydiVoiceBindingRegistry, type SaydiBrowserDriver, type SaydiBrowserDriverResult, type SaydiVoiceBinding } from './saydi-browser-voice.ts';
+
+export { SaydiPlaywrightDriver, SaydiSingleFlight, measureWavDurationMs, validateDownloadedWav, type SaydiPlaywrightDriverOptions, type ValidatedWavFile } from './saydi-playwright-driver.ts';
