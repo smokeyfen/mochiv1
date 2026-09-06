@@ -12,7 +12,9 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - Every physical `ActionId` remains `UNTESTED`
 - F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**; F0-A.4 ROTATE_SLOW is **DEFERRED**
 - R2-A Product Truth: **PASS / LOCKED**
-- R2-B Reference Assessment: **NEXT / NOT STARTED**
+- R2-B Reference Assessment: **PASS / LOCKED**
+- R2 Commit Gate: **PASS / LOCKED**
+- R3 Continuity Synthesis: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
 `STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.
@@ -58,6 +60,8 @@ Read `docs/M0-ACCEPTANCE.md` and other M0 handoff artifacts only as historical c
 This is the frozen V1 architecture target. Do not begin a later stage without explicit authorization and its acceptance gate.
 
 R2-A is a provider-neutral deterministic compiler. It may use a mocked intelligence decision to retain or exclude stable ProductEvidence fact IDs, but the model may never author ProductTruth facts. ProductTruth copies product name/category from ProductInput, preserves evidence risk, accepts no creative controls or media bytes, and remains validated fail-closed.
+
+R2-B assesses only canonical ProductEvidence assets through enum-only values; readiness and limitations are deterministic. The R2 Commit Gate validates both R2 branches against the same ordered source invariants and commits only READY or LIMITED references. It is pure and makes no provider calls.
 
 ## Empirical track
 

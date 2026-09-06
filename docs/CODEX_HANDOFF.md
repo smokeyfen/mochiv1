@@ -21,7 +21,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**
 - F0-A.4 ROTATE_SLOW: **DEFERRED**
 - R2-A Product Truth: **PASS / LOCKED**
-- R2-B Reference Assessment: **NEXT / NOT STARTED**
+- R2-B Reference Assessment: **PASS / LOCKED**
+- R2 Commit Gate: **PASS / LOCKED**
+- R3 Continuity Synthesis: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -31,6 +33,8 @@ The completed live path is:
 This path is locked. It keeps browser runtime files separate from logical AssetRefs, sends only factual ProductInput to Product Evidence, validates output deterministically, and keeps credentials server-side.
 
 R2-A Product Truth is also locked. It receives only ProductInput, validated ProductEvidence, a nonblank caller-supplied sourceEvidenceVersion, and a provider-neutral intelligence boundary. The provider can select only stable catalog fact IDs through a complete retain/exclude partition; the deterministic compiler copies source text and provenance, preserves unresolved evidence risk, and never accepts creative direction, media bytes, provider metadata, or model-authored facts.
+
+R2-B Reference Assessment is locked. It analyzes exactly one runtime image per canonical evidence asset with enum-only output; deterministic contracts derive readiness and limitation codes. The pure R2 Commit Gate independently validates both R2 branches against matching productId, sourceEvidenceVersion, and ordered canonicalAssetIds. BLOCKED references cannot commit; READY and LIMITED contexts retain all reference limitations for later risk evaluation.
 
 ## Current repository responsibilities
 
