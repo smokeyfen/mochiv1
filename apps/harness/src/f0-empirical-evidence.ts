@@ -51,4 +51,48 @@ export const f0EmpiricalBenchmarkObservations: readonly BenchmarkObservation[] =
   ],
   verdict: 'PASS',
   reviewerNotes: 'F0 transfer canary passed. Visual result was judged attractive, realistic and smooth overall. Contact-sheet review and full-motion human review agreed. This observation is empirical evidence only and must not independently promote PICK_UP.'
+}, {
+  schemaVersion: SCHEMA_VERSION,
+  rubricVersion: RUBRIC_0_VERSION,
+  observationId: 'f0-cocoon-hold-v1-attempt-01-review',
+  benchmarkCaseId: 'f0-cocoon-hold-v1',
+  fixtureId: F0_CANOONICAL_FIXTURE_ID,
+  archetype: 'BOTTLE',
+  actionId: 'HOLD',
+  evidenceOrigin: 'REAL_MODEL_VIDEO',
+  candidateAssetId: 'f0-cocoon-hold-v1-attempt-01-video',
+  reviewerId: 'f0-human-reviewer',
+  reviewedAt: '2026-09-06T09:46:30.495Z',
+  dimensions: [
+    {
+      dimension: 'PRODUCT_FIDELITY', passed: true, critical: true,
+      notes: 'The canonical Cocoon bottle remains recognizable throughout the hold. The amber-orange cylindrical body, black attached dropper, and white front label remain materially stable.'
+    },
+    {
+      dimension: 'HAND_ANATOMY', passed: true, critical: true,
+      notes: 'One right hand holds the bottle stably. Finger count, joints, grip, and hand-to-bottle contact remain plausible with no fused or duplicated digits or penetration.'
+    },
+    {
+      dimension: 'ACTION_COMPLETION', passed: true, critical: true,
+      notes: 'The stable one-hand upright HOLD objective is maintained throughout and the final state remains a stable identifiable hold.'
+    },
+    {
+      dimension: 'PHYSICS', passed: true, critical: true,
+      notes: 'Bottle and hand motion remain smooth and physically plausible. No teleportation, floating, penetration, meaningful deformation, cap removal, or dispensing was observed.'
+    },
+    {
+      dimension: 'CAMERA_REALISM', passed: true, critical: false,
+      notes: 'The simple smartphone-style framing remains usable for judging the hold and does not contradict the benchmark physical-action contract.'
+    },
+    {
+      dimension: 'UNEXPECTED_CUTS', passed: true, critical: true,
+      notes: 'No unexpected cut or reset interrupts the stable HOLD action.'
+    },
+    {
+      dimension: 'VISIBLE_ARTIFACTS', passed: true, critical: true,
+      notes: 'No prominent generation artifact materially damages product identity, hand quality, hold readability, or usability.'
+    }
+  ],
+  verdict: 'PASS',
+  reviewerNotes: 'F0 baseline HOLD canary passed. Full-motion review and 16-frame contact-sheet review agreed that the bottle remains stable, upright, and naturally held. This observation is empirical evidence only and must not independently promote HOLD.'
 }];
