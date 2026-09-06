@@ -1,0 +1,13 @@
+{
+  "name": "mochi-v1",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w @mochi/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "benchmark:dry": "npm run benchmark:dry -w @mochi/harness"
+  },
+  "engines": {"node": ">=22"}
+}

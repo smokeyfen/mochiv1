@@ -1,0 +1,12 @@
+{
+  "name": "@mochi/harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "benchmark:dry": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {"@mochi/contracts":"*","@mochi/core":"*"},
+  "devDependencies": {"tsx":"^4.19.3","typescript":"^5.7.3"}
+}
