@@ -1,111 +1,93 @@
 # MochiV1 Agent Instructions
 
-This repository is the source of truth for MochiV1, the repo-first implementation of FEN V1.
+This GitHub repository is the source of truth for MochiV1, the repo-first implementation of FEN V1.
 
-## Product target
+## Current verified state
 
-V1 is **POV Authentic On-Hand Review** for TikTok Affiliate product videos.
+- R1 Application Path: **FINAL LOCKED**
+- R1-LIVE: **PASS**
+- R1 Product Evidence: **RUNTIME VALIDATED / FINAL LOCKED**
+- RUBRIC-0: **PASS / LOCKED**
+- Historical Gemini live calls: 1; Flow calls: 0; video generation: 0; action promotions: 0
+- Every physical `ActionId` remains `UNTESTED`
+- F0 Manual Omni Confirmatory Canary: **NOT STARTED**
+- R2-A Product Truth: **NOT STARTED**
 
-User-facing success means:
-
-Product input -> Blueprint -> 4 scenes -> internal validation/generation/QC/repair -> only APPROVED scenes -> final ready-to-upload MP4.
-
-The system may retry or repair internally. It must never expose a candidate as final merely because generation succeeded.
+`STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.
 
 ## Mandatory reading order
 
 Before changing code, read:
 
-1. `CODEX_START_HERE.md`
+1. `STATUS.md`
 2. `docs/CODEX_HANDOFF.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/M0-ACCEPTANCE.md`
-5. `docs/FEN_V1_PROJECT_HANDOFF.md`
-6. Relevant tests and source files for the current task
+3. `docs/quality/RUBRIC_0.md` when changing benchmark review behavior
+4. Relevant contracts, tests, and source files for the requested task
 
-## Development policy
+Read `docs/M0-ACCEPTANCE.md` and other M0 handoff artifacts only as historical context unless a task explicitly targets a preserved M0 lock.
 
-- Work one milestone and one objective at a time.
-- Do not advance to a later milestone until the current acceptance gate passes.
-- Preserve working modules. Do not refactor unrelated code during a fix or milestone.
-- Prefer deterministic code over additional LLM/model calls.
-- Keep TypeScript strict.
-- Add or update tests for non-trivial domain behavior.
-- Run all relevant typechecks/tests before declaring PASS.
-- Report exact commands run and PASS/FAIL results.
-- If a required external dependency, model credential, or real product reference is unavailable, fail closed and stop at the correct gate. Do not fake empirical evidence.
+## Frozen V1 target pipeline
 
-## Locked V1 domain rules
+`R1 Product Evidence`
+→ `R2-A Product Truth`
+→ `R2-B Reference Assessment`
+→ `R2 Commit Gate`
+→ `R3 Continuity Synthesis`
+→ `R4 Global 4-Scene Planner`
+→ `R5 Deterministic State Engine`
+→ `R6 Scene Risk`
+→ bounded R4 replan when blocked
+→ `R7-A Human Realism`
+→ `T0 Voice Timing Calibration`
+→ `R7-B Dialogue Finalization`
+→ `R8 Deterministic Production Compiler`
+→ `P0 Snapshot Persistence`
+→ `SceneAnchorContract`
+→ `Flow / Omni Flash 1.1`
+→ `Frame QC`
+→ `Temporal QC`
+→ `Pairwise Continuity QC`
+→ `Selective Repair / Approval`
+→ `Global Cumulative QC`
+→ `T1 Local TTS`
+→ one-pass `FFmpeg`
+→ Final MP4
 
-- V1 is On-Hand only. No KOC face.
-- Exactly 4 scenes: HOOK, FEATURE, PROOF, CTA.
-- Scene duration is 8 seconds.
-- Aspect ratio is 9:16.
-- One scene = one primary physical objective.
-- All physical actions start `UNTESTED`.
-- Only real benchmark evidence may promote actions to `SAFE` or `RISKY`.
-- `UNTESTED` and `AVOID` actions fail feasibility preflight.
-- Continuity is state-driven from V1.0.
-- State continuity is more important than pixel continuity.
-- Generation output is a Candidate, not Final.
-- QC is fail-closed.
-- A critical QC failure blocks approval.
-- Voice-over is a separate track from video generation in V1.
-- Product truth and creative direction are separate concerns.
-- Do not invent product claims.
+This is the frozen V1 architecture target. Do not begin a later stage without explicit authorization and its acceptance gate.
 
-## Architecture boundaries
+## Empirical track
 
-Core contracts must remain provider-agnostic.
+After RUBRIC-0, the next empirical work is:
 
-Never leak these into Core contracts:
+`F0-A baseline manual Flow/Omni transfer canary`
+→ later benchmark-mode evidence collection
+→ action promotion only after locked repo-local evidence thresholds.
 
-- Flow `mediaId`
-- Gemini file URI
-- bearer/session token
-- provider operation name
-- provider endpoint
-- Flow project internals
+Do not mark an action `SAFE` or `RISKY` from intuition, a single output, or non-Flow evidence. The locked promotion policy remains 10 reviewed attempts, 0.90 SAFE pass rate, and 0.60 RISKY pass rate.
 
-Provider-specific identifiers belong only in provider/adapter layers.
+## Locked architecture rules
 
-Do not silently fall back to a weaker generation mode. If a contract requires a capability and the provider lacks it, return a capability error.
+- Google Flow is the only video generator. Gemini 3.5 Flash is reasoning and QC only.
+- Core contracts remain provider-neutral. Keep provider identifiers, credentials, endpoints, operation IDs, media IDs, file URIs, and session data outside Core.
+- `apps/web` is the only user-facing surface.
+- Product Truth is separate from `CreativeDirectionInput`; creative controls must not invent product facts.
+- Arbitrary `PRODUCT_REFERENCE` intake is locked. Do not require manual front/side/back classification.
+- V1 is POV Authentic On-Hand only. No KOC face.
+- Exactly four scenes: HOOK, FEATURE, PROOF, CTA. Each scene is 8 seconds, 9:16, and preserves START STATE → ACTION → END STATE.
+- Generated output is always a Candidate until fail-closed QC and approval succeed. Critical QC failure cannot approve.
+- Production remains fail-closed. `UNTESTED` and `AVOID` actions fail feasibility preflight.
+- GitHub remains source of truth. Never commit secrets, tokens, `.env`, private media, generated videos, or `node_modules`.
 
-## Quality priority
+## Development discipline
 
-1. Correctness
-2. Product fidelity
-3. Human realism
-4. Requirement adherence
-5. Continuity
-6. Reliability
-7. Maintainability
-8. Cost
-9. Speed
-
-Do not optimize credits, latency, batch generation, or UI polish before reliability gates pass.
+- Work one authorized milestone and one objective at a time.
+- Make the smallest complete scoped change; do not refactor unrelated working code.
+- Keep TypeScript strict and preserve validation and fail-closed behavior.
+- Add or update meaningful tests for non-trivial contract/domain changes.
+- Run the required verification before declaring PASS and report exact command results.
+- If credentials, real references, or a required external runtime are unavailable, fail closed and stop at that gate. Never fabricate empirical evidence.
+- Do not run Gemini, Flow, F0, or R2 work unless the task explicitly authorizes it.
 
 ## UI policy
 
-UI is deliberately minimal.
-
-- Static, readable, desktop-first.
-- No animation requirement.
-- No canvas, node graph, fancy timeline, or decorative system unless explicitly requested later.
-- UI is not a milestone by itself. Video correctness is.
-
-## Current milestone discipline
-
-Current exported baseline is M0: Contracts + feasibility harness skeleton.
-
-The next domain gate is **FEN V1 FEASIBILITY LOCK**.
-
-Do NOT implement Product Evidence, Planner, Flow runtime, full QC/repair, or production assembly before the feasibility benchmark foundation is ready and real action evidence exists.
-
-## Git / change hygiene
-
-- Keep commits small and milestone-scoped.
-- Do not rewrite unrelated history.
-- Update docs when a contract or locked decision changes.
-- Never commit secrets, generated bearer tokens, `.env`, raw credentials, or private user data.
-- Keep model/provider artifacts outside tracked source unless they are sanitized deterministic fixtures.
+Keep the UI minimal, static, readable, and focused on the current product workflow. Do not add animation, canvas, node graphs, fancy timelines, or a UI redesign unless expressly authorized.
