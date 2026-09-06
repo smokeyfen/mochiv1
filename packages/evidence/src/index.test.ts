@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ProductEvidence, ProductInput } from '@mochi/contracts';
 import { SCHEMA_VERSION } from '@mochi/contracts';
-import type { IntelligenceMediaInput, IntelligenceProvider, StructuredIntelligenceRequest } from '@mochi/providers';
+import {
+  IntelligenceProviderError,
+  type IntelligenceMediaInput,
+  type IntelligenceProvider,
+  type StructuredIntelligenceRequest
+} from '@mochi/providers';
 import {
   analyzeProductEvidence,
   buildProductEvidenceSchema,
@@ -288,6 +293,26 @@ test('provider failures normalize without leaking raw details', async () => {
   const input = product();
   const { provider } = stubProvider(evidenceFor(input), true);
   await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'PROVIDER_FAILURE');
+});
+
+test('normalized intelligence errors survive the evidence boundary unchanged', async () => {
+  const input = product();
+  for (const code of ['AUTHENTICATION', 'RATE_LIMIT', 'UNAVAILABLE', 'INVALID_RESPONSE'] as const) {
+    const providerError = new IntelligenceProviderError(code, code === 'RATE_LIMIT' || code === 'UNAVAILABLE');
+    const provider: IntelligenceProvider = {
+      id: 'stub-intelligence',
+      async analyzeStructured() {
+        throw providerError;
+      }
+    };
+    await assert.rejects(
+      analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }),
+      (error: unknown) => error === providerError
+        && error instanceof IntelligenceProviderError
+        && error.code === code
+        && !error.message.includes('raw provider detail')
+    );
+  }
 });
 
 test('evidence contains no runtime media bytes or provider details', async () => {

@@ -5,10 +5,11 @@ import {
   type ProductEvidence,
   type ProductInput
 } from '@mochi/contracts';
-import type {
-  IntelligenceMediaInput,
-  IntelligenceProvider,
-  StructuredIntelligenceRequest
+import {
+  IntelligenceProviderError,
+  type IntelligenceMediaInput,
+  type IntelligenceProvider,
+  type StructuredIntelligenceRequest
 } from '@mochi/providers';
 
 export type ProductEvidenceErrorCode =
@@ -181,7 +182,8 @@ export async function analyzeProductEvidence(
       outputSchema: buildProductEvidenceSchema(request.product),
       parse: value => value
     });
-  } catch {
+  } catch (error: unknown) {
+    if (error instanceof IntelligenceProviderError) throw error;
     throw new ProductEvidenceError('PROVIDER_FAILURE');
   }
 

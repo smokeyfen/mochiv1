@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { SCHEMA_VERSION, type ProductEvidence, type ProductInput } from '@mochi/contracts';
+import { ProductEvidenceError } from '@mochi/evidence';
 import { IntelligenceProviderError, type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import {
   createProductEvidenceService,
@@ -13,6 +14,7 @@ import {
   loadSmokeManifest,
   runSmokeEvidence
 } from './smoke.ts';
+import { formatSanitizedEvidenceInspection, safeCategory } from './smoke-diagnostics.ts';
 
 const product = (): ProductInput => ({
   schemaVersion: SCHEMA_VERSION,
@@ -138,6 +140,33 @@ test('missing smoke manifest stops before provider composition', async () => {
     loadSmokeManifest(undefined),
     (error: unknown) => error instanceof R1B2SmokeError && error.code === 'MISSING_MANIFEST'
   );
+});
+
+test('smoke diagnostics retain normalized categories without raw detail', () => {
+  for (const code of ['AUTHENTICATION', 'RATE_LIMIT', 'UNAVAILABLE', 'INVALID_RESPONSE'] as const) {
+    const error = new IntelligenceProviderError(code, false);
+    assert.equal(safeCategory(error), `INTELLIGENCE_${code}`);
+    assert.doesNotMatch(safeCategory(error), /raw|secret|request/i);
+  }
+  assert.equal(safeCategory(new ProductEvidenceError('INVALID_MODEL_OUTPUT')), 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT');
+  assert.equal(safeCategory(new R1B2SmokeError('MISSING_MANIFEST')), 'SMOKE_MISSING_MANIFEST');
+});
+
+test('sanitized evidence inspection emits only declared evidence fields', () => {
+  const input = product();
+  const unsafeEvidence = {
+    ...evidenceFor(input),
+    dataBase64: 'runtime-image-bytes',
+    localPath: 'C:\\runtime\\product.jpg',
+    apiKey: 'not-for-output',
+    transport: { requestId: 'not-for-output' }
+  } as unknown as ProductEvidence;
+  const output = formatSanitizedEvidenceInspection(unsafeEvidence);
+
+  assert.match(output, /^R1_B2_PRODUCT_EVIDENCE_JSON=/);
+  assert.match(output, /"productId":"server-product"/);
+  assert.match(output, /"canonicalAssetIds"/);
+  assert.doesNotMatch(output, /dataBase64|runtime-image-bytes|localPath|apiKey|not-for-output|transport|requestId/i);
 });
 
 test('server package has no web, Flow, or video runtime dependency', async () => {
