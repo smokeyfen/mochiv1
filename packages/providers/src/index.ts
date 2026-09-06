@@ -49,3 +49,6 @@ export class CapabilityUnavailableError extends Error {
     this.name = 'CapabilityUnavailableError';
   }
 }
+
+export { VoiceProviderError, validateVoiceSynthesisRequest, type VoiceProvider, type VoiceSynthesisRequest, type VoiceSynthesisResult, type VoiceProviderErrorCode } from './voice.ts';
+export { SaydiBrowserVoiceProvider, createSaydiVoiceBindingRegistry, type SaydiBrowserDriver, type SaydiBrowserDriverResult, type SaydiVoiceBinding } from './saydi-browser-voice.ts';
