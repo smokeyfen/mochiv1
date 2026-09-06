@@ -1,5 +1,11 @@
 import type { ScenePlan } from '@mochi/contracts';
-import { createUntestedActionCapabilityMap, evaluateSceneFeasibility } from '@mochi/core';
+import {
+  classifyCapabilityEvidence,
+  createUntestedActionCapabilityMap,
+  evaluateFixtureReadiness,
+  evaluateSceneFeasibility
+} from '@mochi/core';
+import { pendingGoldenFixtures } from './golden-fixtures';
 
 const fixture: ScenePlan = {
   schemaVersion: '1.0.0',
@@ -14,5 +20,19 @@ const fixture: ScenePlan = {
 
 const map = createUntestedActionCapabilityMap();
 const result = evaluateSceneFeasibility(fixture, map);
-console.log(JSON.stringify({fixture: fixture.sceneId, capability: map.PICK_UP, result}, null, 2));
+const bottleFixture = pendingGoldenFixtures.find(candidate => candidate.archetype === 'BOTTLE');
+if (!bottleFixture) throw new Error('MISSING_BOTTLE_FIXTURE');
+
+console.log(JSON.stringify({
+  schemaVersion: '1.0.0',
+  mode: 'DRY',
+  fixture: fixture.sceneId,
+  goldenFixture: {
+    fixtureId: bottleFixture.fixtureId,
+    readiness: evaluateFixtureReadiness(bottleFixture)
+  },
+  capability: map.PICK_UP,
+  evidence: classifyCapabilityEvidence('PICK_UP', 'BOTTLE', []),
+  result
+}, null, 2));
 // Expected at M0: passed=false until empirical benchmark updates the capability map.

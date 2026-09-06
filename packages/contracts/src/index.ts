@@ -84,6 +84,68 @@ export type ActionId =
   | 'REACH' | 'PICK_UP' | 'HOLD' | 'MOVE_CLOSER' | 'ROTATE_SLOW' | 'PLACE_DOWN'
   | 'OPEN_SIMPLE' | 'PRESS_BUTTON' | 'POUR_SIMPLE' | 'APPLY_SIMPLE' | 'POINT';
 
+export type ProductArchetype = 'BOTTLE' | 'TUBE' | 'BOX' | 'DEVICE' | 'SOFT_PACKAGE';
+
+export interface FixtureProductTruth {
+  verificationStatus: 'PENDING_REAL_REFERENCES' | 'VERIFIED';
+  productId?: string;
+  name?: string;
+  identityDescription?: string;
+  allowedClaims: readonly string[];
+  prohibitedInferences: readonly string[];
+}
+
+export interface GoldenProductFixture {
+  schemaVersion: SchemaVersion;
+  fixtureId: string;
+  archetype: ProductArchetype;
+  productTruth: FixtureProductTruth;
+  expectedReferenceRoles: readonly AssetRole[];
+  referenceAssets: readonly AssetRef[];
+  physicalRiskNotes: readonly string[];
+}
+
+export interface BenchmarkCase {
+  schemaVersion: SchemaVersion;
+  benchmarkCaseId: string;
+  fixtureId: string;
+  actionId: ActionId;
+  sceneContractId: string;
+  providerTarget: string;
+  modelTarget: string;
+  expectedInvariants: readonly string[];
+  attemptNumber: number;
+}
+
+export const BENCHMARK_DIMENSIONS = [
+  'PRODUCT_FIDELITY', 'HAND_ANATOMY', 'ACTION_COMPLETION', 'PHYSICS',
+  'CAMERA_REALISM', 'UNEXPECTED_CUTS', 'VISIBLE_ARTIFACTS'
+] as const;
+export type BenchmarkDimension = typeof BENCHMARK_DIMENSIONS[number];
+
+export interface BenchmarkDimensionResult {
+  dimension: BenchmarkDimension;
+  passed: boolean;
+  critical: boolean;
+  notes: string;
+}
+
+export interface BenchmarkObservation {
+  schemaVersion: SchemaVersion;
+  observationId: string;
+  benchmarkCaseId: string;
+  fixtureId: string;
+  archetype: ProductArchetype;
+  actionId: ActionId;
+  evidenceOrigin: 'REAL_MODEL_VIDEO';
+  candidateAssetId: string;
+  reviewerId: string;
+  reviewedAt: string;
+  dimensions: readonly BenchmarkDimensionResult[];
+  verdict: 'PASS' | 'FAIL';
+  reviewerNotes: string;
+}
+
 export interface ActionStep {
   action: ActionId;
   objective: string;
@@ -191,6 +253,67 @@ export function validateScenePlan(scene: ScenePlan): readonly string[] {
   if (scene.requiredAssetIds.length === 0) issues.push('reference_required');
   if (!nonBlank(scene.primaryObjective)) issues.push('primary_objective');
   if (!nonBlank(scene.dialogue)) issues.push('dialogue');
+  return issues;
+}
+
+export function validateGoldenProductFixture(fixture: GoldenProductFixture): readonly string[] {
+  const issues: string[] = [];
+  if (fixture.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(fixture.fixtureId)) issues.push('fixture_id');
+  if (fixture.expectedReferenceRoles.length === 0) issues.push('expected_reference_roles_required');
+  if (fixture.productTruth.verificationStatus !== 'VERIFIED') issues.push('product_truth_unverified');
+  if (!fixture.productTruth.productId || !nonBlank(fixture.productTruth.productId)) issues.push('product_id_unverified');
+  if (!fixture.productTruth.name || !nonBlank(fixture.productTruth.name)) issues.push('product_name_unverified');
+  if (!fixture.productTruth.identityDescription || !nonBlank(fixture.productTruth.identityDescription)) issues.push('product_identity_unverified');
+  if (fixture.referenceAssets.length === 0) issues.push('real_reference_assets_required');
+
+  const availableRoles = new Set(fixture.referenceAssets.map(asset => asset.role));
+  for (const asset of fixture.referenceAssets) {
+    if (asset.schemaVersion !== SCHEMA_VERSION) issues.push(`reference_schema_version:${asset.assetId}`);
+    if (asset.source !== 'UPLOAD') issues.push(`reference_must_be_real_upload:${asset.assetId}`);
+    if (!asset.sha256 || !nonBlank(asset.sha256)) issues.push(`reference_hash_required:${asset.assetId}`);
+    if (!asset.mimeType.startsWith('image/')) issues.push(`reference_must_be_image:${asset.assetId}`);
+  }
+  for (const role of fixture.expectedReferenceRoles) {
+    if (!availableRoles.has(role)) issues.push(`missing_reference_role:${role}`);
+  }
+  return issues;
+}
+
+export function validateBenchmarkCase(benchmarkCase: BenchmarkCase): readonly string[] {
+  const issues: string[] = [];
+  if (benchmarkCase.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(benchmarkCase.benchmarkCaseId)) issues.push('benchmark_case_id');
+  if (!nonBlank(benchmarkCase.fixtureId)) issues.push('fixture_id');
+  if (!nonBlank(benchmarkCase.sceneContractId)) issues.push('scene_contract_id');
+  if (!nonBlank(benchmarkCase.providerTarget)) issues.push('provider_target');
+  if (!nonBlank(benchmarkCase.modelTarget)) issues.push('model_target');
+  if (benchmarkCase.expectedInvariants.length === 0) issues.push('expected_invariants_required');
+  if (!Number.isInteger(benchmarkCase.attemptNumber) || benchmarkCase.attemptNumber < 1) issues.push('attempt_number');
+  return issues;
+}
+
+export function validateBenchmarkObservation(observation: BenchmarkObservation): readonly string[] {
+  const issues: string[] = [];
+  if (observation.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(observation.observationId)) issues.push('observation_id');
+  if (!nonBlank(observation.benchmarkCaseId)) issues.push('benchmark_case_id');
+  if (!nonBlank(observation.fixtureId)) issues.push('fixture_id');
+  if (observation.evidenceOrigin !== 'REAL_MODEL_VIDEO') issues.push('evidence_origin');
+  if (!nonBlank(observation.candidateAssetId)) issues.push('candidate_asset_id');
+  if (!nonBlank(observation.reviewerId)) issues.push('reviewer_id');
+  if (!nonBlank(observation.reviewedAt) || Number.isNaN(Date.parse(observation.reviewedAt))) issues.push('reviewed_at');
+  if (observation.dimensions.length === 0) issues.push('dimensions_required');
+  const dimensions = new Set<BenchmarkDimension>();
+  for (const result of observation.dimensions) {
+    if (dimensions.has(result.dimension)) issues.push(`duplicate_dimension:${result.dimension}`);
+    dimensions.add(result.dimension);
+  }
+  for (const dimension of BENCHMARK_DIMENSIONS) {
+    if (!dimensions.has(dimension)) issues.push(`missing_dimension:${dimension}`);
+  }
+  const criticalFailure = observation.dimensions.some(result => result.critical && !result.passed);
+  if (observation.verdict === 'PASS' && criticalFailure) issues.push('critical_failure_cannot_pass');
   return issues;
 }
 
