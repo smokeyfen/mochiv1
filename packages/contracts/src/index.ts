@@ -89,6 +89,50 @@ export interface ProductEvidence {
   contradictions: readonly ProductEvidenceContradiction[];
 }
 
+/** A factual, provider-neutral truth record compiled only from ProductEvidence. */
+export type ProductTruthFactKind = 'IDENTITY' | 'GEOMETRY' | 'COLOR' | 'PACKAGING' | 'LABEL';
+
+export interface ProductTruthFact {
+  factId: string;
+  kind: ProductTruthFactKind;
+  text: string;
+  evidenceAssetIds: readonly string[];
+}
+
+export interface ProductTruthClaim {
+  claimId: string;
+  text: string;
+  source: ProductClaim['source'];
+  evidenceAssetIds: readonly string[];
+}
+
+export type ProductTruthExclusionReason = 'UNCERTAIN' | 'CONTRADICTED' | 'INSUFFICIENT_SUPPORT';
+
+export interface ProductTruthExclusion {
+  factId: string;
+  reason: ProductTruthExclusionReason;
+}
+
+/**
+ * The immutable factual input for later production reasoning. Creative
+ * controls, media bytes, and provider state deliberately do not belong here.
+ */
+export interface ProductTruth {
+  schemaVersion: SchemaVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  name: string;
+  category: string;
+  identityDescription: string;
+  facts: readonly ProductTruthFact[];
+  allowedClaims: readonly ProductTruthClaim[];
+  prohibitedInferences: readonly string[];
+  unresolvedUncertainties: readonly ProductEvidenceUncertainty[];
+  unresolvedContradictions: readonly ProductEvidenceContradiction[];
+  exclusions: readonly ProductTruthExclusion[];
+}
+
 export type TransitionType = 'CONTINUOUS' | 'MATCH_CUT' | 'JUMP_CUT';
 export type HeldBy = 'NONE' | 'LEFT_HAND' | 'RIGHT_HAND' | 'BOTH_HANDS';
 
@@ -423,6 +467,161 @@ export function validateProductEvidence(
     }
   }
   return issues;
+}
+
+/**
+ * Creates the complete, stable source fact catalog used by Product Truth.
+ * Note text and provenance are copied from validated evidence; no intelligence
+ * provider participates in this derivation.
+ */
+export function buildProductTruthCandidateFacts(evidence: ProductEvidence): readonly ProductTruthFact[] {
+  const provenance = evidence.canonicalAssetIds;
+  const facts: ProductTruthFact[] = [{
+    factId: 'identity', kind: 'IDENTITY', text: evidence.identityDescription, evidenceAssetIds: provenance
+  }];
+  for (const [kind, prefix, notes] of [
+    ['GEOMETRY', 'geometry', evidence.geometryNotes],
+    ['COLOR', 'color', evidence.colorNotes],
+    ['PACKAGING', 'packaging', evidence.packagingNotes],
+    ['LABEL', 'label', evidence.labelNotes]
+  ] as const) {
+    notes.forEach((text, index) => facts.push({
+      factId: `${prefix}:${index}`, kind, text, evidenceAssetIds: provenance
+    }));
+  }
+  return facts;
+}
+
+/**
+ * Validates that ProductTruth is an exact deterministic projection of one
+ * factual ProductInput and ProductEvidence version. It never trusts model text.
+ */
+export function validateProductTruth(
+  truth: ProductTruth,
+  product: ProductInput,
+  evidence: ProductEvidence,
+  sourceEvidenceVersion: string
+): readonly string[] {
+  const issues: string[] = [];
+  if (truth.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(truth.productId)) issues.push('product_id');
+  if (truth.productId !== product.productId) issues.push('product_id_mismatch');
+  if (!nonBlank(truth.sourceEvidenceVersion)) issues.push('source_evidence_version');
+  if (truth.sourceEvidenceVersion !== sourceEvidenceVersion) issues.push('source_evidence_version_mismatch');
+
+  const productAssetIds = new Set(product.assets.map(asset => asset.assetId));
+  const canonicalIds = new Set<string>();
+  for (const assetId of truth.canonicalAssetIds) {
+    if (canonicalIds.has(assetId)) issues.push(`duplicate_canonical_asset:${assetId}`);
+    canonicalIds.add(assetId);
+    if (!productAssetIds.has(assetId)) issues.push(`unknown_canonical_asset:${assetId}`);
+  }
+  if (!sameStringArray(truth.canonicalAssetIds, evidence.canonicalAssetIds)) {
+    issues.push('canonical_asset_ids_mismatch');
+  }
+  if (truth.name !== product.name) issues.push('name_mismatch');
+  if (truth.category !== product.category) issues.push('category_mismatch');
+
+  const candidates = buildProductTruthCandidateFacts(evidence);
+  const candidateById = new Map(candidates.map(fact => [fact.factId, fact]));
+  const identity = candidateById.get('identity')!;
+  if (!nonBlank(truth.identityDescription)) issues.push('identity_description');
+  if (truth.identityDescription !== identity.text) issues.push('identity_description_mismatch');
+
+  const retainedIds = new Set<string>(['identity']);
+  const factIds = new Set<string>();
+  for (const fact of truth.facts) {
+    if (!nonBlank(fact.factId)) issues.push('fact_id');
+    if (factIds.has(fact.factId)) issues.push(`duplicate_fact:${fact.factId}`);
+    factIds.add(fact.factId);
+    const candidate = candidateById.get(fact.factId);
+    if (!candidate || fact.factId === 'identity') {
+      issues.push(`unknown_fact:${fact.factId}`);
+      continue;
+    }
+    retainedIds.add(fact.factId);
+    if (fact.kind !== candidate.kind) issues.push(`fact_kind_mismatch:${fact.factId}`);
+    if (fact.text !== candidate.text) issues.push(`fact_text_mismatch:${fact.factId}`);
+    if (!sameStringArray(fact.evidenceAssetIds, candidate.evidenceAssetIds)) {
+      issues.push(`fact_provenance_mismatch:${fact.factId}`);
+    }
+    for (const assetId of fact.evidenceAssetIds) {
+      if (!productAssetIds.has(assetId)) issues.push(`unknown_fact_asset:${fact.factId}:${assetId}`);
+    }
+  }
+
+  const evidenceClaims = evidence.claims.filter(claim => claim.allowed);
+  const evidenceClaimById = new Map(evidenceClaims.map(claim => [claim.claimId, claim]));
+  const truthClaimIds = new Set<string>();
+  for (const claim of truth.allowedClaims) {
+    if (!nonBlank(claim.claimId)) issues.push('claim_id');
+    if (truthClaimIds.has(claim.claimId)) issues.push(`duplicate_claim:${claim.claimId}`);
+    truthClaimIds.add(claim.claimId);
+    const source = evidenceClaimById.get(claim.claimId);
+    if (!source) {
+      issues.push(`claim_not_allowed_or_unknown:${claim.claimId}`);
+      continue;
+    }
+    if (claim.text !== source.text || claim.source !== source.source || !sameStringArray(claim.evidenceAssetIds, source.evidenceAssetIds)) {
+      issues.push(`claim_mismatch:${claim.claimId}`);
+    }
+  }
+  for (const claim of evidenceClaims) {
+    if (!truthClaimIds.has(claim.claimId)) issues.push(`missing_allowed_claim:${claim.claimId}`);
+  }
+
+  if (!sameStringArray(truth.prohibitedInferences, evidence.prohibitedInferences)) {
+    issues.push('prohibited_inferences_mismatch');
+  }
+  if (!sameUncertainties(truth.unresolvedUncertainties, evidence.uncertainties)) {
+    issues.push('uncertainties_mismatch');
+  }
+  if (!sameContradictions(truth.unresolvedContradictions, evidence.contradictions)) {
+    issues.push('contradictions_mismatch');
+  }
+
+  const excludedIds = new Set<string>();
+  for (const exclusion of truth.exclusions) {
+    if (excludedIds.has(exclusion.factId)) issues.push(`duplicate_exclusion:${exclusion.factId}`);
+    excludedIds.add(exclusion.factId);
+    if (!candidateById.has(exclusion.factId)) issues.push(`unknown_exclusion:${exclusion.factId}`);
+    if (exclusion.reason !== 'UNCERTAIN' && exclusion.reason !== 'CONTRADICTED' && exclusion.reason !== 'INSUFFICIENT_SUPPORT') {
+      issues.push(`invalid_exclusion_reason:${exclusion.factId}`);
+    }
+    if (retainedIds.has(exclusion.factId)) issues.push(`retained_exclusion_overlap:${exclusion.factId}`);
+  }
+  if (excludedIds.has('identity')) issues.push('identity_excluded');
+  for (const candidate of candidates) {
+    if (!retainedIds.has(candidate.factId) && !excludedIds.has(candidate.factId)) {
+      issues.push(`candidate_partition_incomplete:${candidate.factId}`);
+    }
+  }
+  return issues;
+}
+
+function sameStringArray(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameUncertainties(
+  left: readonly ProductEvidenceUncertainty[], right: readonly ProductEvidenceUncertainty[]
+): boolean {
+  return left.length === right.length && left.every((value, index) => {
+    const source = right[index];
+    return source !== undefined && value.subject === source.subject && value.reason === source.reason
+      && sameStringArray(value.assetIds, source.assetIds);
+  });
+}
+
+function sameContradictions(
+  left: readonly ProductEvidenceContradiction[], right: readonly ProductEvidenceContradiction[]
+): boolean {
+  return left.length === right.length && left.every((value, index) => {
+    const source = right[index];
+    return source !== undefined && value.reason === source.reason
+      && sameStringArray(value.statements, source.statements)
+      && sameStringArray(value.assetIds, source.assetIds);
+  });
 }
 
 export function validateCreativeDirectionInput(input: CreativeDirectionInput): readonly string[] {

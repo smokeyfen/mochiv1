@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetRef, AssetRole, BenchmarkObservation, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
+import type { AssetRef, AssetRole, BenchmarkObservation, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ProductTruth, ScenePlan } from './index.ts';
 import {
   BENCHMARK_DIMENSIONS,
   RUBRIC_0,
@@ -12,6 +12,7 @@ import {
   validateMochiProjectInput,
   validateProductEvidence,
   validateProductInput,
+  validateProductTruth,
   validateScenePlan
 } from './index.ts';
 
@@ -93,6 +94,35 @@ const validProductEvidence = (product: ProductInput): ProductEvidence => ({
   prohibitedInferences: ['No efficacy inference.'],
   uncertainties: [],
   contradictions: []
+});
+
+test('ProductTruth validation requires an exact deterministic projection of ProductEvidence', () => {
+  const product = validProjectInput().product;
+  const evidence = validProductEvidence(product);
+  const truth: ProductTruth = {
+    schemaVersion: SCHEMA_VERSION,
+    productId: product.productId,
+    sourceEvidenceVersion: 'evidence-v1',
+    canonicalAssetIds: evidence.canonicalAssetIds,
+    name: product.name,
+    category: product.category,
+    identityDescription: evidence.identityDescription,
+    facts: [
+      { factId: 'geometry:0', kind: 'GEOMETRY', text: evidence.geometryNotes[0]!, evidenceAssetIds: evidence.canonicalAssetIds },
+      { factId: 'color:0', kind: 'COLOR', text: evidence.colorNotes[0]!, evidenceAssetIds: evidence.canonicalAssetIds },
+      { factId: 'packaging:0', kind: 'PACKAGING', text: evidence.packagingNotes[0]!, evidenceAssetIds: evidence.canonicalAssetIds },
+      { factId: 'label:0', kind: 'LABEL', text: evidence.labelNotes[0]!, evidenceAssetIds: evidence.canonicalAssetIds }
+    ],
+    allowedClaims: [{ claimId: 'claim-1', text: 'User supplied product name.', source: 'USER_INPUT', evidenceAssetIds: [] }],
+    prohibitedInferences: evidence.prohibitedInferences,
+    unresolvedUncertainties: evidence.uncertainties,
+    unresolvedContradictions: evidence.contradictions,
+    exclusions: []
+  };
+  assert.deepEqual(validateProductTruth(truth, product, evidence, 'evidence-v1'), []);
+  assert.ok(validateProductTruth({ ...truth, name: 'Model-authored name' }, product, evidence, 'evidence-v1').includes('name_mismatch'));
+  assert.ok(validateProductTruth({ ...truth, facts: [{ ...truth.facts[0]!, text: 'Model-authored fact' }, ...truth.facts.slice(1)] }, product, evidence, 'evidence-v1').includes('fact_text_mismatch:geometry:0'));
+  assert.ok(validateProductTruth({ ...truth, canonicalAssetIds: ['unknown'] }, product, evidence, 'evidence-v1').includes('canonical_asset_ids_mismatch'));
 });
 
 const validBenchmarkObservation = (): BenchmarkObservation => ({
