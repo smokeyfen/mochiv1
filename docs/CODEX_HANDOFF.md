@@ -20,7 +20,8 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - All physical `ActionId` values: `UNTESTED`
 - F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**
 - F0-A.4 ROTATE_SLOW: **DEFERRED**
-- R2-A Product Truth: **NEXT / NOT STARTED**
+- R2-A Product Truth: **PASS / LOCKED**
+- R2-B Reference Assessment: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -29,6 +30,8 @@ The completed live path is:
 
 This path is locked. It keeps browser runtime files separate from logical AssetRefs, sends only factual ProductInput to Product Evidence, validates output deterministically, and keeps credentials server-side.
 
+R2-A Product Truth is also locked. It receives only ProductInput, validated ProductEvidence, a nonblank caller-supplied sourceEvidenceVersion, and a provider-neutral intelligence boundary. The provider can select only stable catalog fact IDs through a complete retain/exclude partition; the deterministic compiler copies source text and provenance, preserves unresolved evidence risk, and never accepts creative direction, media bytes, provider metadata, or model-authored facts.
+
 ## Current repository responsibilities
 
 - `apps/web`: the only user-facing surface; Product Input and locked Product Evidence experience.
@@ -36,6 +39,7 @@ This path is locked. It keeps browser runtime files separate from logical AssetR
 - `packages/contracts`: provider-neutral contracts, validation, benchmark observations, and Rubric-0 scoring contract.
 - `packages/core`: feasibility, continuity carryover, lifecycle, and ActionCapability policy.
 - `packages/evidence`: provider-neutral factual product evidence boundary.
+- `packages/reasoning`: provider-neutral reasoning modules; R2-A deterministically compiles ProductTruth from ProductEvidence.
 - `packages/providers`: Gemini 3.5 Flash intelligence adapter only. It is not a video provider.
 - `apps/harness`: dry feasibility runner; its expected output remains fail-closed `action_untested:PICK_UP`.
 - `docs/quality/RUBRIC_0.md`: human-review instructions for one real generated benchmark scene.

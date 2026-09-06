@@ -11,7 +11,8 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - Historical Gemini live calls: 1; Flow generations: 2 (24 credits); action promotions: 0
 - Every physical `ActionId` remains `UNTESTED`
 - F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**; F0-A.4 ROTATE_SLOW is **DEFERRED**
-- R2-A Product Truth: **NEXT / NOT STARTED**
+- R2-A Product Truth: **PASS / LOCKED**
+- R2-B Reference Assessment: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
 `STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.
@@ -55,6 +56,8 @@ Read `docs/M0-ACCEPTANCE.md` and other M0 handoff artifacts only as historical c
 → Final MP4
 
 This is the frozen V1 architecture target. Do not begin a later stage without explicit authorization and its acceptance gate.
+
+R2-A is a provider-neutral deterministic compiler. It may use a mocked intelligence decision to retain or exclude stable ProductEvidence fact IDs, but the model may never author ProductTruth facts. ProductTruth copies product name/category from ProductInput, preserves evidence risk, accepts no creative controls or media bytes, and remains validated fail-closed.
 
 ## Empirical track
 

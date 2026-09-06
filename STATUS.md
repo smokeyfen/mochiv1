@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `ef6e3dd02c3eb3800df508b98f97ff755b326cec`
+- Current verified implementation commit: `332cbe25eba6373d840fef76a856e6645dad105b`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: F0 BASELINE TRANSFER
-- Milestone status: ACCEPTED / FAST-TRACK — reviewed PICK_UP and HOLD baseline canaries recorded
+- Current milestone: R2-A Product Truth
+- Milestone status: PASS / LOCKED — deterministic ProductEvidence-to-ProductTruth compiler with mocked intelligence decision
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. F0-A.4 ROTATE_SLOW is DEFERRED. R2-A Product Truth is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE is the future consolidated runtime check after R8 and P0.
+- Next action: STOP. R2-B Reference Assessment is NEXT / NOT STARTED. R2 Commit Gate and R3 are NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
@@ -22,7 +22,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 PASS / LOCKED → F0 BASELINE TRANSFER ACCEPTED / FAST-TRACK → R2-A → R2-B → R2 Commit Gate → R3 → R4 → R5 → R6 → R7-A → T0 → R7-B → R8 → P0 → PRE-F1 INTEGRATION GATE → final Flow runtime path. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 PASS / LOCKED → F0 BASELINE TRANSFER ACCEPTED / FAST-TRACK → R2-A Product Truth PASS / LOCKED → R2-B → R2 Commit Gate → R3 → R4 → R5 → R6 → R7-A → T0 → R7-B → R8 → P0 → PRE-F1 INTEGRATION GATE → final Flow runtime path. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 
@@ -64,3 +64,5 @@ F0-A.1 Real Bottle Canary Fixture at `f138448c5ccf8c080400e04354fac6a9760d1f33`:
 F0-A.2 PICK_UP Manual Flow Canary at `58b87a2c741bc6d44a384405f742ebd038dc0bbb`: one completed real Flow benchmark attempt is recorded as the sole provider-neutral `BenchmarkObservation` for the READY Cocoon fixture. The observation uses `RUBRIC_0`, seven passing reviewed dimensions, deterministic PASS, and candidate logical asset `f0-cocoon-pick-up-v1-attempt-01-video`; it contains no MP4, contact-sheet bytes, local path, Flow media ID, or provider session data. `classifyCapabilityEvidence` reports one valid PICK_UP observation but preserves `UNTESTED` with `insufficient_real_observations:1<10`; HOLD and ROTATE_SLOW have zero observations and remain UNTESTED. Historical Flow generation count is 1, credit spend 12, and action promotions remain 0. Verification: `npm run typecheck` PASS; `npm test` PASS (103 tests); `npm run benchmark:dry` PASS with the three expected fail-closed actions; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. F0-A.2 is PASS / LOCKED. F0-A.3 HOLD Manual Flow Canary is NEXT / NOT STARTED. R2-A Product Truth is NOT STARTED.
 
 F0 BASELINE TRANSFER at `ef6e3dd02c3eb3800df508b98f97ff755b326cec`: the reviewed HOLD observation is recorded beside PICK_UP, both valid under RUBRIC-0 with deterministic PASS and one reviewed attempt each. PICK_UP and HOLD remain UNTESTED with `insufficient_real_observations:1<10`; ROTATE_SLOW has zero observations and remains UNTESTED. Baseline transfer confidence is accepted for roadmap continuation without weakening benchmark or production capability semantics. F0-A.4 ROTATE_SLOW runtime canary is DEFERRED. R2-A through P0 may proceed only through strict provider-neutral contracts, deterministic validation, unit/integration tests, and fail-closed behavior. PRE-F1 INTEGRATION GATE is the one consolidated real-runtime validation after R8 and P0, before final Flow runtime path work. Historical Flow generations are 2, credits 24, and action promotions 0. Verification: `npm run typecheck` PASS; `npm test` PASS (103 tests); `npm run benchmark:dry` PASS with all three actions fail-closed; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. R2-A Product Truth is NEXT / NOT STARTED.
+
+R2-A Product Truth at `332cbe25eba6373d840fef76a856e6645dad105b`: `packages/reasoning` now compiles a provider-neutral ProductTruth only from validated ProductInput, ProductEvidence, and a caller-supplied nonblank sourceEvidenceVersion. A deterministic catalog gives each source fact a stable ID; mocked intelligence can only retain or exclude those IDs through a complete, validated partition. The compiler copies exact catalog text and provenance, copies name/category only from ProductInput, carries only ProductEvidence allowed claims, and preserves prohibited inferences, uncertainties, and contradictions. CreativeDirectionInput, media bytes, provider identifiers, and provider-authored fact prose are absent. Identity exclusion, malformed output, invalid evidence, and partition failures fail closed; normalized IntelligenceProviderError values remain preserved. Verification: `npm run typecheck` PASS; `npm test` PASS (114 tests); `npm run benchmark:dry` PASS with all three actions fail-closed; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No new Gemini or Flow calls occurred; Flow historical accounting remains 2 generations / 24 credits and action promotions remain 0. R2-A Product Truth is PASS / LOCKED. R2-B Reference Assessment is NEXT / NOT STARTED; R2 Commit Gate and R3 are NOT STARTED.
