@@ -213,9 +213,8 @@ Logical asset identity. Current fields include:
 - source
 - mimeType
 - optional hash/view angle/quality
-- provider bindings map
 
-Long-term intent: Core sees logical assets; providers resolve logical IDs to provider-specific URIs/media IDs.
+Core sees only logical assets and provider-agnostic metadata. Provider and infrastructure layers resolve logical IDs to provider-specific URIs or media IDs; those bindings must never be stored on `AssetRef`.
 
 ### ProductInput
 

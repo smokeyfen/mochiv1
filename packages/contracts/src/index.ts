@@ -14,7 +14,6 @@ export interface AssetRef {
   sha256?: string;
   viewAngle?: string;
   qualityScore?: number;
-  providerBindings: Readonly<Record<string, string>>;
 }
 
 export interface ProductInput {

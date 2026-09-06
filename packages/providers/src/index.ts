@@ -9,9 +9,13 @@ export interface VideoProviderCapabilities {
   supportedDurationsSeconds: readonly number[];
 }
 
+// Provider implementations own these resolved references. Their values may be
+// provider URIs or IDs and must never be copied into Core AssetRef contracts.
+export type ProviderAssetBindings = Readonly<Record<string, string>>;
+
 export interface GenerateVideoRequest {
   contract: SceneProductionContract;
-  resolvedAssets: Readonly<Record<string, string>>;
+  resolvedAssets: ProviderAssetBindings;
 }
 
 export interface VideoProvider {

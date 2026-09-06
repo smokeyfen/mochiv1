@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { GoldenProductFixture, ProductInput, ScenePlan } from './index.ts';
+import type { AssetRef, GoldenProductFixture, ProductInput, ScenePlan } from './index.ts';
 import { SCHEMA_VERSION, validateGoldenProductFixture, validateProductInput, validateScenePlan } from './index.ts';
 
 test('product input rejects missing assets', () => {
@@ -8,6 +8,23 @@ test('product input rejects missing assets', () => {
     schemaVersion: SCHEMA_VERSION, productId:'p1', name:'Bottle', details:'Test', category:'Beauty', audience:'Adults', assets:[]
   };
   assert.ok(validateProductInput(input).includes('assets_required'));
+});
+
+test('core asset reference requires no provider-specific binding', () => {
+  const asset: AssetRef = {
+    schemaVersion: SCHEMA_VERSION,
+    assetId: 'product-front',
+    role: 'PRODUCT_FRONT',
+    source: 'UPLOAD',
+    mimeType: 'image/jpeg',
+    sha256: 'logical-content-hash',
+    viewAngle: 'front',
+    qualityScore: 1
+  };
+  assert.equal('providerBindings' in asset, false);
+  assert.deepEqual(Object.keys(asset).sort(), [
+    'assetId', 'mimeType', 'qualityScore', 'role', 'schemaVersion', 'sha256', 'source', 'viewAngle'
+  ]);
 });
 
 test('scene plan locks duration and aspect', () => {
@@ -62,8 +79,7 @@ test('generated references cannot satisfy golden fixture evidence', () => {
       role: 'PRODUCT_FRONT',
       source: 'GENERATED',
       mimeType: 'image/png',
-      sha256: 'validation-only-hash',
-      providerBindings: {}
+      sha256: 'validation-only-hash'
     }],
     physicalRiskNotes: []
   };
