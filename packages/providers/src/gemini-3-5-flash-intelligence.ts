@@ -14,6 +14,7 @@ export const GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash' as const;
 export interface GeminiStructuredTransportRequest {
   readonly model: typeof GEMINI_3_5_FLASH_MODEL;
   readonly instruction: string;
+  readonly inputText?: string;
   readonly media: readonly IntelligenceMediaInput[];
   readonly outputSchema: StructuredOutputSchema;
 }
@@ -36,28 +37,34 @@ class GeminiSdkStructuredTransport implements GeminiIntelligenceTransport {
   }
 
   async generateStructured(request: GeminiStructuredTransportRequest): Promise<string> {
-    const response = await this.#client.models.generateContent({
-      model: request.model,
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: request.instruction },
-          ...request.media.map(media => ({
-            inlineData: {
-              mimeType: media.mimeType,
-              data: media.dataBase64
-            }
-          }))
-        ]
-      }],
-      config: {
-        responseMimeType: 'application/json',
-        responseJsonSchema: request.outputSchema
-      }
-    });
+    const response = await this.#client.models.generateContent(createGeminiGenerateContentRequest(request));
 
     return response.text ?? '';
   }
+}
+
+/** Maps the provider-neutral trust boundary to the SDK request shape. */
+export function createGeminiGenerateContentRequest(request: GeminiStructuredTransportRequest) {
+  return {
+    model: request.model,
+    contents: [{
+      role: 'user' as const,
+      parts: [
+        ...(request.inputText === undefined ? [] : [{ text: request.inputText }]),
+        ...request.media.map(media => ({
+          inlineData: {
+            mimeType: media.mimeType,
+            data: media.dataBase64
+          }
+        }))
+      ]
+    }],
+    config: {
+      systemInstruction: request.instruction,
+      responseMimeType: 'application/json',
+      responseJsonSchema: request.outputSchema
+    }
+  };
 }
 
 const createGeminiSdkTransport: GeminiIntelligenceTransportFactory = apiKey =>
@@ -80,6 +87,7 @@ export class Gemini35FlashIntelligenceProvider implements IntelligenceProvider {
       const text = await this.transport.generateStructured({
         model: GEMINI_3_5_FLASH_MODEL,
         instruction: request.instruction,
+        ...(request.inputText === undefined ? {} : { inputText: request.inputText }),
         media: request.media,
         outputSchema: request.outputSchema
       });
@@ -124,7 +132,9 @@ export function createGemini35FlashIntelligenceProviderFromEnv(
 }
 
 function validateRequest<T>(request: StructuredIntelligenceRequest<T>): void {
-  if (request.instruction.trim().length === 0 || Object.keys(request.outputSchema).length === 0) {
+  if (request.instruction.trim().length === 0
+    || (request.inputText !== undefined && request.inputText.trim().length === 0)
+    || Object.keys(request.outputSchema).length === 0) {
     throw new IntelligenceProviderError('INVALID_REQUEST', false);
   }
   if (request.media.length === 0 || request.media.some(hasInvalidMediaInput)) {

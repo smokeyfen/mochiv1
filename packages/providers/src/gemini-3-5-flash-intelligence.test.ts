@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   GEMINI_3_5_FLASH_MODEL,
   Gemini35FlashIntelligenceProvider,
+  createGeminiGenerateContentRequest,
   createGemini35FlashIntelligenceProviderFromEnv,
   type GeminiIntelligenceTransport,
   type GeminiStructuredTransportRequest
@@ -51,8 +52,40 @@ test('Gemini intelligence requests use the fixed free-tier model and return type
 
   assert.deepEqual(result, { data: { label: 'bottle' } });
   assert.equal(captured?.model, GEMINI_3_5_FLASH_MODEL);
+  assert.equal(captured?.inputText, undefined);
   assert.equal(captured?.media[0]?.assetId, 'logical-product-image');
   assert.equal(captured?.outputSchema, request.outputSchema);
+});
+
+test('Gemini transport maps authoritative instruction and untrusted input to separate SDK fields', () => {
+  const mapped = createGeminiGenerateContentRequest({
+    model: GEMINI_3_5_FLASH_MODEL,
+    instruction: 'Authoritative policy',
+    inputText: 'Untrusted task data',
+    media: [{ assetId: 'logical-image', mimeType: 'image/png', dataBase64: 'aGVsbG8=' }],
+    outputSchema: { type: 'object' }
+  });
+
+  assert.equal(mapped.config.systemInstruction, 'Authoritative policy');
+  assert.deepEqual(mapped.contents[0]?.parts[0], { text: 'Untrusted task data' });
+  assert.deepEqual(mapped.contents[0]?.parts[1], { inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' } });
+  assert.doesNotMatch(JSON.stringify(mapped.contents), /Authoritative policy/);
+  assert.doesNotMatch(JSON.stringify(mapped.config.systemInstruction), /Untrusted task data/);
+});
+
+test('blank optional input text fails before the transport is called', async () => {
+  let called = false;
+  const provider = new Gemini35FlashIntelligenceProvider({
+    async generateStructured() {
+      called = true;
+      return '{}';
+    }
+  });
+  await assert.rejects(
+    provider.analyzeStructured({ ...request, inputText: ' ' }),
+    (error: unknown) => error instanceof IntelligenceProviderError && error.code === 'INVALID_REQUEST'
+  );
+  assert.equal(called, false);
 });
 
 test('provider remains an intelligence boundary rather than a VideoProvider', () => {

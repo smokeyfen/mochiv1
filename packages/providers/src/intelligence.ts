@@ -12,7 +12,10 @@ export interface IntelligenceMediaInput {
 }
 
 export interface StructuredIntelligenceRequest<T> {
+  /** Authoritative engine policy, kept separate from caller-supplied data. */
   readonly instruction: string;
+  /** Optional untrusted task data, delivered separately from instruction. */
+  readonly inputText?: string;
   readonly media: readonly IntelligenceMediaInput[];
   readonly outputSchema: StructuredOutputSchema;
   readonly parse: (value: unknown) => T;
