@@ -5,7 +5,7 @@ Date: 2026-09-06
 ## Checkpoint
 
 - Branch: `codex/feasibility-lock-candidate`
-- Current upstream checkpoint: `2e17c83`
+- Current upstream checkpoint: `d8553db`
 - Status: NOT STARTED — blocked by M2 prerequisites
 
 ## Files changed

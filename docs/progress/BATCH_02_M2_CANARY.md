@@ -6,6 +6,7 @@ Date: 2026-09-06
 
 - Branch: `codex/feasibility-lock-candidate`
 - Starting commit: `2e17c83`
+- M2 prerequisite audit commit: `d8553db`
 - Status: BLOCKED at prerequisite gate
 
 ## Files changed

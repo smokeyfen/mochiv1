@@ -3,7 +3,7 @@
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
 - Current verified implementation commit: `5af5172`
-- Latest pushed checkpoint before M2 audit: `2e17c83`
+- M2 prerequisite audit commit: `d8553db`
 - Current milestone: M2 Real Omni Canary
 - Milestone status: BLOCKED at prerequisite gate
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending real product references, Gemini API credentials and controlled empirical evidence
