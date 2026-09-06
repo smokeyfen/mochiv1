@@ -25,7 +25,10 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R2 Commit Gate: **PASS / LOCKED**
 - R3 Continuity Synthesis: **PASS / LOCKED**
 - R4 Global 4-Scene Planner: **PASS / LOCKED**
-- R5 Deterministic State Engine: **NEXT / NOT STARTED**
+- R5 Deterministic State Engine: **PASS / LOCKED**
+- R6 Scene Risk + bounded replan: **PASS / LOCKED**
+- R7-A Human Realism: **PASS / LOCKED**
+- T0 Voice Timing Calibration: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -129,3 +132,8 @@ RUBRIC-0 still evaluates one generated benchmark scene against actual generated 
 ## Historical material
 
 Earlier M0 feasibility-first roadmap text, initial exported-tree descriptions, and pre-R1 task sequencing are superseded as current instructions. They remain accessible in Git history and older documentation only as historical context. Preserve the underlying M0 locks—provider-neutral contracts, 8-second and 9:16 scenes, state continuity, Candidate lifecycle, QC fail-closed behavior, and UNTESTED action defaults—but do not present historical sequencing as the current roadmap.
+
+
+## R7-A Human Realism
+
+R7-A is locked at `680012c10f3f0f92a7744c496350b450c0f9e916`. It produces a provider-neutral, versioned four-scene Human Realism overlay after re-validating R4, re-resolving R5, and matching R6 risk. It never changes truth, objectives, actions, states, dialogue, references, continuity, format, or transitions. Any non-READY R6 scene—including the empirical UNTESTED map—fails before intelligence. The single global intelligence request has empty media and can return only five scene behavior strings. Deterministic global constraints remain immutable and preserve POV realism, contact continuity, canonical end states, and the R3 identity/environment locks. T0 is next and is not authorization to begin it.

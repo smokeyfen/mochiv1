@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `e187ffa57fc2c0018ea86f4517ced09ce769261a`
+- Current verified implementation commit: `680012c10f3f0f92a7744c496350b450c0f9e916`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R6 Scene Risk + bounded replan — FINAL LOCKED
-- Milestone status: PASS / LOCKED — R3, R4, R5, R6, and bounded replan acceptance coverage complete
+- Current milestone: R7-A Human Realism — FINAL LOCKED
+- Milestone status: PASS / LOCKED — R3 through R7-A acceptance coverage complete
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. R7-A Human Realism is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
+- Next action: STOP. T0 Voice Timing Calibration is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
@@ -71,3 +71,6 @@ R2-B Reference Assessment and R2 Commit Gate at `e48e5ffe397721da42e376f6c299518
 
 
 R5/R6 acceptance hardening at `e187ffa57fc2c0018ea86f4517ced09ce769261a`: R6 now preserves `BLOCKED` for `AVOID` actions even when references are LIMITED and complexity is 3. Planner validation uses an explicit structural continuity comparator and rejects action/effect mismatches. Bounded replan rejects an empty safer-action set before any provider invocation, accepts only the exact five mutable decision fields, and exhausts its default two-attempt budget without looping. Dedicated Gate 0/A and replan tests cover deterministic scene IDs, serialized continuity equivalence, locked-field mutations, readiness/limitation mutations, carried-state incompatibility, canonical references, and zero-provider R5/R6 execution. Verification: `npm run typecheck` PASS; `npm test` PASS (140 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. R3 PASS / LOCKED; R4 PASS / LOCKED; R5 PASS / LOCKED; R6 + bounded replan PASS / LOCKED. No new Gemini or Flow calls, video generations, or action promotions occurred. R7-A Human Realism is NEXT / NOT STARTED.
+
+
+R7-A Human Realism at `680012c10f3f0f92a7744c496350b450c0f9e916`: provider-neutral `HumanRealism4ScenePlan` compiles exactly four scene behavior overlays from validated R4, deterministically re-resolved R5 state, and corresponding R6 risk. The gate fails before intelligence for source/state/risk mismatch or any non-READY scene; therefore all actual UNTESTED action maps remain excluded. One global mocked provider call receives authoritative instructions, separate limited inputText, and `media: []`; its strict four-decision output can author only five nonblank behavior strings per scene. Deterministic global constraints prevent face visibility, extra hands, state resets, teleportation, penetration, impossible grip, robotic motion, and cinematic movement. Verification: `npm run typecheck` PASS; `npm test` PASS (144 tests); `npm run benchmark:dry` PASS with expected UNTESTED action failures; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. R7-A PASS / LOCKED; T0 Voice Timing Calibration is NEXT / NOT STARTED. No live Gemini or Flow calls; historical Flow remains 2 generations / 24 credits.
