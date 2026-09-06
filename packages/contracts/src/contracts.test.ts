@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetRef, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
+import type { AssetRef, AssetRole, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
 import {
   SCHEMA_VERSION,
   validateGoldenProductFixture,
@@ -15,6 +15,36 @@ test('product input rejects missing assets', () => {
     schemaVersion: SCHEMA_VERSION, productId:'p1', name:'Bottle', details:'Test', category:'Beauty', assets:[]
   };
   assert.ok(validateProductInput(input).includes('assets_required'));
+});
+
+test('generic PRODUCT_REFERENCE accepts one or many arbitrary product images', () => {
+  const asset = (assetId: string): AssetRef => ({
+    schemaVersion: SCHEMA_VERSION,
+    assetId,
+    role: 'PRODUCT_REFERENCE',
+    source: 'UPLOAD',
+    mimeType: 'image/jpeg'
+  });
+  const oneReference: ProductInput = {
+    schemaVersion: SCHEMA_VERSION, productId: 'p1', name: 'Bottle', details: 'Test', category: 'Beauty', assets: [asset('reference-1')]
+  };
+  const manyReferences: ProductInput = { ...oneReference, assets: [asset('reference-1'), asset('reference-2'), asset('reference-3')] };
+  assert.deepEqual(validateProductInput(oneReference), []);
+  assert.deepEqual(validateProductInput(manyReferences), []);
+});
+
+test('generic references do not require front, side, or back coverage and existing roles remain valid', () => {
+  const roles: readonly AssetRole[] = [
+    'PRODUCT_REFERENCE', 'PRODUCT_FRONT', 'PRODUCT_SIDE', 'PRODUCT_BACK', 'PRODUCT_IN_HAND',
+    'HAND_REFERENCE', 'ENVIRONMENT_REFERENCE', 'FIRST_FRAME', 'LAST_FRAME'
+  ];
+  for (const role of roles) {
+    const input: ProductInput = {
+      schemaVersion: SCHEMA_VERSION, productId: `p-${role}`, name: 'Bottle', details: 'Test', category: 'Beauty',
+      assets: [{ schemaVersion: SCHEMA_VERSION, assetId: `asset-${role}`, role, source: 'UPLOAD', mimeType: 'image/jpeg' }]
+    };
+    assert.deepEqual(validateProductInput(input), []);
+  }
 });
 
 const validProjectInput = (): MochiProjectInput => ({

@@ -17,9 +17,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function selectProductImages(names: readonly string[] = ['front.jpg']) {
+  const images = names.map(name => new File(['image bytes'], name, { type: 'image/jpeg' }));
+  fireEvent.change(screen.getByLabelText('Add product images'), { target: { files: images } });
+}
+
 function selectProductImage(name = 'front.jpg') {
-  const image = new File(['image bytes'], name, { type: 'image/jpeg' });
-  fireEvent.change(screen.getByLabelText('Add product images'), { target: { files: [image] } });
+  selectProductImages([name]);
 }
 
 function enterValidProjectInput() {
@@ -107,14 +111,14 @@ describe('App', () => {
     expect(preview.creativeDirection).toMatchObject({ voiceGender: 'MALE', voiceRegion: 'NORTH' });
   });
 
-  it('creates a logical AssetRef, updates its role, and removes it from canonical input', () => {
+  it('creates a generic logical product reference and removes it from canonical input', () => {
     render(<App />);
     enterValidProjectInput();
     expect(screen.getByAltText(/Preview for asset-/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Reference role for asset-/), { target: { value: 'PRODUCT_IN_HAND' } });
+    expect(screen.queryByLabelText(/Reference role for asset-/)).not.toBeInTheDocument();
     submitProject();
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.product.assets[0]).toMatchObject({ role: 'PRODUCT_IN_HAND', source: 'UPLOAD', mimeType: 'image/jpeg' });
+    expect(preview.product.assets[0]).toMatchObject({ role: 'PRODUCT_REFERENCE', source: 'UPLOAD', mimeType: 'image/jpeg' });
     fireEvent.click(screen.getByRole('button', { name: 'Remove reference' }));
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
     submitProject();
@@ -135,15 +139,20 @@ describe('App', () => {
     expect(preview.product.assets[0].assetId).not.toBeUndefined();
   });
 
-  it('invalidates READY_FOR_ANALYSIS when references are added or roles change', () => {
+  it('assigns PRODUCT_REFERENCE to multiple arbitrary uploads and invalidates READY_FOR_ANALYSIS on add/remove', () => {
     render(<App />);
     enterValidProjectInput();
     submitProject();
-    selectProductImage('side.jpg');
+    selectProductImages(['any-order-one.jpg', 'any-order-two.png']);
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
 
     submitProject();
-    fireEvent.change(screen.getAllByLabelText(/Reference role for asset-/)[0]!, { target: { value: 'PRODUCT_SIDE' } });
+    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
+    expect(preview.product.assets).toHaveLength(3);
+    expect(preview.product.assets.every((asset: { role: string }) => asset.role === 'PRODUCT_REFERENCE')).toBe(true);
+    expect(screen.queryByRole('combobox', { name: /reference role/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
   });
 

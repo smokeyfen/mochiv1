@@ -2,7 +2,7 @@ export const SCHEMA_VERSION = '1.0.0' as const;
 export type SchemaVersion = typeof SCHEMA_VERSION;
 
 export type AssetRole =
-  | 'PRODUCT_FRONT' | 'PRODUCT_SIDE' | 'PRODUCT_BACK' | 'PRODUCT_IN_HAND'
+  | 'PRODUCT_REFERENCE' | 'PRODUCT_FRONT' | 'PRODUCT_SIDE' | 'PRODUCT_BACK' | 'PRODUCT_IN_HAND'
   | 'HAND_REFERENCE' | 'ENVIRONMENT_REFERENCE' | 'FIRST_FRAME' | 'LAST_FRAME';
 
 export interface AssetRef {

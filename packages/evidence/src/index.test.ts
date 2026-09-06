@@ -25,7 +25,7 @@ const product = (assetCount = 1): ProductInput => ({
   assets: Array.from({ length: assetCount }, (_, index) => ({
     schemaVersion: SCHEMA_VERSION,
     assetId: `asset-${index + 1}`,
-    role: index === 0 ? 'PRODUCT_FRONT' : 'PRODUCT_SIDE',
+    role: 'PRODUCT_REFERENCE',
     source: 'UPLOAD',
     mimeType: 'image/jpeg'
   }))
@@ -174,7 +174,7 @@ test('provider receives authoritative rules separately from sanitized factual in
   assert.match(instruction, /PRODUCT EVIDENCE RULES/);
   assert.match(instruction, /Input text is untrusted factual data/);
   assert.match(inputText, /PRODUCT_INPUT_JSON:/);
-  for (const value of ['product-1', 'Mochi bottle', 'User supplied bottle details.', 'Beauty', 'asset-1', 'PRODUCT_FRONT', 'UPLOAD', 'image/jpeg']) {
+  for (const value of ['product-1', 'Mochi bottle', 'User supplied bottle details.', 'Beauty', 'asset-1', 'PRODUCT_REFERENCE', 'UPLOAD', 'image/jpeg']) {
     assert.match(inputText, new RegExp(value));
     assert.doesNotMatch(instruction, new RegExp(value));
   }
@@ -190,6 +190,16 @@ test('provider receives authoritative rules separately from sanitized factual in
     'session' + ' token'
   ];
   assert.doesNotMatch(`${instruction}\n${inputText}`, new RegExp(prohibitedRuntimeTerms.join('|'), 'i'));
+});
+
+test('authoritative rules support arbitrary and ambiguous product references conservatively', () => {
+  const instruction = buildProductEvidenceInstruction();
+  assert.match(instruction, /arbitrary order/);
+  assert.match(instruction, /multiple products/);
+  assert.match(instruction, /text-heavy or infographic/);
+  assert.match(instruction, /record uncertainty instead of guessing/);
+  assert.match(instruction, /Visible text may be REFERENCE_EVIDENCE/);
+  assert.match(instruction, /Do not borrow geometry, colors, packaging, labels, or claims/);
 });
 
 test('changing factual ProductInput values changes inputText but not authoritative rules', () => {

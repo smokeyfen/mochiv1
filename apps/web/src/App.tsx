@@ -3,19 +3,10 @@ import {
   SCHEMA_VERSION,
   validateMochiProjectInput,
   type AssetRef,
-  type AssetRole,
   type MochiProjectInput,
   type VoiceGender,
   type VoiceRegion
 } from '@mochi/contracts';
-
-const PRODUCT_REFERENCE_ROLES = [
-  'PRODUCT_FRONT',
-  'PRODUCT_SIDE',
-  'PRODUCT_BACK',
-  'PRODUCT_IN_HAND'
-] as const satisfies readonly AssetRole[];
-type ProductReferenceRole = typeof PRODUCT_REFERENCE_ROLES[number];
 
 interface ReferenceAssetState {
   readonly asset: AssetRef;
@@ -96,7 +87,7 @@ export function App() {
           asset: {
             schemaVersion: SCHEMA_VERSION,
             assetId,
-            role: 'PRODUCT_FRONT' as const,
+            role: 'PRODUCT_REFERENCE' as const,
             source: 'UPLOAD' as const,
             mimeType: file.type
           },
@@ -106,14 +97,6 @@ export function App() {
     if (additions.length > 0) invalidateReadyInput();
     setReferenceAssets(current => [...current, ...additions]);
     event.target.value = '';
-  };
-
-  const updateReferenceRole = (assetId: string, role: ProductReferenceRole) => {
-    invalidateReadyInput();
-    setReferenceAssets(current => current.map(reference => reference.asset.assetId === assetId
-      ? { ...reference, asset: { ...reference.asset, role } }
-      : reference
-    ));
   };
 
   const removeReference = (assetId: string) => {
@@ -162,11 +145,6 @@ export function App() {
                 <li key={reference.asset.assetId} className="reference-card">
                   <img src={reference.previewUrl} alt={`Preview for ${reference.asset.assetId}`} />
                   <div>
-                    <label>Reference role for {reference.asset.assetId}
-                      <select value={reference.asset.role} onChange={event => updateReferenceRole(reference.asset.assetId, event.target.value as ProductReferenceRole)}>
-                        {PRODUCT_REFERENCE_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
-                      </select>
-                    </label>
                     <p>{reference.asset.mimeType}</p>
                     <button type="button" className="secondary-button" onClick={() => removeReference(reference.asset.assetId)}>Remove reference</button>
                   </div>
