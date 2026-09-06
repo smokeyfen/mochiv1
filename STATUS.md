@@ -2,10 +2,10 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `3c3e3af7d00e91f70e13f9ec1b403a0d207708d0`
+- Current verified implementation commit: `3581a87708e2107e35392a2b0ab33cb58bfef9d9`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R4 Global 4-Scene Planner
+- Current milestone: R6 Scene Risk + bounded replan
 - Milestone status: PASS / LOCKED — global four-scene intents compile from committed R2 truth and R3 continuity
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. R5 Deterministic State Engine is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
+- Next action: STOP. R7-A Human Realism is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
