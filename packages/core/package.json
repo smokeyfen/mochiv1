@@ -8,5 +8,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test src/core.test.ts"
   },
-  "dependencies": {"@mochi/contracts": "*"}
+  "dependencies": {"@mochi/contracts": "*"},
+  "devDependencies": {"typescript": "^5.7.3"}
 }

@@ -1,0 +1,6 @@
+{
+  "name": "MochiV1",
+  "description": "POV Authentic On-Hand Review for TikTok Affiliate product videos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

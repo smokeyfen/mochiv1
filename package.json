@@ -5,9 +5,14 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "npm run dev -w @mochi/web",
+    "build": "npm run build -w @mochi/web",
+    "lint": "npm run typecheck",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "benchmark:dry": "npm run benchmark:dry -w @mochi/harness"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
   },
   "engines": {"node": ">=22"}
 }
