@@ -7,6 +7,7 @@ Date: 2026-09-06
 - Branch: `codex/feasibility-lock-candidate`
 - Starting checkpoint: `1e1252bd35acbb8a045b065d24e8fa4f41964918`
 - R0-B implementation commit: `5e807ec160e7e05d8d74d2e9e0e9c65d961222ac`
+- R0-B state-integrity correction: `190100ba9f27551e09e0371a7a6799e3e29c25ad`
 - Status: PASS
 
 ## Files changed
@@ -15,6 +16,8 @@ Date: 2026-09-06
 - `apps/web/src/App.tsx`
 - `apps/web/src/App.test.tsx`
 - `apps/web/src/styles.css`
+- `apps/web/src/App.tsx` state-integrity correction
+- `apps/web/src/App.test.tsx` regression coverage
 - `package-lock.json`
 - `README.md`
 - `STATUS.md`
@@ -53,6 +56,18 @@ No Contract, Core, Provider, harness, backend, or production-runtime source chan
 ## Architecture deviations
 
 None. R0-A contracts are unchanged. The browser does not call a provider, create Product Evidence, reason, generate video, synthesize voice, plan scenes, run QC, or create a backend/persistence layer.
+
+## State-integrity correction
+
+The initial R0-B surface could retain a previously validated `readyInput` after the editable form state changed. A shared invalidation helper now clears that snapshot for every canonical project mutation: all product and creative controls, voice controls, adding an image, changing a reference role, and removing a reference. The user must validate again before `READY_FOR_ANALYSIS` and the canonical preview return.
+
+Regression verification at `190100ba9f27551e09e0371a7a6799e3e29c25ad`:
+
+- `npm run typecheck` — PASS.
+- `npm test` — PASS, 37 tests total; web has 10 tests.
+- `npm run benchmark:dry` — PASS with expected fail-closed `action_untested:PICK_UP`.
+- `npm run build -w @mochi/web` — PASS.
+- Gemini calls: 0; Flow calls: 0; real video generation count: 0.
 
 ## Next action
 
