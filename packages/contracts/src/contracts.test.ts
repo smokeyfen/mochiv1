@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetRef, GoldenProductFixture, MochiProjectInput, ProductInput, ScenePlan } from './index.ts';
+import type { AssetRef, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
 import {
   SCHEMA_VERSION,
   validateGoldenProductFixture,
   validateMochiProjectInput,
+  validateProductEvidence,
   validateProductInput,
   validateScenePlan
 } from './index.ts';
@@ -42,6 +43,42 @@ const validProjectInput = (): MochiProjectInput => ({
     voiceGender: 'FEMALE',
     voiceRegion: 'SOUTH'
   }
+});
+
+const validProductEvidence = (product: ProductInput): ProductEvidence => ({
+  schemaVersion: SCHEMA_VERSION,
+  productId: product.productId,
+  canonicalAssetIds: product.assets.map(asset => asset.assetId),
+  identityDescription: 'A factual product identity description.',
+  geometryNotes: ['A visible cylindrical form.'],
+  colorNotes: ['A visible light color.'],
+  packagingNotes: ['A visible capped package.'],
+  labelNotes: ['A visible label.'],
+  claims: [{ claimId: 'claim-1', text: 'User supplied product name.', source: 'USER_INPUT', evidenceAssetIds: [], allowed: true }],
+  prohibitedInferences: ['No efficacy inference.'],
+  uncertainties: [],
+  contradictions: []
+});
+
+test('ProductEvidence fails closed for invalid logical provenance and structured entries', () => {
+  const product = validProjectInput().product;
+  const evidence = validProductEvidence(product);
+  evidence.canonicalAssetIds = ['product-front', 'product-front', 'unknown'];
+  evidence.identityDescription = ' ';
+  evidence.geometryNotes = [''];
+  evidence.claims = [
+    { claimId: 'claim-1', text: '', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: [], allowed: true },
+    { claimId: 'claim-1', text: 'Duplicate claim', source: 'USER_INPUT', evidenceAssetIds: ['unknown'], allowed: false }
+  ];
+  evidence.uncertainties = [{ subject: '', assetIds: ['unknown'], reason: '' }];
+  evidence.contradictions = [{ statements: ['Only one statement'], assetIds: ['unknown'], reason: '' }];
+  const issues = validateProductEvidence(evidence, product);
+  for (const issue of [
+    'duplicate_canonical_asset:product-front', 'unknown_canonical_asset:unknown', 'identity_description',
+    'blank_geometry_note', 'claim_text:claim-1', 'reference_claim_requires_evidence:claim-1',
+    'duplicate_claim:claim-1', 'unknown_claim_asset:claim-1:unknown', 'uncertainty_subject',
+    'unknown_uncertainty_asset:unknown', 'contradiction_statements', 'unknown_contradiction_asset:unknown'
+  ]) assert.ok(issues.includes(issue));
 });
 
 test('canonical Mochi project input accepts valid separate product and creative concerns', () => {

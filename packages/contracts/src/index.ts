@@ -62,6 +62,18 @@ export interface ProductClaim {
   allowed: boolean;
 }
 
+export interface ProductEvidenceUncertainty {
+  subject: string;
+  assetIds: readonly string[];
+  reason: string;
+}
+
+export interface ProductEvidenceContradiction {
+  statements: readonly string[];
+  assetIds: readonly string[];
+  reason: string;
+}
+
 export interface ProductEvidence {
   schemaVersion: SchemaVersion;
   productId: string;
@@ -69,9 +81,12 @@ export interface ProductEvidence {
   identityDescription: string;
   geometryNotes: readonly string[];
   colorNotes: readonly string[];
+  packagingNotes: readonly string[];
   labelNotes: readonly string[];
   claims: readonly ProductClaim[];
   prohibitedInferences: readonly string[];
+  uncertainties: readonly ProductEvidenceUncertainty[];
+  contradictions: readonly ProductEvidenceContradiction[];
 }
 
 export type TransitionType = 'CONTINUOUS' | 'MATCH_CUT' | 'JUMP_CUT';
@@ -272,6 +287,69 @@ export function validateProductInput(input: ProductInput): readonly string[] {
     if (ids.has(asset.assetId)) issues.push(`duplicate_asset:${asset.assetId}`);
     ids.add(asset.assetId);
     if (asset.qualityScore !== undefined && (asset.qualityScore < 0 || asset.qualityScore > 1)) issues.push(`asset_quality:${asset.assetId}`);
+  }
+  return issues;
+}
+
+/** Validates evidence only against factual ProductInput and logical asset IDs. */
+export function validateProductEvidence(
+  evidence: ProductEvidence,
+  product: ProductInput
+): readonly string[] {
+  const issues: string[] = [];
+  if (evidence.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(evidence.productId)) issues.push('product_id');
+  if (evidence.productId !== product.productId) issues.push('product_id_mismatch');
+  if (evidence.canonicalAssetIds.length === 0) issues.push('canonical_assets_required');
+  if (!nonBlank(evidence.identityDescription)) issues.push('identity_description');
+
+  const productAssetIds = new Set(product.assets.map(asset => asset.assetId));
+  const canonicalAssetIds = new Set<string>();
+  for (const assetId of evidence.canonicalAssetIds) {
+    if (canonicalAssetIds.has(assetId)) issues.push(`duplicate_canonical_asset:${assetId}`);
+    canonicalAssetIds.add(assetId);
+    if (!productAssetIds.has(assetId)) issues.push(`unknown_canonical_asset:${assetId}`);
+  }
+
+  for (const [name, notes] of [
+    ['geometry', evidence.geometryNotes],
+    ['color', evidence.colorNotes],
+    ['packaging', evidence.packagingNotes],
+    ['label', evidence.labelNotes],
+    ['prohibited_inference', evidence.prohibitedInferences]
+  ] as const) {
+    for (const note of notes) if (!nonBlank(note)) issues.push(`blank_${name}_note`);
+  }
+
+  const claimIds = new Set<string>();
+  for (const claim of evidence.claims) {
+    if (!nonBlank(claim.claimId)) issues.push('claim_id');
+    if (!nonBlank(claim.text)) issues.push(`claim_text:${claim.claimId}`);
+    if (claimIds.has(claim.claimId)) issues.push(`duplicate_claim:${claim.claimId}`);
+    claimIds.add(claim.claimId);
+    if (claim.source === 'REFERENCE_EVIDENCE' && claim.evidenceAssetIds.length === 0) {
+      issues.push(`reference_claim_requires_evidence:${claim.claimId}`);
+    }
+    for (const assetId of claim.evidenceAssetIds) {
+      if (!productAssetIds.has(assetId)) issues.push(`unknown_claim_asset:${claim.claimId}:${assetId}`);
+    }
+  }
+
+  for (const uncertainty of evidence.uncertainties) {
+    if (!nonBlank(uncertainty.subject)) issues.push('uncertainty_subject');
+    if (!nonBlank(uncertainty.reason)) issues.push('uncertainty_reason');
+    for (const assetId of uncertainty.assetIds) {
+      if (!productAssetIds.has(assetId)) issues.push(`unknown_uncertainty_asset:${assetId}`);
+    }
+  }
+  for (const contradiction of evidence.contradictions) {
+    if (contradiction.statements.length < 2 || contradiction.statements.some(statement => !nonBlank(statement))) {
+      issues.push('contradiction_statements');
+    }
+    if (!nonBlank(contradiction.reason)) issues.push('contradiction_reason');
+    for (const assetId of contradiction.assetIds) {
+      if (!productAssetIds.has(assetId)) issues.push(`unknown_contradiction_asset:${assetId}`);
+    }
   }
   return issues;
 }
