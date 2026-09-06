@@ -165,6 +165,64 @@ export const BENCHMARK_DIMENSIONS = [
 ] as const;
 export type BenchmarkDimension = typeof BENCHMARK_DIMENSIONS[number];
 
+/** Versioned human-review rubric for one real generated benchmark scene. */
+export const RUBRIC_0_VERSION = 'RUBRIC_0' as const;
+export type RubricVersion = typeof RUBRIC_0_VERSION;
+
+export interface BenchmarkRubricDimensionDefinition {
+  readonly dimension: BenchmarkDimension;
+  readonly passCriteria: readonly string[];
+  readonly failExamples: readonly string[];
+}
+
+/**
+ * Rubric-0 is deliberately limited to the existing per-scene benchmark dimensions.
+ * Cross-scene continuity belongs to the later production QC pipeline.
+ */
+export const RUBRIC_0: Readonly<{
+  version: RubricVersion;
+  dimensions: readonly BenchmarkRubricDimensionDefinition[];
+}> = {
+  version: RUBRIC_0_VERSION,
+  dimensions: [
+    {
+      dimension: 'PRODUCT_FIDELITY',
+      passCriteria: ['Correct target product is preserved.', 'Major silhouette and geometry are stable.', 'Dominant color family is preserved.', 'Identity-bearing packaging, logo, and label are neither substituted nor invented.', 'Unrelated referenced products are not borrowed into the target.'],
+      failExamples: ['Wrong SKU or product.', 'Severe geometry morph.', 'Major unexplained color shift.', 'Identity-bearing label or logo substitution.']
+    },
+    {
+      dimension: 'HAND_ANATOMY',
+      passCriteria: ['Hand and finger anatomy is plausible.', 'Grip and contact are plausible.', 'There are no fused or duplicated digits.', 'There is no impossible joint behavior.', 'There is no hand or product penetration.'],
+      failExamples: ['Fused or duplicated fingers.', 'Impossible joint articulation.', 'Hand penetrating the product.']
+    },
+    {
+      dimension: 'ACTION_COMPLETION',
+      passCriteria: ['The benchmarked primary action is visibly completed.', 'Action direction is correct.', 'The expected end state is reached.'],
+      failExamples: ['Primary action is incomplete.', 'Action direction is reversed.', 'Expected end state is not reached.']
+    },
+    {
+      dimension: 'PHYSICS',
+      passCriteria: ['There is no floating, teleportation, or impossible clipping.', 'The product does not deform impossibly.', 'Grip and object motion remain physically plausible.'],
+      failExamples: ['Floating product.', 'Teleportation.', 'Impossible clipping or deformation.']
+    },
+    {
+      dimension: 'CAMERA_REALISM',
+      passCriteria: ['The intended smartphone or POV camera family is preserved.', 'Framing supports the physical objective.', 'Camera movement does not contradict the scene contract.'],
+      failExamples: ['Camera family contradicts the intended POV.', 'Framing prevents action review.', 'Camera movement contradicts the scene contract.']
+    },
+    {
+      dimension: 'UNEXPECTED_CUTS',
+      passCriteria: ['No uncontracted cut or reset breaks action or state progression.'],
+      failExamples: ['Uncontracted cut.', 'State-reset cut that breaks the action.']
+    },
+    {
+      dimension: 'VISIBLE_ARTIFACTS',
+      passCriteria: ['No prominent generation artifact materially damages product, hand, action readability, or final usability.'],
+      failExamples: ['Prominent artifact obscures the product.', 'Artifact damages hand or action readability.']
+    }
+  ]
+};
+
 export interface BenchmarkDimensionResult {
   dimension: BenchmarkDimension;
   passed: boolean;
@@ -174,6 +232,7 @@ export interface BenchmarkDimensionResult {
 
 export interface BenchmarkObservation {
   schemaVersion: SchemaVersion;
+  rubricVersion: RubricVersion;
   observationId: string;
   benchmarkCaseId: string;
   fixtureId: string;
@@ -186,6 +245,18 @@ export interface BenchmarkObservation {
   dimensions: readonly BenchmarkDimensionResult[];
   verdict: 'PASS' | 'FAIL';
   reviewerNotes: string;
+}
+
+/** Rubric-0 never averages failures away: every required dimension must pass. */
+export function deriveBenchmarkVerdict(dimensions: readonly BenchmarkDimensionResult[]): 'PASS' | 'FAIL' {
+  if (!Array.isArray(dimensions) || dimensions.length !== BENCHMARK_DIMENSIONS.length) return 'FAIL';
+  const seen = new Set<BenchmarkDimension>();
+  for (const result of dimensions) {
+    if (!isRecord(result) || !BENCHMARK_DIMENSIONS.includes(result.dimension as BenchmarkDimension) ||
+      seen.has(result.dimension as BenchmarkDimension) || result.passed !== true) return 'FAIL';
+    seen.add(result.dimension as BenchmarkDimension);
+  }
+  return BENCHMARK_DIMENSIONS.every(dimension => seen.has(dimension)) ? 'PASS' : 'FAIL';
 }
 
 export interface ActionStep {
@@ -444,6 +515,7 @@ export function validateBenchmarkCase(benchmarkCase: BenchmarkCase): readonly st
 export function validateBenchmarkObservation(observation: BenchmarkObservation): readonly string[] {
   const issues: string[] = [];
   if (observation.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (observation.rubricVersion !== RUBRIC_0_VERSION) issues.push('rubric_version');
   if (!nonBlank(observation.observationId)) issues.push('observation_id');
   if (!nonBlank(observation.benchmarkCaseId)) issues.push('benchmark_case_id');
   if (!nonBlank(observation.fixtureId)) issues.push('fixture_id');
@@ -451,16 +523,26 @@ export function validateBenchmarkObservation(observation: BenchmarkObservation):
   if (!nonBlank(observation.candidateAssetId)) issues.push('candidate_asset_id');
   if (!nonBlank(observation.reviewerId)) issues.push('reviewer_id');
   if (!nonBlank(observation.reviewedAt) || Number.isNaN(Date.parse(observation.reviewedAt))) issues.push('reviewed_at');
-  if (observation.dimensions.length === 0) issues.push('dimensions_required');
+  if (!Array.isArray(observation.dimensions) || observation.dimensions.length === 0) issues.push('dimensions_required');
   const dimensions = new Set<BenchmarkDimension>();
-  for (const result of observation.dimensions) {
-    if (dimensions.has(result.dimension)) issues.push(`duplicate_dimension:${result.dimension}`);
-    dimensions.add(result.dimension);
+  for (const result of Array.isArray(observation.dimensions) ? observation.dimensions : []) {
+    if (!isRecord(result) || !BENCHMARK_DIMENSIONS.includes(result.dimension as BenchmarkDimension) ||
+      typeof result.passed !== 'boolean' || typeof result.critical !== 'boolean' || !nonBlank(result.notes)) {
+      issues.push('malformed_dimension_result');
+      continue;
+    }
+    const dimension = result.dimension as BenchmarkDimension;
+    if (dimensions.has(dimension)) issues.push(`duplicate_dimension:${dimension}`);
+    dimensions.add(dimension);
   }
   for (const dimension of BENCHMARK_DIMENSIONS) {
     if (!dimensions.has(dimension)) issues.push(`missing_dimension:${dimension}`);
   }
-  const criticalFailure = observation.dimensions.some(result => result.critical && !result.passed);
+  const derivedVerdict = deriveBenchmarkVerdict(Array.isArray(observation.dimensions) ? observation.dimensions : []);
+  if (observation.verdict !== derivedVerdict) issues.push('verdict_inconsistent_with_rubric');
+  const criticalFailure = Array.isArray(observation.dimensions) && observation.dimensions.some(result =>
+    isRecord(result) && result.critical === true && result.passed === false
+  );
   if (observation.verdict === 'PASS' && criticalFailure) issues.push('critical_failure_cannot_pass');
   return issues;
 }

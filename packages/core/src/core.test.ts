@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { BenchmarkObservation, QCReport, ScenePlan } from '@mochi/contracts';
-import { BENCHMARK_DIMENSIONS, SCHEMA_VERSION } from '@mochi/contracts';
+import { BENCHMARK_DIMENSIONS, RUBRIC_0_VERSION, SCHEMA_VERSION } from '@mochi/contracts';
 import {
   canTransition,
   classifyCapabilityEvidence,
   createUntestedActionCapabilityMap,
+  DEFAULT_CAPABILITY_PROMOTION_POLICY,
   evaluateSceneFeasibility,
   isQCFailClosed,
   validateStateCarryover
@@ -73,9 +74,18 @@ test('no evidence cannot promote an action', () => {
   assert.ok(result.reasons.includes('insufficient_real_observations:0<10'));
 });
 
+test('capability promotion thresholds remain locked', () => {
+  assert.deepEqual(DEFAULT_CAPABILITY_PROMOTION_POLICY, {
+    minimumReviewedAttempts: 10,
+    safePassRate: 0.9,
+    riskyPassRate: 0.6
+  });
+});
+
 test('a single successful observation cannot promote an action', () => {
   const observation: BenchmarkObservation = {
     schemaVersion: SCHEMA_VERSION,
+    rubricVersion: RUBRIC_0_VERSION,
     observationId: 'observation-1',
     benchmarkCaseId: 'case-1',
     fixtureId: 'fixture-1',

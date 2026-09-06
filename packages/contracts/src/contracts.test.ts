@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetRef, AssetRole, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
+import type { AssetRef, AssetRole, BenchmarkObservation, GoldenProductFixture, MochiProjectInput, ProductEvidence, ProductInput, ScenePlan } from './index.ts';
 import {
+  BENCHMARK_DIMENSIONS,
+  RUBRIC_0,
+  RUBRIC_0_VERSION,
   SCHEMA_VERSION,
+  deriveBenchmarkVerdict,
+  validateBenchmarkObservation,
   validateGoldenProductFixture,
   validateMochiProjectInput,
   validateProductEvidence,
@@ -88,6 +93,97 @@ const validProductEvidence = (product: ProductInput): ProductEvidence => ({
   prohibitedInferences: ['No efficacy inference.'],
   uncertainties: [],
   contradictions: []
+});
+
+const validBenchmarkObservation = (): BenchmarkObservation => ({
+  schemaVersion: SCHEMA_VERSION,
+  rubricVersion: RUBRIC_0_VERSION,
+  observationId: 'observation-1',
+  benchmarkCaseId: 'case-1',
+  fixtureId: 'fixture-1',
+  archetype: 'BOTTLE',
+  actionId: 'PICK_UP',
+  evidenceOrigin: 'REAL_MODEL_VIDEO',
+  candidateAssetId: 'candidate-1',
+  reviewerId: 'reviewer-1',
+  reviewedAt: '2026-09-06T00:00:00.000Z',
+  dimensions: BENCHMARK_DIMENSIONS.map(dimension => ({ dimension, passed: true, critical: true, notes: 'Visible pass.' })),
+  verdict: 'PASS',
+  reviewerNotes: 'Human review fixture only.'
+});
+
+test('Rubric-0 covers every existing benchmark dimension', () => {
+  assert.equal(RUBRIC_0.version, RUBRIC_0_VERSION);
+  assert.deepEqual(RUBRIC_0.dimensions.map(definition => definition.dimension), BENCHMARK_DIMENSIONS);
+  assert.ok(RUBRIC_0.dimensions.every(definition => definition.passCriteria.length > 0 && definition.failExamples.length > 0));
+});
+
+test('a fully passing Rubric-0 observation derives PASS', () => {
+  const observation = validBenchmarkObservation();
+  assert.equal(deriveBenchmarkVerdict(observation.dimensions), 'PASS');
+  assert.deepEqual(validateBenchmarkObservation(observation), []);
+});
+
+test('any single required Rubric-0 dimension failure derives FAIL', () => {
+  for (const failedDimension of BENCHMARK_DIMENSIONS) {
+    const observation = validBenchmarkObservation();
+    observation.dimensions = observation.dimensions.map(result =>
+      result.dimension === failedDimension ? { ...result, passed: false, notes: 'Observed failure.' } : result
+    );
+    observation.verdict = 'FAIL';
+    assert.equal(deriveBenchmarkVerdict(observation.dimensions), 'FAIL', failedDimension);
+    assert.deepEqual(validateBenchmarkObservation(observation), [], failedDimension);
+  }
+});
+
+test('missing or duplicate Rubric-0 dimensions are rejected', () => {
+  const missing = validBenchmarkObservation();
+  missing.dimensions = missing.dimensions.slice(1);
+  missing.verdict = 'FAIL';
+  assert.ok(validateBenchmarkObservation(missing).includes('missing_dimension:PRODUCT_FIDELITY'));
+
+  const duplicate = validBenchmarkObservation();
+  duplicate.dimensions = [...duplicate.dimensions, duplicate.dimensions[0]!];
+  duplicate.verdict = 'FAIL';
+  assert.ok(validateBenchmarkObservation(duplicate).includes('duplicate_dimension:PRODUCT_FIDELITY'));
+});
+
+test('wrong or missing Rubric-0 version and malformed dimension data are rejected', () => {
+  const wrongVersion = validBenchmarkObservation();
+  wrongVersion.rubricVersion = 'RUBRIC_1' as never;
+  assert.ok(validateBenchmarkObservation(wrongVersion).includes('rubric_version'));
+
+  const missingVersion = validBenchmarkObservation();
+  missingVersion.rubricVersion = undefined as never;
+  assert.ok(validateBenchmarkObservation(missingVersion).includes('rubric_version'));
+
+  const malformed = validBenchmarkObservation();
+  malformed.dimensions = [{ dimension: 'PRODUCT_FIDELITY', passed: true, critical: true, notes: '' }] as never;
+  malformed.verdict = 'FAIL';
+  assert.ok(validateBenchmarkObservation(malformed).includes('malformed_dimension_result'));
+});
+
+test('a manually supplied PASS cannot override a derived Rubric-0 FAIL', () => {
+  const observation = validBenchmarkObservation();
+  observation.dimensions = observation.dimensions.map(result =>
+    result.dimension === 'PRODUCT_FIDELITY' ? { ...result, passed: false, notes: 'Wrong SKU.' } : result
+  );
+  assert.equal(deriveBenchmarkVerdict(observation.dimensions), 'FAIL');
+  const issues = validateBenchmarkObservation(observation);
+  assert.ok(issues.includes('verdict_inconsistent_with_rubric'));
+  assert.ok(issues.includes('critical_failure_cannot_pass'));
+});
+
+test('product, hand, action, and physics failures cannot be marked PASS', () => {
+  for (const failedDimension of ['PRODUCT_FIDELITY', 'HAND_ANATOMY', 'ACTION_COMPLETION', 'PHYSICS'] as const) {
+    const observation = validBenchmarkObservation();
+    observation.dimensions = observation.dimensions.map(result =>
+      result.dimension === failedDimension ? { ...result, passed: false, notes: 'Critical review failure.' } : result
+    );
+    const issues = validateBenchmarkObservation(observation);
+    assert.ok(issues.includes('verdict_inconsistent_with_rubric'), failedDimension);
+    assert.ok(issues.includes('critical_failure_cannot_pass'), failedDimension);
+  }
 });
 
 test('ProductEvidence fails closed for invalid logical provenance and structured entries', () => {
