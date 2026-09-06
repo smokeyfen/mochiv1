@@ -119,21 +119,31 @@ Goal:
 
 Connect the validated evidence boundary to a live Gemini intelligence provider through a server-side bridge without exposing credentials or provider details through apps/web. The service and one-call smoke runner are implemented and locally verified. The live smoke is blocked until a server-only `GEMINI_API_KEY` and a valid local `R1_B2_SMOKE_MANIFEST` with real product images are present. Local/free TTS remains the default future voice direction and will be benchmarked separately.
 
-## R1-B3 — apps/web integration
+## R1-B2.2 — Flexible Product Reference Intake (PASS)
 
 Prerequisites:
 
-- R1-B2 live smoke PASS
+- R1-B2 implementation PASS
 
 Goal:
 
-Connect the future user-facing app surface to the trusted server boundary. This milestone is NOT STARTED.
+Accept one or many arbitrary product reference images without user view classification. User uploads map to provider-neutral logical `PRODUCT_REFERENCE` assets; Product Evidence handles ambiguity conservatively. Live runtime validation remains deferred until the R1 application milestone is complete.
+
+## R1-B3A — Server HTTP Analysis Boundary
+
+Prerequisites:
+
+- R1-B2.2 PASS
+
+Goal:
+
+Expose the trusted server-side evidence service through a minimal HTTP boundary without accepting credentials from apps/web. This milestone is NOT STARTED.
 
 ## M2-B — Flow Video Canary
 
 Prerequisites:
 
-- R1-B3 integration stable
+- R1 application integration stable
 - real product references
 - working Google Flow session/runtime access
 
