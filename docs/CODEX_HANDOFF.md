@@ -976,17 +976,33 @@ Objective:
 
 Expose the canonical project input through the minimal application surface.
 
-### Reasoning pipeline
+### R1-A — Product Evidence Engine
 
 Only after R0-B PASS.
 
 Objective:
 
-Build the provider-neutral reasoning path. Gemini 3.5 Flash remains reasoning-only; no video generation may be added.
+Build the provider-neutral product-evidence path through the intelligence abstraction with mock/stub verification. Gemini 3.5 Flash remains reasoning-only; no video generation may be added.
+
+### R1-B1 — Intelligence Trust Boundary
+
+Only after R1-A PASS.
+
+Objective:
+
+Separate authoritative intelligence rules from untrusted product input before the first live intelligence call. Provider instructions contain fixed policy only; sanitized factual input travels independently as data. Do not make live calls in this step.
+
+### R1-B2 — Server-side live Gemini bridge
+
+Only after R1-B1 PASS and separately authorized provider configuration.
+
+Objective:
+
+Connect the validated provider-neutral evidence path to Gemini through a server-side bridge without exposing credentials or provider details through apps/web.
 
 ### M2-B — Flow Video Canary
 
-Only after the reasoning pipeline is stable and when real product references plus Flow runtime access are available.
+Only after R1-B2 is stable and when real product references plus Flow runtime access are available.
 
 Objective:
 

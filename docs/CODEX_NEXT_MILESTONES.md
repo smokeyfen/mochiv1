@@ -98,22 +98,32 @@ Goal:
 
 Introduce the provider-neutral Product Evidence boundary behind the application surface. It uses the IntelligenceProvider abstraction with mock/stub verification only, and Gemini 3.5 Flash remains reasoning and multimodal analysis only.
 
-## R1-B — Live reasoning bridge
+## R1-B1 — Intelligence Trust Boundary (PASS)
 
 Prerequisites:
 
 - R1-A PASS
+
+Goal:
+
+Separate authoritative intelligence-provider rules from untrusted caller data before any live request. `instruction` carries rules only; optional `inputText` carries sanitized factual data only. The provider transport maps rules to its system-instruction mechanism and does not duplicate them in user content. This milestone makes no live call and does not change apps/web.
+
+## R1-B2 — Server-side live Gemini bridge
+
+Prerequisites:
+
+- R1-B1 PASS
 - separately authorized provider configuration
 
 Goal:
 
-Connect the validated evidence boundary to a live intelligence provider without exposing it through apps/web. This milestone is NOT STARTED. Local/free TTS remains the default future voice direction and will be benchmarked separately.
+Connect the validated evidence boundary to a live Gemini intelligence provider through a server-side bridge without exposing credentials or provider details through apps/web. This milestone is NOT STARTED. Local/free TTS remains the default future voice direction and will be benchmarked separately.
 
 ## M2-B — Flow Video Canary
 
 Prerequisites:
 
-- R1-B live reasoning bridge stable
+- R1-B2 server-side live Gemini bridge stable
 - real product references
 - working Google Flow session/runtime access
 
