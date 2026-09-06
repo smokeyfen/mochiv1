@@ -44,7 +44,7 @@ export interface CreativeDirectionInput {
 
 /**
  * Canonical provider-neutral boundary for a MochiV1 project. Assets remain
- * logical references; uploads, provider IDs, model settings, and file data
+ * logical references; uploads, runtime identifiers, model settings, and file data
  * belong outside this contract.
  */
 export interface MochiProjectInput {
