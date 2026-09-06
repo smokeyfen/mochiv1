@@ -1,4 +1,4 @@
-# Batch 03 — Controlled Feasibility Benchmark
+# Batch 03 — M2-B Flow Video Canary / Controlled Feasibility Benchmark
 
 Date: 2026-09-06
 
@@ -6,7 +6,7 @@ Date: 2026-09-06
 
 - Branch: `codex/feasibility-lock-candidate`
 - Current upstream checkpoint: `d8553db`
-- Status: NOT STARTED — blocked by M2 prerequisites
+- Status: NOT STARTED — follows M2-A
 
 ## Files changed
 
@@ -14,7 +14,7 @@ None for benchmark implementation.
 
 ## Commands executed
 
-None. Dispatch is forbidden until M2 produces a real, reviewable canary.
+None. Dispatch is forbidden until a Flow-backed `VideoProvider` produces a real, reviewable canary.
 
 ## Verification status
 
@@ -29,9 +29,9 @@ None. Dispatch is forbidden until M2 produces a real, reviewable canary.
 
 ## Blockers
 
-- M2 has no provider credential.
-- M2 has no real product reference set.
-- No real canary has passed provider capability and output verification.
+- M2-B has no Flow runtime/session access.
+- M2-B has no real product reference set.
+- No Flow canary has passed provider capability and output verification.
 
 ## Architecture deviations
 
@@ -39,4 +39,4 @@ None.
 
 ## Next action
 
-Complete M2 before scheduling controlled attempts. All actions remain `UNTESTED`.
+Complete M2-A, then explicitly authorize and implement M2-B before scheduling controlled attempts. All actions remain `UNTESTED`.

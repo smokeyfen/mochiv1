@@ -6,7 +6,7 @@ Date: 2026-09-06
 
 - Branch: `codex/feasibility-lock-candidate`
 - Current upstream checkpoint: `d8553db`
-- Status: NOT STARTED — blocked by M2 and M3
+- Status: NOT STARTED — blocked by M2-B and controlled benchmark evidence
 
 ## Files changed
 
@@ -31,7 +31,7 @@ None. No empirical evidence exists to aggregate.
 
 ## Blockers
 
-- No real Omni canary.
+- No real Flow video canary.
 - No controlled multi-archetype action observations.
 - No evidence-backed action classification.
 
@@ -41,4 +41,4 @@ None.
 
 ## Next action
 
-Complete M2 and M3 with reviewable real evidence. Do not promote any action from `UNTESTED` before the evidence policy passes.
+Complete M2-B and the controlled benchmark with reviewable real evidence. Do not promote any action from `UNTESTED` before the evidence policy passes.

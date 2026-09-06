@@ -24,7 +24,11 @@ Each scene owns START STATE -> ACTION -> END STATE. Cross-scene handoff must pre
 
 ## Physical-action policy
 
-All ActionIds start UNTESTED. Only empirical Omni feasibility evidence can promote them to SAFE or RISKY. AVOID and UNTESTED actions fail feasibility preflight.
+All ActionIds start UNTESTED. Only empirical evidence from the Flow video feasibility benchmark can promote them to SAFE or RISKY. Intelligence-provider analysis alone can never promote an action. AVOID and UNTESTED actions fail feasibility preflight.
+
+## Provider separation
+
+Gemini 3.5 Flash Free Tier is an intelligence and multimodal-analysis provider only. It must not implement `VideoProvider`. Actual video generation is a separate responsibility reserved for a future Google Flow adapter using Flow credits.
 
 ## UI
 

@@ -59,7 +59,7 @@ M1 implementation:
 
 - No verified real product reference set is committed or configured.
 - Provider credentials have not been established in this environment.
-- The exact current official Omni-capable model and API capability must be verified before wiring a real canary.
+- The approved intelligence model and future Flow video path must remain separate before provider implementation.
 
 ## Architecture deviations
 
@@ -67,7 +67,7 @@ None. Core remains provider-agnostic; generated output remains Candidate-only; Q
 
 ## Next action
 
-Perform the M2 prerequisite audit against official provider documentation and local environment configuration. If prerequisites are unavailable, stop M2 at an explicit fail-closed blocker without fabricating evidence.
+Implement M2-A as a Gemini 3.5 Flash Free Tier intelligence-provider boundary using mocks/stubs. M2-B Flow Video Canary remains separate and requires real Flow access plus product references.
 
 ## Pre-M2 provider boundary correction
 

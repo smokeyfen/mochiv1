@@ -38,7 +38,7 @@ Core principle:
 
 GitHub repo = source of truth
 
-AI Studio = development / test bench
+Gemini 3.5 Flash Free Tier = intelligence / multimodal-analysis provider only
 
 Google Flow = production video renderer
 
@@ -52,8 +52,8 @@ The product should be built from scratch in our own repo. Existing open-source r
 - Easier testing and rollback
 - Clear contracts between engines
 - Easier model/provider switching
-- AI Studio can be used as a test runtime
-- Flow can later become only the production renderer
+- Gemini can be used for provider-isolated intelligence and multimodal analysis
+- Flow remains the separate video renderer
 - Avoid coupling business logic to Flow internals
 
 ---
@@ -459,7 +459,7 @@ The real capability map should be determined experimentally, not guessed.
 
 Before building the full application, test the hardest assumption:
 
-**Can Omni 1.1 consistently generate realistic hand-product interaction with product fidelity?**
+**Can the Google Flow video runtime consistently generate realistic hand-product interaction with product fidelity?**
 
 This phase comes before FEN V1 FOUNDATION.
 
@@ -506,7 +506,7 @@ Checkpoint:
 
 **FEN V1 FEASIBILITY LOCK**
 
-Achieved only when product-reference + on-hand action + Omni 1.1 + 9:16/8s works sufficiently well across representative product types.
+Achieved only when product-reference + on-hand action + Google Flow video generation + 9:16/8s works sufficiently well across representative product types.
 
 ---
 
@@ -790,7 +790,7 @@ V1 should separate voice-over from video generation.
 
 Preferred pipeline:
 
-Omni
+VideoProvider / Google Flow
 -> visual / optional ambient audio
 
 Voice Engine
@@ -1017,20 +1017,18 @@ The tool may generate multiple candidates, repair, or regenerate as needed.
 
 ---
 
-## 29. AI Studio Strategy
+## 29. Gemini Intelligence Strategy
 
-AI Studio is the test bench, not the source of truth.
+Gemini 3.5 Flash on the Gemini Free Tier is used only for intelligence and multimodal analysis. GitHub remains the source of truth.
 
 Use it for:
 
-- testing repo builds
-- model experiments
-- prompt/reference testing
-- integration verification
+- product image understanding
+- structured multimodal analysis
+- future video analysis and QC support
+- intelligence-provider integration verification
 
-GitHub remains authoritative.
-
-Do not let AI Studio become the canonical code copy.
+Do not use Gemini API for video generation and do not couple Gemini intelligence to `VideoProvider`.
 
 ---
 
@@ -1068,24 +1066,22 @@ But because this is session/browser-coupled rather than a stable public SDK abst
 
 ---
 
-## 31. AI Studio Provider vs Flow Provider
+## 31. Intelligence Provider vs Video Provider
 
-The same Production Contract should be usable by:
+These are separate responsibilities:
 
-VideoRuntimeProvider
+- `IntelligenceProvider`: Gemini 3.5 Flash Free Tier for typed analysis
+- `VideoProvider`: Google Flow for actual video generation
 
-Implementations:
+Gemini file URIs, upload IDs, request IDs, API details and credentials remain inside Gemini provider/infrastructure code. Flow session, media and operation identifiers remain inside the Flow adapter.
 
-- AI_STUDIO / Gemini API
-- GOOGLE_FLOW
-
-Core should not change when switching providers.
+Core contracts contain neither provider's infrastructure identifiers.
 
 ---
 
-## 32. Omni / Video Runtime Assumption
+## 32. Flow Video Runtime Assumption
 
-The current project direction assumes Omni-class video generation supports the capabilities needed for V1:
+The current project direction requires the Flow video runtime to be empirically tested for the capabilities needed by V1:
 
 - 9:16
 - reference-conditioned generation
@@ -1250,7 +1246,7 @@ Standard software engineering problem.
 Before full build.
 
 Meaning:
-On-hand + correct product references + Omni + 9:16/8s has been experimentally validated across representative product archetypes and Safe Action Grammar is known.
+On-hand + correct product references + Google Flow video generation + 9:16/8s has been experimentally validated across representative product archetypes and Safe Action Grammar is known.
 
 ### FEN V1 FOUNDATION
 Repo-first architecture established.
@@ -1261,7 +1257,7 @@ Meaning:
 - contracts
 - continuity-aware architecture
 - QC-aware lifecycle
-- AI Studio test path
+- Gemini intelligence-provider test path
 - Flow production adapter path
 
 ### FEN V1 ON-HAND LOCK
@@ -1309,7 +1305,7 @@ LOCKED:
 
 - Build our own repo from scratch
 - GitHub is source of truth
-- AI Studio is test bench
+- Gemini 3.5 Flash Free Tier is intelligence/multimodal analysis only
 - Flow is preferred production renderer
 - Flow credits preferred for production video generation
 - Flowboard is a donor for Flow runtime code, not the application base
@@ -1344,9 +1340,8 @@ Repo-first
 + continuity-aware contracts
 + QC-aware lifecycle
 + feasibility benchmark first
-+ AI Studio for testing
++ Gemini 3.5 Flash Free Tier for intelligence and multimodal analysis only
 + Google Flow for production rendering
 + no early KOC face
 + no early cost optimization
 + final objective: only approved, sellable output reaches the user.
-

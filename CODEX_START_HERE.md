@@ -19,7 +19,7 @@ Your first task is to establish a reproducible M0 baseline before implementing M
    - `npm run build -w @mochi/web`
 6. Fix only baseline/tooling/type/test issues needed to make M0 reproducible.
 7. Do not change domain contracts unless a concrete test or type failure proves a defect.
-8. Do not implement real Omni calls, Product Evidence, Planner, Flow integration, QC repair loops, or UI features in this task.
+8. Do not implement real video-provider calls, Product Evidence, Planner, Flow integration, QC repair loops, or UI features in this task.
 9. Update `docs/M0-ACCEPTANCE.md` with an explicit VERIFIED/UNVERIFIED section based on actual commands run.
 10. Commit only the baseline-verification changes if the environment is a Git worktree.
 

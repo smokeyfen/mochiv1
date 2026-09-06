@@ -6,12 +6,13 @@ MochiV1 is the repo-first implementation of FEN V1: POV Authentic On-Hand Review
 
 M0 — Contracts + feasibility harness skeleton.
 
-This milestone intentionally does **not** call a real video model. The next gate is the Omni feasibility spike, which will empirically classify physical actions as SAFE / RISKY / AVOID.
+This milestone intentionally does **not** call a real video model. Gemini 3.5 Flash Free Tier is used only for intelligence and multimodal-analysis provider work. Video generation remains behind a separate `VideoProvider`; the next video runtime gate is the Flow Video Canary using Google Flow credits.
 
 ## Principles
 
 - GitHub repo is source of truth.
-- AI Studio is a test bench.
+- Gemini 3.5 Flash Free Tier is the intelligence and multimodal-analysis provider.
+- Google Flow is the future video runtime and remains separate from intelligence.
 - Google Flow is the preferred production renderer.
 - Core contracts are provider-agnostic.
 - Generation output is a Candidate, never automatically Final.

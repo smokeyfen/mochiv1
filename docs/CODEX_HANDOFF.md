@@ -25,8 +25,8 @@ Input -> validated product truth -> continuity-aware 4-scene plan -> feasibility
 
 1. Build our own repository from scratch. Do not fork another app as the product base.
 2. GitHub repository is the source of truth.
-3. Google AI Studio / Gemini API is the development and test runtime.
-4. Google Flow is the preferred production renderer later because Flow credits are preferred.
+3. Gemini 3.5 Flash on the Gemini Free Tier is the intelligence and multimodal-analysis provider only.
+4. Google Flow is the video renderer because Flow credits are the approved video-generation resource.
 5. Flow-specific implementation must be isolated behind an adapter/provider.
 6. Flowboard is a donor/reference for Flow auth/project/upload/mediaId/Omni/polling, not the product architecture.
 7. ClipForge is a donor/reference for product fidelity, UGC planning, continuity and QC concepts.
@@ -45,7 +45,7 @@ Input -> validated product truth -> continuity-aware 4-scene plan -> feasibility
 #### FEN V1 FEASIBILITY SPIKE
 Prove the hardest assumption empirically:
 
-Can the selected Omni runtime consistently produce realistic hand-product interaction while preserving product fidelity for representative packaging/action types?
+Can the Flow video runtime consistently produce realistic hand-product interaction while preserving product fidelity for representative packaging/action types?
 
 #### FEN V1 FEASIBILITY LOCK
 Gate passes only after representative real benchmarks establish a Safe Action Grammar.
@@ -626,29 +626,30 @@ Only then is FEN V1 FEASIBILITY LOCK eligible to pass.
 
 ---
 
-## 16. Real-model provider order
+## 16. Provider order and separation
 
-### First provider: AI Studio / Gemini API
+### M2-A: Gemini 3.5 Flash Free Intelligence Provider
 
 Purpose:
 
-- development/test bench
-- direct model experimentation
-- reference strategy experiments
-- feasibility benchmark
+- product image understanding
+- structured multimodal analysis
+- future video analysis and QC support
+- model/config validation
+- provider error normalization
 
-Implement via provider interface. Keep credentials in environment variables only.
+Implement behind a dedicated intelligence-provider interface. Keep credentials in environment variables only. Gemini intelligence must never implement or be substituted for `VideoProvider`.
 
-Do not hardcode stale API endpoints/model names if current official SDK/config can resolve them. Model/provider configuration should be runtime-configurable.
+Do not implement Product Evidence, Planner or full QC in M2-A. The milestone establishes the boundary only.
 
-### Later provider: Google Flow
+### M2-B: Google Flow Video Canary
 
 Purpose:
 
 - production renderer
 - use Flow credits
 
-Do NOT implement Flow during the initial feasibility-baseline task.
+Do NOT implement Flow during M2-A.
 
 Later Flow adapter responsibilities include:
 
@@ -924,17 +925,33 @@ Acceptance should include tests proving:
 - invalid/missing fixture evidence fails closed
 - tracked fixtures contain product truth metadata but no fabricated visual evidence
 
-### M2 — Real Gemini/Omni Feasibility Provider
+### M2-A — Gemini 3.5 Flash Free Intelligence Provider
 
-Only after M1 PASS and when real product references + credentials are available.
+Only after M1 PASS.
 
 Objective:
 
-Wire the first real video provider through the existing provider boundary and run repeatable feasibility cases.
+Establish a separate intelligence-provider boundary for Gemini 3.5 Flash Free Tier with typed provider-neutral output, environment-only configuration and normalized errors.
 
 Must preserve:
 
 - no provider leakage into Core
+- no silent fallback
+- no Gemini implementation of `VideoProvider`
+- no action-capability promotion from intelligence output
+- mock/stub tests only during the provider-foundation milestone
+
+### M2-B — Flow Video Canary
+
+Only after M2-A PASS and when real product references plus Flow runtime access are available.
+
+Objective:
+
+Wire the first real video canary through a Flow-backed `VideoProvider` and validate explicit 8-second, 9:16 reference-conditioned generation.
+
+Must preserve:
+
+- all Flow identifiers inside adapter/infrastructure code
 - no silent fallback
 - no automatic SAFE classification from a single successful generation
 - all generated files remain Candidates

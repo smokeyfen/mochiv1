@@ -15,7 +15,7 @@
 
 ## Gate
 
-Do not start Product Evidence / Planner implementation until the real Omni feasibility harness is wired and representative physical actions have been benchmarked.
+Do not start Product Evidence / Planner implementation until the Flow video feasibility harness is wired and representative physical actions have been benchmarked with real video evidence.
 
 ## Verification — 2026-09-06
 

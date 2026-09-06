@@ -3,14 +3,15 @@
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
 - Current verified implementation commit: `5af5172`
-- M2 prerequisite audit commit: `d8553db`
+- Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: M2 Real Omni Canary
-- Milestone status: BLOCKED at prerequisite gate
-- FEN V1 FEASIBILITY LOCK: BLOCKED pending real product references, Gemini API credentials and controlled empirical evidence
+- Current milestone: M2-A Gemini 3.5 Flash Free Intelligence Provider
+- Milestone status: IN PROGRESS — documentation corrected before implementation
+- Next video milestone: M2-B Flow Video Canary — NOT STARTED
+- FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: configure `GEMINI_API_KEY` outside Git, add a user-approved real product reference set with verified truth metadata, then implement and run one 8-second 9:16 Gemini Omni canary through the provider boundary
+- Next action: implement and verify the M2-A intelligence-provider boundary with mocks/stubs; `GEMINI_API_KEY` remains environment-only
 
 No action has been promoted from `UNTESTED`.
 

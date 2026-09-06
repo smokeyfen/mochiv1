@@ -42,30 +42,41 @@ Preservation Lock:
 
 Gate:
 
-M1 PASS before M2.
+M1 PASS before M2-A.
 
-## M2 — Real Gemini/Omni Feasibility Provider
+## M2-A — Gemini 3.5 Flash Free Intelligence Provider
 
 Prerequisites:
 
 - M1 PASS
-- real product references
-- configured model credentials
 
 Goal:
 
-Run repeatable real feasibility cases through `VideoProvider`.
+Establish the minimum provider boundary for Gemini 3.5 Flash on the Gemini Free Tier.
 
 Required behavior:
 
-- capability negotiation
-- explicit 9:16 / 8s request
-- reference-conditioned request when required
-- no silent fallback
-- candidate metadata persisted/reported
-- benchmark observation can be recorded per attempt
-- errors classified and surfaced
-- secrets not committed/logged
+- separate `IntelligenceProvider` contract; no `VideoProvider` implementation
+- environment-only `GEMINI_API_KEY`
+- clear missing-key failure
+- typed, provider-neutral structured results
+- model/config validation
+- provider error normalization
+- mock/stub tests only
+
+Do not implement a Product Evidence Engine, Planner, full QC Engine, or any Gemini video generation. Intelligence output cannot promote Action Capability classifications.
+
+## M2-B — Flow Video Canary
+
+Prerequisites:
+
+- M2-A PASS
+- real product references
+- working Google Flow session/runtime access
+
+Goal:
+
+Run the first real 8-second, 9:16, reference-conditioned video canary through a Flow-backed `VideoProvider` while keeping Flow identifiers inside the adapter/infrastructure layer.
 
 Do not auto-promote actions from a single output.
 
