@@ -5,6 +5,7 @@ import { SCHEMA_VERSION } from '@mochi/contracts';
 import type { IntelligenceMediaInput, IntelligenceProvider, StructuredIntelligenceRequest } from '@mochi/providers';
 import {
   analyzeProductEvidence,
+  buildProductEvidenceSchema,
   buildProductEvidenceInputText,
   buildProductEvidenceInstruction,
   ProductEvidenceError
@@ -79,6 +80,83 @@ test('valid product references produce validated evidence in one pass', async ()
   assert.deepEqual(result, evidenceFor(input));
   assert.equal(requests.length, 1);
   assert.deepEqual(requests[0]?.media.map(item => item.assetId), ['asset-1', 'asset-2']);
+});
+
+test('product evidence schema fully types top-level and nested output', () => {
+  const schema = buildProductEvidenceSchema(product(2));
+  const properties = schema.properties;
+
+  assert.equal(schema.type, 'object');
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.required, [
+    'schemaVersion', 'productId', 'canonicalAssetIds', 'identityDescription',
+    'geometryNotes', 'colorNotes', 'packagingNotes', 'labelNotes', 'claims',
+    'prohibitedInferences', 'uncertainties', 'contradictions'
+  ]);
+  assert.equal(properties.schemaVersion.type, 'string');
+  assert.equal(properties.productId.type, 'string');
+  assert.equal(properties.canonicalAssetIds.type, 'array');
+  assert.equal(properties.canonicalAssetIds.items.type, 'string');
+  assert.equal(properties.identityDescription.type, 'string');
+  for (const field of ['geometryNotes', 'colorNotes', 'packagingNotes', 'labelNotes', 'prohibitedInferences'] as const) {
+    assert.equal(properties[field].type, 'array');
+    assert.equal(properties[field].items.type, 'string');
+  }
+
+  assert.equal(properties.claims.type, 'array');
+  assert.equal(properties.claims.items.type, 'object');
+  assert.equal(properties.claims.items.additionalProperties, false);
+  assert.deepEqual(properties.claims.items.required, ['claimId', 'text', 'source', 'evidenceAssetIds', 'allowed']);
+  assert.equal(properties.claims.items.properties.claimId.type, 'string');
+  assert.equal(properties.claims.items.properties.text.type, 'string');
+  assert.deepEqual(properties.claims.items.properties.source.enum, ['USER_INPUT', 'REFERENCE_EVIDENCE']);
+  assert.equal(properties.claims.items.properties.evidenceAssetIds.type, 'array');
+  assert.equal(properties.claims.items.properties.evidenceAssetIds.items.type, 'string');
+  assert.equal(properties.claims.items.properties.allowed.type, 'boolean');
+
+  assert.equal(properties.uncertainties.type, 'array');
+  assert.equal(properties.uncertainties.items.type, 'object');
+  assert.equal(properties.uncertainties.items.properties.subject.type, 'string');
+  assert.equal(properties.uncertainties.items.properties.assetIds.type, 'array');
+  assert.equal(properties.uncertainties.items.properties.assetIds.items.type, 'string');
+  assert.equal(properties.uncertainties.items.properties.reason.type, 'string');
+
+  assert.equal(properties.contradictions.type, 'array');
+  assert.equal(properties.contradictions.items.type, 'object');
+  assert.equal(properties.contradictions.items.properties.statements.type, 'array');
+  assert.equal(properties.contradictions.items.properties.statements.items.type, 'string');
+  assert.equal(properties.contradictions.items.properties.statements.minItems, 2);
+  assert.equal(properties.contradictions.items.properties.assetIds.type, 'array');
+  assert.equal(properties.contradictions.items.properties.assetIds.items.type, 'string');
+  assert.equal(properties.contradictions.items.properties.reason.type, 'string');
+});
+
+test('product evidence schema binds provenance only to current logical input', () => {
+  const input = product(2);
+  const schema = buildProductEvidenceSchema(input);
+  const expectedAssetIds = ['asset-1', 'asset-2'];
+
+  assert.deepEqual(schema.properties.schemaVersion.enum, [SCHEMA_VERSION]);
+  assert.deepEqual(schema.properties.productId.enum, ['product-1']);
+  assert.deepEqual(schema.properties.canonicalAssetIds.items.enum, expectedAssetIds);
+  assert.deepEqual(schema.properties.claims.items.properties.evidenceAssetIds.items.enum, expectedAssetIds);
+  assert.deepEqual(schema.properties.uncertainties.items.properties.assetIds.items.enum, expectedAssetIds);
+  assert.deepEqual(schema.properties.contradictions.items.properties.assetIds.items.enum, expectedAssetIds);
+});
+
+test('product evidence schema has no runtime, provider, credential, or local data', () => {
+  const schemaText = JSON.stringify(buildProductEvidenceSchema(product()));
+  assert.doesNotMatch(schemaText, /dataBase64|bytes-for-|File|Blob|[A-Za-z]:\\\\|credential|apiKey|endpoint/i);
+  const prohibitedRuntimeTerms = [
+    'Gemini' + '35FlashIntelligenceProvider',
+    'gemini-' + '3.5-flash',
+    'GEMINI' + '_API_KEY',
+    'F' + 'low',
+    'media' + 'Id',
+    'bear' + 'er',
+    'session' + ' token'
+  ];
+  assert.doesNotMatch(schemaText, new RegExp(prohibitedRuntimeTerms.join('|'), 'i'));
 });
 
 test('provider receives authoritative rules separately from sanitized factual input text', async () => {

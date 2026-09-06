@@ -1,4 +1,5 @@
 import {
+  SCHEMA_VERSION,
   validateProductEvidence,
   validateProductInput,
   type ProductEvidence,
@@ -33,14 +34,93 @@ export interface AnalyzeProductEvidenceRequest {
   readonly intelligence: IntelligenceProvider;
 }
 
-const PRODUCT_EVIDENCE_SCHEMA = {
-  type: 'object',
-  required: [
-    'schemaVersion', 'productId', 'canonicalAssetIds', 'identityDescription',
-    'geometryNotes', 'colorNotes', 'packagingNotes', 'labelNotes', 'claims',
-    'prohibitedInferences', 'uncertainties', 'contradictions'
-  ]
-} as const;
+/**
+ * Creates the constrained, provider-neutral output shape for one factual
+ * product. Deterministic validation remains the final authority after the
+ * provider response is parsed.
+ */
+export function buildProductEvidenceSchema(product: ProductInput) {
+  const logicalAssetIds = product.assets.map(asset => asset.assetId);
+  const stringArray = () => ({
+    type: 'array',
+    items: { type: 'string' }
+  });
+  const logicalAssetIdArray = () => ({
+    type: 'array',
+    items: {
+      type: 'string',
+      enum: logicalAssetIds
+    }
+  });
+
+  return {
+    type: 'object',
+    properties: {
+      schemaVersion: { type: 'string', enum: [SCHEMA_VERSION] },
+      productId: { type: 'string', enum: [product.productId] },
+      canonicalAssetIds: {
+        ...logicalAssetIdArray(),
+        minItems: 1
+      },
+      identityDescription: { type: 'string' },
+      geometryNotes: stringArray(),
+      colorNotes: stringArray(),
+      packagingNotes: stringArray(),
+      labelNotes: stringArray(),
+      claims: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            claimId: { type: 'string' },
+            text: { type: 'string' },
+            source: { type: 'string', enum: ['USER_INPUT', 'REFERENCE_EVIDENCE'] },
+            evidenceAssetIds: logicalAssetIdArray(),
+            allowed: { type: 'boolean' }
+          },
+          required: ['claimId', 'text', 'source', 'evidenceAssetIds', 'allowed'],
+          additionalProperties: false
+        }
+      },
+      prohibitedInferences: stringArray(),
+      uncertainties: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string' },
+            assetIds: logicalAssetIdArray(),
+            reason: { type: 'string' }
+          },
+          required: ['subject', 'assetIds', 'reason'],
+          additionalProperties: false
+        }
+      },
+      contradictions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            statements: {
+              ...stringArray(),
+              minItems: 2
+            },
+            assetIds: logicalAssetIdArray(),
+            reason: { type: 'string' }
+          },
+          required: ['statements', 'assetIds', 'reason'],
+          additionalProperties: false
+        }
+      }
+    },
+    required: [
+      'schemaVersion', 'productId', 'canonicalAssetIds', 'identityDescription',
+      'geometryNotes', 'colorNotes', 'packagingNotes', 'labelNotes', 'claims',
+      'prohibitedInferences', 'uncertainties', 'contradictions'
+    ],
+    additionalProperties: false
+  } as const;
+}
 
 const PRODUCT_EVIDENCE_RULES = [
   'PRODUCT EVIDENCE RULES:',
@@ -98,7 +178,7 @@ export async function analyzeProductEvidence(
       instruction: buildProductEvidenceInstruction(),
       inputText: buildProductEvidenceInputText(request.product),
       media: request.media,
-      outputSchema: PRODUCT_EVIDENCE_SCHEMA,
+      outputSchema: buildProductEvidenceSchema(request.product),
       parse: value => value
     });
   } catch {
