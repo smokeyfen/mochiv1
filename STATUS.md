@@ -2,18 +2,19 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `f138448c5ccf8c080400e04354fac6a9760d1f33`
+- Current verified implementation commit: `58b87a2c741bc6d44a384405f742ebd038dc0bbb`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: F0-A.1 Real Bottle Canary Fixture
-- Milestone status: PASS / LOCKED — deterministic real-reference fixture and baseline cases prepared
+- Current milestone: F0-A.2 PICK_UP Manual Flow Canary
+- Milestone status: PASS / LOCKED — first reviewed real Flow PICK_UP observation recorded
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
-- Real generation count: 0
+- Historical Flow benchmark generations: 1 (12 credits); new Flow calls in this Codex task: 0
+- Real generation count: 1
 - Architecture deviations: none
-- Next action: STOP. F0-A.2 PICK_UP Manual Flow Canary is NEXT and NOT STARTED. R2-A Product Truth is NOT STARTED.
+- Next action: STOP. F0-A.3 HOLD Manual Flow Canary is NEXT and NOT STARTED. R2-A Product Truth is NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -59,3 +60,5 @@ RUBRIC-0 at `7c5f93c34ce89ee2c63d2ce538fbfd43f79ad26d`: BenchmarkObservation now
 F0-PREP Flexible Benchmark References at `1f94688483ffe1e7c08dcb60bb4c559dec18d76a`: pending GoldenProductFixture expectations and the dry bottle ScenePlan now use the provider-neutral logical `PRODUCT_REFERENCE` / `product-reference` naming locked by R1 intake. Golden fixture validation remains unchanged and fail-closed: a benchmark-ready reference still requires verified ProductTruth, a real UPLOAD image, non-empty SHA-256, and the expected PRODUCT_REFERENCE role. The pending fixture remains not benchmark-ready because it has no real references, and dry feasibility remains blocked by `action_untested:PICK_UP`. Verification: `npm run typecheck` PASS; `npm test` PASS (97 tests); `npm run benchmark:dry` PASS with expected fail-closed output; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. F0-PREP is PASS / LOCKED. No new Gemini calls occurred (historical total remains 1); Flow calls, video generation, and action promotions remain 0. F0-A Manual Omni Confirmatory Canary is NEXT / NOT STARTED. R2-A Product Truth is NOT STARTED.
 
 F0-A.1 Real Bottle Canary Fixture at `f138448c5ccf8c080400e04354fac6a9760d1f33`: the harness records one provider-neutral canonical Cocoon Hưng Yên Turmeric Serum bottle reference and three independent baseline ScenePlans/BenchmarkCases for PICK_UP, HOLD, and ROTATE_SLOW. The GoldenProductFixture is READY while all three actions remain UNTESTED and fail production feasibility with no BenchmarkObservation or promotion. The fixture stores no image bytes, local path, provider identifier, or runtime credential. Verification: `npm run typecheck` PASS; `npm test` PASS (101 tests); `npm run benchmark:dry` PASS with fixture READY and expected `action_untested:PICK_UP`, `action_untested:HOLD`, and `action_untested:ROTATE_SLOW`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. F0-A.1 is PASS / LOCKED. No new Gemini calls occurred (historical total remains 1); Flow calls, video generation, and action promotions remain 0. F0-A.2 PICK_UP Manual Flow Canary is NEXT / NOT STARTED. R2-A Product Truth is NOT STARTED.
+
+F0-A.2 PICK_UP Manual Flow Canary at `58b87a2c741bc6d44a384405f742ebd038dc0bbb`: one completed real Flow benchmark attempt is recorded as the sole provider-neutral `BenchmarkObservation` for the READY Cocoon fixture. The observation uses `RUBRIC_0`, seven passing reviewed dimensions, deterministic PASS, and candidate logical asset `f0-cocoon-pick-up-v1-attempt-01-video`; it contains no MP4, contact-sheet bytes, local path, Flow media ID, or provider session data. `classifyCapabilityEvidence` reports one valid PICK_UP observation but preserves `UNTESTED` with `insufficient_real_observations:1<10`; HOLD and ROTATE_SLOW have zero observations and remain UNTESTED. Historical Flow generation count is 1, credit spend 12, and action promotions remain 0. Verification: `npm run typecheck` PASS; `npm test` PASS (103 tests); `npm run benchmark:dry` PASS with the three expected fail-closed actions; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. F0-A.2 is PASS / LOCKED. F0-A.3 HOLD Manual Flow Canary is NEXT / NOT STARTED. R2-A Product Truth is NOT STARTED.
