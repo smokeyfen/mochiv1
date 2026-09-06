@@ -129,7 +129,7 @@ Goal:
 
 Accept one or many arbitrary product reference images without user view classification. User uploads map to provider-neutral logical `PRODUCT_REFERENCE` assets; Product Evidence handles ambiguity conservatively. Live runtime validation remains deferred until the R1 application milestone is complete.
 
-## R1-B3A — Server HTTP Analysis Boundary
+## R1-B3A — Server HTTP Analysis Boundary (PASS)
 
 Prerequisites:
 
@@ -137,13 +137,54 @@ Prerequisites:
 
 Goal:
 
-Expose the trusted server-side evidence service through a minimal HTTP boundary without accepting credentials from apps/web. This milestone is NOT STARTED.
+Expose the trusted server-side evidence service through a minimal HTTP boundary without accepting credentials from apps/web. The handler strictly decodes ProductInput, maps multipart images to runtime media, invokes the injected service at most once, and returns only safe responses.
+
+## R1-B3B — apps/web Product Evidence Integration
+
+Prerequisites:
+
+- R1-B3A PASS
+
+Goal:
+
+Connect apps/web to the trusted HTTP boundary without exposing server credentials. This milestone is NOT STARTED.
+
+## R1 Application Path Complete
+
+Prerequisites:
+
+- R1-B3B PASS
+
+Goal:
+
+Confirm the Product Evidence application path is integrated and preserves factual/creative separation.
+
+## Deferred Live Runtime Validation
+
+Prerequisites:
+
+- R1 Application Path Complete
+- separately authorized server runtime prerequisites
+
+Goal:
+
+Run the controlled one-call live intelligence validation with real product references. This remains deferred.
+
+## R2 — Product Truth / Blueprint
+
+Prerequisites:
+
+- Deferred Live Runtime Validation completed or explicitly re-planned
+
+Goal:
+
+Build Product Truth reconciliation and the Blueprint boundary. This milestone is NOT STARTED.
 
 ## M2-B — Flow Video Canary
 
 Prerequisites:
 
-- R1 application integration stable
+- R2 Product Truth / Blueprint stable
 - real product references
 - working Google Flow session/runtime access
 
