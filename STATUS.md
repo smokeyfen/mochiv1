@@ -2,12 +2,12 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `e236d02f2a994684dee23f5b8c372ac67a261f86`
+- Current verified implementation commit: `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B3B.2 apps/web Product Evidence UI
-- Milestone status: PASS — provider-neutral web analysis client and Product Evidence UI verified with mocks
-- Application path: IMPLEMENTED — awaiting deferred live runtime validation
+- Current milestone: R1-B3B.2.1 Claim Allowed-State UI
+- Milestone status: PASS — ProductClaim allowed state is visibly rendered from the validated contract
+- Application path: COMPLETE — ready for deferred live runtime validation
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
@@ -48,3 +48,5 @@ R1-B3A Server HTTP Analysis Boundary at `8ab8e002b246b689ba3d80fed074f306b279e20
 R1-B3B.1 HTTP Runtime Adapter at `242cc9b16cecb7a967330b2e20b840f63e4c882c`: native `node:http` now translates Node requests to the locked Web Request handler and writes the resulting Web Response back without logging request bodies or credentials. It preserves method, path, query, headers, multipart bytes, response status, headers, and body, with a bounded 10 MiB development body limit. `npm run dev -w @mochi/server` composes server-only provider configuration, the locked HTTP handler, and adapter on `127.0.0.1:8787` with an optional `MOCHI_SERVER_PORT` override. Vite proxies `/api` to that local server without exposing credentials. Verification: `npm run typecheck` PASS; `npm test` PASS (78 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
 
 R1-B3B.2 apps/web Product Evidence UI at `e236d02f2a994684dee23f5b8c372ac67a261f86`: apps/web posts only factual `ProductInput` and exact browser `File` values to the relative `/api/product-evidence` endpoint. It validates files locally, never sends creative direction or project data, decodes the response into the explicit ProductEvidence contract, and runs final contract validation before rendering factual analysis sections. Factual changes abort and invalidate evidence immediately; creative changes preserve evidence while still invalidating the canonical project preview. Verification: `npm run typecheck` PASS; `npm test` PASS (86 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live runtime validation was not run. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
+
+R1-B3B.2.1 Claim Allowed-State UI at `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`: every Product Analysis claim now shows its contract-provided source and direct `ALLOWED` or `NOT ALLOWED` state. Reference-evidence claims show only the count of supporting references; logical asset IDs remain absent from the user-facing claim display. Verification: `npm run typecheck` PASS; `npm test` PASS (87 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. R1 Application Path is COMPLETE and ready for the separately authorized deferred live runtime validation, which remains NOT RUN. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
