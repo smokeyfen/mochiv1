@@ -8,10 +8,11 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - R1-LIVE: **PASS**
 - R1 Product Evidence: **RUNTIME VALIDATED / FINAL LOCKED**
 - RUBRIC-0: **PASS / LOCKED**
-- Historical Gemini live calls: 1; Flow calls: 0; video generation: 0; action promotions: 0
+- Historical Gemini live calls: 1; Flow generations: 2 (24 credits); action promotions: 0
 - Every physical `ActionId` remains `UNTESTED`
-- F0 Manual Omni Confirmatory Canary: **NOT STARTED**
-- R2-A Product Truth: **NOT STARTED**
+- F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**; F0-A.4 ROTATE_SLOW is **DEFERRED**
+- R2-A Product Truth: **NEXT / NOT STARTED**
+- PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
 `STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.
 
@@ -57,11 +58,11 @@ This is the frozen V1 architecture target. Do not begin a later stage without ex
 
 ## Empirical track
 
-After RUBRIC-0, the next empirical work is:
+F0 baseline transfer confidence is accepted for roadmap continuation from successful reviewed PICK_UP and HOLD canaries. No additional per-action runtime canary is required while implementing R2-A, R2-B, R2 Commit Gate, R3, R4, R5, R6, R7-A, T0, R7-B, R8, and P0.
 
-`F0-A baseline manual Flow/Omni transfer canary`
-→ later benchmark-mode evidence collection
-→ action promotion only after locked repo-local evidence thresholds.
+`F0-A.4 ROTATE_SLOW` is deferred. The next runtime checkpoint is **PRE-F1 INTEGRATION GATE**, only after R8 and P0 are PASS / LOCKED. It performs one consolidated real-runtime validation of the completed reasoning/compiler pipeline before final Flow runtime path work.
+
+Implementation milestones may use deterministic fixtures and mocks when empirical capability is unavailable. This does not promote an action or weaken production feasibility.
 
 Do not mark an action `SAFE` or `RISKY` from intuition, a single output, or non-Flow evidence. The locked promotion policy remains 10 reviewed attempts, 0.90 SAFE pass rate, and 0.60 RISKY pass rate.
 

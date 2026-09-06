@@ -15,12 +15,13 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - RUBRIC-0 benchmark scoring contract: **PASS / LOCKED**
 - SYNC-0 Mandatory Codex Handoff: **PASS**
 - Historical Gemini live calls: 1
-- Flow calls: 0
-- Video generation: 0
+- Historical Flow generations: 2 (24 credits)
 - Action promotions: 0
 - All physical `ActionId` values: `UNTESTED`
-- F0 Manual Omni Confirmatory Canary: **NOT STARTED**
-- R2-A Product Truth: **NOT STARTED**
+- F0 BASELINE TRANSFER: **ACCEPTED / FAST-TRACK**
+- F0-A.4 ROTATE_SLOW: **DEFERRED**
+- R2-A Product Truth: **NEXT / NOT STARTED**
+- PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
 
@@ -70,17 +71,15 @@ The frozen V1 target pipeline is:
 
 This is a sequencing and boundary lock. It is not authorization to begin the next stage. Each stage requires an explicit task and acceptance gate.
 
-## Empirical track after RUBRIC-0
+## Empirical and PRE-F1 runtime policy
 
-The next empirical stage is **F0-A baseline manual Flow/Omni transfer canary**. It is NOT STARTED.
+Baseline transfer confidence is accepted for roadmap continuation because the completed real PICK_UP and HOLD canaries each have a valid, single reviewed RUBRIC-0 PASS observation. Those observations do not promote either action: the locked 10-attempt, 0.90 SAFE, and 0.60 RISKY policy remains in force.
 
-The empirical path is:
+F0-A.4 ROTATE_SLOW is DEFERRED. No additional per-action runtime validation is required while implementing R2-A, R2-B, R2 Commit Gate, R3, R4, R5, R6, R7-A, T0, R7-B, R8, and P0. These milestones must retain strict contracts, deterministic validation, unit/integration tests, provider-neutral boundaries, and fail-closed behavior.
 
-`F0-A baseline manual Flow/Omni transfer canary`
-→ later benchmark-mode evidence collection
-→ ActionCapability promotion only after locked evidence thresholds.
+The next consolidated runtime checkpoint is **PRE-F1 INTEGRATION GATE**, only after R8 and P0 are PASS / LOCKED. At PRE-F1, perform one consolidated real-runtime validation of the completed reasoning/compiler pipeline before implementing or enabling the final Flow runtime path.
 
-RUBRIC-0 evaluates one generated benchmark scene against actual generated video, real product references, and the benchmark contract. It does not add artificial cross-scene continuity to F0. Pairwise and global continuity QC belong to the later production pipeline.
+RUBRIC-0 still evaluates one generated benchmark scene against actual generated video, real product references, and the benchmark contract. It does not add artificial cross-scene continuity to F0. Pairwise and global continuity QC belong to the later production pipeline.
 
 ## Non-negotiable architecture locks
 
