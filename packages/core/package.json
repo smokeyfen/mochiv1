@@ -6,7 +6,9 @@
   "exports": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --experimental-strip-types --test src/core.test.ts"
+    "test": "node --experimental-strip-types --test src/*.test.ts"
   },
-  "dependencies": {"@mochi/contracts": "*"}
+  "dependencies": {
+    "@mochi/contracts": "*"
+  }
 }

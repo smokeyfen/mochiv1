@@ -54,6 +54,13 @@ export interface MochiProjectInput {
   creativeDirection: CreativeDirectionInput;
 }
 
+export type VoiceTimingCalibrationProvenance = 'SYNTHETIC'|'EMPIRICAL';
+export interface VoiceTimingCalibrationKey { language:'vi-VN'; voiceGender:VoiceGender; voiceRegion:VoiceRegion; voiceStyle:string; }
+export interface VoiceTimingObservation { observationId:string; calibrationKey:VoiceTimingCalibrationKey; normalizedText:string; spokenUnitCount:number; measuredDurationMs:number; provenance:VoiceTimingCalibrationProvenance; }
+export interface VoiceTimingCalibrationPolicy { targetSceneDurationMs:8000; safetyMarginMs:number; minimumObservations:number; }
+export interface VoiceTimingProfile { schemaVersion:SchemaVersion; calibrationVersion:'VOICE_TIMING_V1'; calibrationKey:VoiceTimingCalibrationKey; provenance:VoiceTimingCalibrationProvenance; sampleCount:number; medianUnitsPerSecond:number; conservativeUnitsPerSecond:number; targetSceneDurationMs:8000; safetyMarginMs:number; usableSpeechDurationMs:number; recommendedMaxSpokenUnits:number; sourceObservationIds:readonly string[]; }
+export type DialogueTimingStatus='FITS'|'TOO_LONG';export interface DialogueDurationEstimate { normalizedText:string; spokenUnitCount:number; estimatedDurationMs:number; usableSpeechDurationMs:number; status:DialogueTimingStatus; }
+
 export interface ProductClaim {
   claimId: string;
   text: string;
