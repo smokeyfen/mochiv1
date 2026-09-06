@@ -57,3 +57,17 @@ None. Product Truth remains separate from Creative Direction. Core contracts rem
 ## Next action
 
 STOP. R1-B2 server-side live Gemini bridge is NOT STARTED. Do not connect apps/web to a provider, make live calls, or begin Flow integration.
+
+## R1-B1.1 — Product Evidence Structured Output Schema
+
+- Starting checkpoint: `425b6fad6dd56f6c3ae05fe2d5ce6e5a7dc20550`
+- Implementation commit: `7a0d0a56ddaabdd2235cffa906a19d46977f330c`
+- Status: PASS
+
+The weak required-fields-only schema was replaced with `buildProductEvidenceSchema(product)`. The schema defines full properties and types for ProductEvidence, claims, uncertainties, and contradictions. It accepts only supported structural constructs, rejects undeclared top-level and nested object properties, restricts schema version and product ID to the current domain values, and restricts every provenance array to the product's logical asset IDs. `contradictions.statements` requires at least two strings. Semantic conditions such as reference-claim evidence remain enforced by deterministic validation after the single provider response.
+
+Files changed: `packages/evidence/src/index.ts`, `packages/evidence/src/index.test.ts`, `STATUS.md`, and this checkpoint. No apps/web, Core, contracts, provider implementation, VideoProvider, Flow runtime, backend, or action-capability code changed.
+
+Verification: `npm run typecheck` PASS across six workspaces; `npm test` PASS with 56 tests; `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Schema and identifier audit PASS: full properties and nested types exist; enums contain logical/domain values only; Evidence has no Gemini, Flow, credential, runtime identifier, local path, File/Blob, or media-byte schema data. Live Gemini calls: 0; Flow calls: 0; real video generation: 0. `main` remains `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`.
+
+R1-B1.1 is PASS. R1-B2 server-side live Gemini bridge remains NOT STARTED.
