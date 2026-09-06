@@ -28,8 +28,8 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R5 Deterministic State Engine: **PASS / LOCKED**
 - R6 Scene Risk + bounded replan: **PASS / LOCKED**
 - R7-A Human Realism: **PASS / LOCKED**
-- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
-- T0-LIVE empirical local-TTS calibration: **NEXT / NOT STARTED**
+- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**`r`n- T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary: **PASS / LOCKED**
+- T0-LIVE Saydi browser automation, empirical timing, and human listening: **NEXT / NOT STARTED**
 - R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
@@ -144,3 +144,7 @@ R7-A is locked at `680012c10f3f0f92a7744c496350b450c0f9e916`. It produces a prov
 ## T0-PREP Voice Timing Calibration Infrastructure
 
 T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE is next and must supply measured local-TTS timing before R7-B may begin.
+
+## T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary
+
+T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 `vi-VN` review identities cover the four gender/region combinations, and timing profiles are accepted only for their exact identity. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.

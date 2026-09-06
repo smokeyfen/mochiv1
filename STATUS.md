@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`
+- Current verified implementation commit: `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: T0-PREP Voice Timing Calibration Infrastructure — FINAL LOCKED
-- Milestone status: PASS / LOCKED — R3 through R7-A plus T0-PREP acceptance coverage complete
+- Current milestone: T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary — FINAL LOCKED
+- Milestone status: PASS / LOCKED — R3 through R7-A, T0-PREP, and T0-SAYDI-PREP acceptance coverage complete
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. T0-LIVE empirical local-TTS calibration is NEXT / NOT STARTED; R7-B is BLOCKED on T0-LIVE. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
+- Next action: STOP. T0-LIVE Saydi browser automation, empirical timing, and human listening are NEXT / NOT STARTED; R7-B remains BLOCKED on T0-LIVE. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
@@ -77,3 +77,5 @@ R7-A Human Realism at `680012c10f3f0f92a7744c496350b450c0f9e916`: provider-neutr
 
 
 T0-PREP Voice Timing Calibration Infrastructure at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`: provider-neutral contracts and a pure core compiler normalize Vietnamese-oriented spoken units, validate exact voice identity, and derive a versioned VoiceTimingProfile from measured durations. Conservative rate uses documented nearest-rank lower-quartile measured rate; policy explicitly supplies margin and minimum observations, and target scene duration remains exactly 8000 ms. The estimator returns FITS/TOO_LONG without rewriting text. Profiles carry explicit SYNTHETIC or EMPIRICAL provenance; synthetic profiles are rejected by the empirical readiness guard. Verification: `npm run typecheck` PASS; `npm test` PASS (150 tests); `npm run benchmark:dry` PASS with expected UNTESTED action failures; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. T0-PREP PASS / LOCKED. T0-LIVE is NEXT / NOT STARTED; R7-B is BLOCKED on T0-LIVE. No TTS engine, audio generation, Gemini/Flow call, or action promotion occurred.
+
+T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`: `VOICE_TIMING_V2` makes provider-neutral `voiceIdentityId` mandatory in every timing calibration key and profile. Four deterministic V1 Vietnamese review identities cover FEMALE/MALE × SOUTH/NORTH; unsupported style fails closed. Empirical profile readiness now binds to the exact identity, so a profile cannot be reused after a physical voice change. `packages/providers` adds a generic `VoiceProvider` interface and an unimplemented, mock-tested Saydi browser boundary. Provider voice IDs, names, settings, and browser mechanics remain only in that boundary; no production Saydi bindings, browser automation, or audio calls exist. Verification: `npm run typecheck` PASS; `npm test` PASS (158 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. T0-SAYDI-PREP PASS / LOCKED. T0-LIVE Saydi browser automation, empirical timing, and human listening are NEXT / NOT STARTED; R7-B remains BLOCKED. No Saydi, Gemini, or Flow call occurred; no audio was generated; action capability remains unchanged.

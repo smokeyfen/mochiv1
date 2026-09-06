@@ -19,8 +19,8 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - R5 Deterministic State Engine: **PASS / LOCKED**
 - R6 Scene Risk + bounded replan: **PASS / LOCKED**
 - R7-A Human Realism: **PASS / LOCKED**
-- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
-- T0-LIVE empirical local-TTS calibration: **NEXT / NOT STARTED**
+- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**`r`n- T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary: **PASS / LOCKED**
+- T0-LIVE Saydi browser automation, empirical timing, and human listening: **NEXT / NOT STARTED**
 - R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
@@ -106,3 +106,7 @@ Do not mark an action `SAFE` or `RISKY` from intuition, a single output, or non-
 ## UI policy
 
 Keep the UI minimal, static, readable, and focused on the current product workflow. Do not add animation, canvas, node graphs, fancy timelines, or a UI redesign unless expressly authorized.
+
+## T0-SAYDI-PREP lock
+
+`VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` for every calibration observation and profile. The four V1 review identities are deterministic for `vi-VN` × `FEMALE|MALE` × `SOUTH|NORTH` with `voiceStyle: review`; no other style may claim timing support. The generic VoiceProvider contract remains provider-neutral. Saydi browser bindings may contain provider voice IDs, names, settings, and browser mechanics only in `packages/providers`; contracts and profiles must never contain those values. No production Saydi binding may be guessed. T0-LIVE must first prove browser feasibility, exact binding, measured audio timing, and human listening quality before it can be locked or unblock R7-B.
