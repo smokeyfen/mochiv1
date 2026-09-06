@@ -14,7 +14,9 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - R2-A Product Truth: **PASS / LOCKED**
 - R2-B Reference Assessment: **PASS / LOCKED**
 - R2 Commit Gate: **PASS / LOCKED**
-- R3 Continuity Synthesis: **NEXT / NOT STARTED**
+- R3 Continuity Synthesis: **PASS / LOCKED**
+- R4 Global 4-Scene Planner: **PASS / LOCKED**
+- R5 Deterministic State Engine: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
 `STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.

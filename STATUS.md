@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `e48e5ffe397721da42e376f6c2995189c0c1fbd3`
+- Current verified implementation commit: `3c3e3af7d00e91f70e13f9ec1b403a0d207708d0`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R2 Commit Gate
-- Milestone status: PASS / LOCKED — ProductTruth and ReferenceAssessment commit atomically only from the same validated source
+- Current milestone: R4 Global 4-Scene Planner
+- Milestone status: PASS / LOCKED — global four-scene intents compile from committed R2 truth and R3 continuity
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. R3 Continuity Synthesis is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
+- Next action: STOP. R5 Deterministic State Engine is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
@@ -22,7 +22,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 PASS / LOCKED → F0 BASELINE TRANSFER ACCEPTED / FAST-TRACK → R2-A Product Truth PASS / LOCKED → R2-B Reference Assessment PASS / LOCKED → R2 Commit Gate PASS / LOCKED → R3 → R4 → R5 → R6 → R7-A → T0 → R7-B → R8 → P0 → PRE-F1 INTEGRATION GATE → final Flow runtime path. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 PASS / LOCKED → F0 BASELINE TRANSFER ACCEPTED / FAST-TRACK → R2-A Product Truth PASS / LOCKED → R2-B Reference Assessment PASS / LOCKED → R2 Commit Gate PASS / LOCKED → R3 Continuity Synthesis PASS / LOCKED → R4 Global 4-Scene Planner PASS / LOCKED → R5 → R6 → R7-A → T0 → R7-B → R8 → P0 → PRE-F1 INTEGRATION GATE → final Flow runtime path.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 

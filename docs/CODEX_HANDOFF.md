@@ -23,7 +23,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R2-A Product Truth: **PASS / LOCKED**
 - R2-B Reference Assessment: **PASS / LOCKED**
 - R2 Commit Gate: **PASS / LOCKED**
-- R3 Continuity Synthesis: **NEXT / NOT STARTED**
+- R3 Continuity Synthesis: **PASS / LOCKED**
+- R4 Global 4-Scene Planner: **PASS / LOCKED**
+- R5 Deterministic State Engine: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
