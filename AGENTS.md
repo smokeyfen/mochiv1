@@ -62,7 +62,7 @@ Read `docs/M0-ACCEPTANCE.md` and other M0 handoff artifacts only as historical c
 → `Pairwise Continuity QC`
 → `Selective Repair / Approval`
 → `Global Cumulative QC`
-→ `T1 Local TTS`
+→ `T1 Authoritative Voice Synthesis`
 → one-pass `FFmpeg`
 → Final MP4
 
@@ -112,3 +112,7 @@ Keep the UI minimal, static, readable, and focused on the current product workfl
 ## T0-SAYDI-PREP lock
 
 `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` for every calibration observation and profile. The four V1 review identities are deterministic for `vi-VN` × `FEMALE|MALE` × `SOUTH|NORTH` with `voiceStyle: review`; one canonical Core validator requires each identity and every metadata field to correspond exactly, and no other style may claim timing support. The generic VoiceProvider contract remains provider-neutral. Saydi browser bindings may contain provider voice IDs, names, settings, and browser mechanics only in `packages/providers`; contracts and profiles must never contain those values. No production Saydi binding may be guessed. T0-LIVE must first prove browser feasibility, exact binding, measured audio timing, and human listening quality before it can be locked or unblock R7-B.
+
+## Frozen V1 voice architecture
+
+`T1 Authoritative Voice Synthesis` is provider-neutral at the architecture boundary. The V1 primary provider is SaydiVoice via `SaydiBrowserVoiceProvider`; Local TTS is fallback contingency only. Google Flow is video only and is never authoritative speech. Later final audio assembly combines authoritative voice WAV with approved Flow scene video through one FFmpeg pass. Saydi-specific physical voice IDs remain confined to provider infrastructure and never enter Core architecture contracts.

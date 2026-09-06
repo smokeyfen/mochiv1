@@ -82,7 +82,7 @@ The frozen V1 target pipeline is:
 → `Pairwise Continuity QC`
 → `Selective Repair / Approval`
 → `Global Cumulative QC`
-→ `T1 Local TTS`
+→ `T1 Authoritative Voice Synthesis`
 → one-pass `FFmpeg`
 → Final MP4
 
@@ -145,8 +145,12 @@ R7-A is locked at `680012c10f3f0f92a7744c496350b450c0f9e916`. It produces a prov
 
 ## T0-PREP Voice Timing Calibration Infrastructure
 
-T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE is next and must supply measured local-TTS timing before R7-B may begin.
+T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE is next and must establish Saydi browser feasibility, exact physical voice binding, empirical VOICE_TIMING_V2 calibration, and human listening before R7-B may begin.
 
 ## T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary
 
-T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 i-VN review identities cover the four gender/region combinations. Since $sha, one canonical Core validator requires every identity, language, gender, region, and style field to correspond exactly; observations, persisted profiles, and Saydi binding construction all fail closed on contradiction. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.
+T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 vi-VN review identities cover the four gender/region combinations. Corrective implementation `0b818a956b2fc34c2d3d560eba57c090d10dcca2` adds one canonical Core validator that enforces exact correspondence between `voiceIdentityId`, `language`, `voiceGender`, `voiceRegion`, and `voiceStyle` for observations, persisted timing profiles, and Saydi bindings; contradictions fail closed. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.
+
+## Frozen V1 voice architecture
+
+`T1 Authoritative Voice Synthesis` is provider-neutral at the architecture boundary. The V1 primary provider is SaydiVoice via `SaydiBrowserVoiceProvider`; Local TTS is fallback contingency only. Google Flow is video only and is never authoritative speech. Later final audio assembly combines authoritative voice WAV with approved Flow scene video through one FFmpeg pass. Saydi-specific physical voice IDs remain confined to provider infrastructure and never enter Core architecture contracts.
