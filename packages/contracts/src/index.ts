@@ -133,6 +133,69 @@ export interface ProductTruth {
   exclusions: readonly ProductTruthExclusion[];
 }
 
+export type ReferenceTargetVisibility = 'CLEAR' | 'PARTIAL' | 'POOR';
+export type ReferenceIdentityConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export type ReferenceGeometryCoverage = 'STRONG' | 'PARTIAL' | 'MINIMAL';
+export type ReferenceLabelReadability = 'CLEAR' | 'PARTIAL' | 'UNREADABLE' | 'NOT_VISIBLE';
+export type ReferenceOcclusion = 'NONE' | 'PARTIAL' | 'SEVERE';
+export type ReferenceBackgroundInterference = 'LOW' | 'MEDIUM' | 'HIGH';
+export type ReferenceMultiProductAmbiguity = 'NONE' | 'MODERATE' | 'HIGH';
+
+/** Enum-only assessment of a single logical canonical reference asset. */
+export interface ReferenceAssetAssessment {
+  assetId: string;
+  targetVisibility: ReferenceTargetVisibility;
+  identityConfidence: ReferenceIdentityConfidence;
+  geometryCoverage: ReferenceGeometryCoverage;
+  labelReadability: ReferenceLabelReadability;
+  occlusion: ReferenceOcclusion;
+  backgroundInterference: ReferenceBackgroundInterference;
+  multiProductAmbiguity: ReferenceMultiProductAmbiguity;
+}
+
+export type ReferenceReadiness = 'READY' | 'LIMITED' | 'BLOCKED';
+export type ReferenceLimitationCode =
+  | 'TARGET_VISIBILITY_POOR'
+  | 'IDENTITY_CONFIDENCE_LOW'
+  | 'GEOMETRY_COVERAGE_PARTIAL'
+  | 'GEOMETRY_COVERAGE_MINIMAL'
+  | 'LABEL_READABILITY_PARTIAL'
+  | 'LABEL_READABILITY_UNREADABLE'
+  | 'LABEL_NOT_VISIBLE'
+  | 'OCCLUSION_PARTIAL'
+  | 'OCCLUSION_SEVERE'
+  | 'BACKGROUND_INTERFERENCE_MEDIUM'
+  | 'BACKGROUND_INTERFERENCE_HIGH'
+  | 'MULTI_PRODUCT_AMBIGUITY_MODERATE'
+  | 'MULTI_PRODUCT_AMBIGUITY_HIGH';
+
+/**
+ * A provider-neutral, enum-only assessment of the same canonical evidence
+ * source used by ProductTruth. Readiness and limitations are deterministic.
+ */
+export interface ReferenceAssessment {
+  schemaVersion: SchemaVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  assetAssessments: readonly ReferenceAssetAssessment[];
+  readiness: ReferenceReadiness;
+  limitationCodes: readonly ReferenceLimitationCode[];
+}
+
+/**
+ * Atomic provider-neutral context committed only after ProductTruth and
+ * ReferenceAssessment independently validate against the same evidence source.
+ */
+export interface R2CommittedProductContext {
+  schemaVersion: SchemaVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  productTruth: ProductTruth;
+  referenceAssessment: ReferenceAssessment;
+}
+
 export type TransitionType = 'CONTINUOUS' | 'MATCH_CUT' | 'JUMP_CUT';
 export type HeldBy = 'NONE' | 'LEFT_HAND' | 'RIGHT_HAND' | 'BOTH_HANDS';
 
@@ -622,6 +685,133 @@ function sameContradictions(
       && sameStringArray(value.statements, source.statements)
       && sameStringArray(value.assetIds, source.assetIds);
   });
+}
+
+const REFERENCE_LIMITATION_CODE_ORDER: readonly ReferenceLimitationCode[] = [
+  'TARGET_VISIBILITY_POOR',
+  'IDENTITY_CONFIDENCE_LOW',
+  'GEOMETRY_COVERAGE_PARTIAL',
+  'GEOMETRY_COVERAGE_MINIMAL',
+  'LABEL_READABILITY_PARTIAL',
+  'LABEL_READABILITY_UNREADABLE',
+  'LABEL_NOT_VISIBLE',
+  'OCCLUSION_PARTIAL',
+  'OCCLUSION_SEVERE',
+  'BACKGROUND_INTERFERENCE_MEDIUM',
+  'BACKGROUND_INTERFERENCE_HIGH',
+  'MULTI_PRODUCT_AMBIGUITY_MODERATE',
+  'MULTI_PRODUCT_AMBIGUITY_HIGH'
+];
+
+/** Derives a stable set of limitations from enum-only asset assessments. */
+export function deriveReferenceLimitationCodes(
+  assessments: readonly ReferenceAssetAssessment[]
+): readonly ReferenceLimitationCode[] {
+  const observed = new Set<ReferenceLimitationCode>();
+  for (const assessment of assessments) {
+    if (assessment.targetVisibility === 'POOR') observed.add('TARGET_VISIBILITY_POOR');
+    if (assessment.identityConfidence === 'LOW') observed.add('IDENTITY_CONFIDENCE_LOW');
+    if (assessment.geometryCoverage === 'PARTIAL') observed.add('GEOMETRY_COVERAGE_PARTIAL');
+    if (assessment.geometryCoverage === 'MINIMAL') observed.add('GEOMETRY_COVERAGE_MINIMAL');
+    if (assessment.labelReadability === 'PARTIAL') observed.add('LABEL_READABILITY_PARTIAL');
+    if (assessment.labelReadability === 'UNREADABLE') observed.add('LABEL_READABILITY_UNREADABLE');
+    if (assessment.labelReadability === 'NOT_VISIBLE') observed.add('LABEL_NOT_VISIBLE');
+    if (assessment.occlusion === 'PARTIAL') observed.add('OCCLUSION_PARTIAL');
+    if (assessment.occlusion === 'SEVERE') observed.add('OCCLUSION_SEVERE');
+    if (assessment.backgroundInterference === 'MEDIUM') observed.add('BACKGROUND_INTERFERENCE_MEDIUM');
+    if (assessment.backgroundInterference === 'HIGH') observed.add('BACKGROUND_INTERFERENCE_HIGH');
+    if (assessment.multiProductAmbiguity === 'MODERATE') observed.add('MULTI_PRODUCT_AMBIGUITY_MODERATE');
+    if (assessment.multiProductAmbiguity === 'HIGH') observed.add('MULTI_PRODUCT_AMBIGUITY_HIGH');
+  }
+  return REFERENCE_LIMITATION_CODE_ORDER.filter(code => observed.has(code));
+}
+
+/** Derives readiness without a model score or model-authored explanation. */
+export function deriveReferenceReadiness(
+  assessments: readonly ReferenceAssetAssessment[]
+): ReferenceReadiness {
+  const usable = assessments.filter(assessment =>
+    (assessment.targetVisibility === 'CLEAR' || assessment.targetVisibility === 'PARTIAL')
+    && (assessment.identityConfidence === 'HIGH' || assessment.identityConfidence === 'MEDIUM')
+  );
+  if (usable.length === 0) return 'BLOCKED';
+  if (usable.some(assessment => assessment.geometryCoverage === 'MINIMAL'
+    || assessment.occlusion === 'SEVERE'
+    || assessment.multiProductAmbiguity === 'HIGH')) return 'LIMITED';
+  return 'READY';
+}
+
+/** Validates the exact reference source and deterministic derivations. */
+export function validateReferenceAssessment(
+  assessment: ReferenceAssessment,
+  product: ProductInput,
+  evidence: ProductEvidence,
+  sourceEvidenceVersion: string
+): readonly string[] {
+  const issues: string[] = [];
+  if (assessment.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(assessment.productId)) issues.push('product_id');
+  if (assessment.productId !== product.productId) issues.push('product_id_mismatch');
+  if (!nonBlank(assessment.sourceEvidenceVersion)) issues.push('source_evidence_version');
+  if (assessment.sourceEvidenceVersion !== sourceEvidenceVersion) issues.push('source_evidence_version_mismatch');
+
+  const productAssetIds = new Set(product.assets.map(asset => asset.assetId));
+  const canonicalIds = new Set<string>();
+  for (const assetId of assessment.canonicalAssetIds) {
+    if (canonicalIds.has(assetId)) issues.push(`duplicate_canonical_asset:${assetId}`);
+    canonicalIds.add(assetId);
+    if (!productAssetIds.has(assetId)) issues.push(`unknown_canonical_asset:${assetId}`);
+  }
+  if (!sameStringArray(assessment.canonicalAssetIds, evidence.canonicalAssetIds)) {
+    issues.push('canonical_asset_ids_mismatch');
+  }
+
+  const assessmentIds = new Set<string>();
+  for (const [index, item] of assessment.assetAssessments.entries()) {
+    if (!nonBlank(item.assetId)) issues.push('assessment_asset_id');
+    if (assessmentIds.has(item.assetId)) issues.push(`duplicate_asset_assessment:${item.assetId}`);
+    assessmentIds.add(item.assetId);
+    if (!canonicalIds.has(item.assetId)) issues.push(`unknown_asset_assessment:${item.assetId}`);
+    if (item.assetId !== assessment.canonicalAssetIds[index]) issues.push(`asset_assessment_order_mismatch:${item.assetId}`);
+    if (!isTargetVisibility(item.targetVisibility)) issues.push(`invalid_target_visibility:${item.assetId}`);
+    if (!isIdentityConfidence(item.identityConfidence)) issues.push(`invalid_identity_confidence:${item.assetId}`);
+    if (!isGeometryCoverage(item.geometryCoverage)) issues.push(`invalid_geometry_coverage:${item.assetId}`);
+    if (!isLabelReadability(item.labelReadability)) issues.push(`invalid_label_readability:${item.assetId}`);
+    if (!isOcclusion(item.occlusion)) issues.push(`invalid_occlusion:${item.assetId}`);
+    if (!isBackgroundInterference(item.backgroundInterference)) issues.push(`invalid_background_interference:${item.assetId}`);
+    if (!isMultiProductAmbiguity(item.multiProductAmbiguity)) issues.push(`invalid_multi_product_ambiguity:${item.assetId}`);
+  }
+  for (const assetId of assessment.canonicalAssetIds) {
+    if (!assessmentIds.has(assetId)) issues.push(`missing_asset_assessment:${assetId}`);
+  }
+
+  const expectedReadiness = deriveReferenceReadiness(assessment.assetAssessments);
+  if (assessment.readiness !== expectedReadiness) issues.push('readiness_mismatch');
+  const expectedLimitations = deriveReferenceLimitationCodes(assessment.assetAssessments);
+  if (!sameStringArray(assessment.limitationCodes, expectedLimitations)) issues.push('limitation_codes_mismatch');
+  return issues;
+}
+
+function isTargetVisibility(value: unknown): value is ReferenceTargetVisibility {
+  return value === 'CLEAR' || value === 'PARTIAL' || value === 'POOR';
+}
+function isIdentityConfidence(value: unknown): value is ReferenceIdentityConfidence {
+  return value === 'HIGH' || value === 'MEDIUM' || value === 'LOW';
+}
+function isGeometryCoverage(value: unknown): value is ReferenceGeometryCoverage {
+  return value === 'STRONG' || value === 'PARTIAL' || value === 'MINIMAL';
+}
+function isLabelReadability(value: unknown): value is ReferenceLabelReadability {
+  return value === 'CLEAR' || value === 'PARTIAL' || value === 'UNREADABLE' || value === 'NOT_VISIBLE';
+}
+function isOcclusion(value: unknown): value is ReferenceOcclusion {
+  return value === 'NONE' || value === 'PARTIAL' || value === 'SEVERE';
+}
+function isBackgroundInterference(value: unknown): value is ReferenceBackgroundInterference {
+  return value === 'LOW' || value === 'MEDIUM' || value === 'HIGH';
+}
+function isMultiProductAmbiguity(value: unknown): value is ReferenceMultiProductAmbiguity {
+  return value === 'NONE' || value === 'MODERATE' || value === 'HIGH';
 }
 
 export function validateCreativeDirectionInput(input: CreativeDirectionInput): readonly string[] {
