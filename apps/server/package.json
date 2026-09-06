@@ -1,0 +1,21 @@
+{
+  "name": "@mochi/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "smoke:evidence": "tsx src/smoke-evidence.ts"
+  },
+  "dependencies": {
+    "@mochi/contracts": "*",
+    "@mochi/evidence": "*",
+    "@mochi/providers": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
