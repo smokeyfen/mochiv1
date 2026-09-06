@@ -22,3 +22,5 @@ export {
   R2CommitError,
   type CommitR2ProductContextRequest
 } from './commit.ts';
+export { synthesizeGlobalContinuity, validateGlobalContinuityState, ContinuityError } from './continuity.ts';
+export { planGlobal4Scenes, buildPlanningTruthCatalog, validatePlan, PlannerError } from './planner.ts';

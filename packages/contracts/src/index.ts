@@ -209,8 +209,10 @@ export interface PhysicalState {
 
 export interface GlobalContinuityState {
   schemaVersion: SchemaVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
   immutable: {
-    productId: string;
     handIdentity: {
       skinTone: string;
       nailStyle: string;
@@ -223,10 +225,39 @@ export interface GlobalContinuityState {
       background: string;
       lighting: string;
     };
-    cameraFamily: string;
-    voiceIdentity: string;
+    cameraFamily: 'SMARTPHONE_POV';
+    voiceIdentity: {
+      voiceGender: VoiceGender;
+      voiceRegion: VoiceRegion;
+      voiceStyle: string;
+    };
   };
-  current: PhysicalState;
+}
+
+export type DesiredStateEffect = 'NO_STATE_CHANGE' | 'BECOME_HELD' | 'REMAIN_HELD' | 'BECOME_PLACED' | 'CHANGE_ORIENTATION' | 'CHANGE_PRODUCT_STATE';
+export type Global4SceneRole = 'HOOK' | 'FEATURE' | 'PROOF' | 'CTA';
+export interface Global4SceneIntent {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  role: Global4SceneRole;
+  durationSeconds: 8;
+  aspectRatio: '9:16';
+  primaryTruthRefId: string;
+  physicalObjective: string;
+  primaryAction: ActionId;
+  desiredStateEffect: DesiredStateEffect;
+  dialogueDraft: string;
+  referenceAssetIds: readonly string[];
+  transitionToNext?: TransitionType;
+}
+export interface Global4ScenePlan {
+  schemaVersion: SchemaVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  continuity: GlobalContinuityState;
+  referenceLimitations: readonly ReferenceLimitationCode[];
+  scenes: readonly Global4SceneIntent[];
 }
 
 export type ActionId =
