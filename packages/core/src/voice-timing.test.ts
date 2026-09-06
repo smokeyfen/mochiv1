@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { VoiceTimingCalibrationKey, VoiceTimingCalibrationPolicy, VoiceTimingObservation } from '@mochi/contracts';
-import { assertEmpiricalVoiceTimingProfile, assertVoiceTimingProfileForKey, buildVoiceTimingProfile, countVietnameseSpokenUnits, estimateDialogueDuration, normalizeVietnameseSpokenText, resolveV1ReviewVoiceIdentity, VoiceTimingError } from './index.ts';
+import { assertEmpiricalVoiceTimingProfile, assertVoiceTimingProfileForKey, buildVoiceTimingProfile, countVietnameseSpokenUnits, estimateDialogueDuration, isCanonicalV1ReviewVoiceKey, normalizeVietnameseSpokenText, resolveV1ReviewVoiceIdentity, validateVoiceTimingObservation, VoiceTimingError } from './index.ts';
 
 const key: VoiceTimingCalibrationKey = { language: 'vi-VN', voiceIdentityId: 'VN_FEMALE_SOUTH_REVIEW_V1', voiceGender: 'FEMALE', voiceRegion: 'SOUTH', voiceStyle: 'review' };
 const policy: VoiceTimingCalibrationPolicy = { targetSceneDurationMs: 8000, safetyMarginMs: 1000, minimumObservations: 4 };
@@ -69,12 +69,32 @@ test('the four exact V1 review identities resolve deterministically and unsuppor
   assert.throws(() => resolveV1ReviewVoiceIdentity('vi-VN', 'FEMALE', 'SOUTH', 'warm'), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
 });
 
+test('canonical V1 voice keys require identity and metadata to correspond exactly', () => {
+  const canonicalKeys: readonly VoiceTimingCalibrationKey[] = [
+    { language: 'vi-VN', voiceIdentityId: 'VN_FEMALE_SOUTH_REVIEW_V1', voiceGender: 'FEMALE', voiceRegion: 'SOUTH', voiceStyle: 'review' },
+    { language: 'vi-VN', voiceIdentityId: 'VN_FEMALE_NORTH_REVIEW_V1', voiceGender: 'FEMALE', voiceRegion: 'NORTH', voiceStyle: 'review' },
+    { language: 'vi-VN', voiceIdentityId: 'VN_MALE_SOUTH_REVIEW_V1', voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' },
+    { language: 'vi-VN', voiceIdentityId: 'VN_MALE_NORTH_REVIEW_V1', voiceGender: 'MALE', voiceRegion: 'NORTH', voiceStyle: 'review' }
+  ];
+  for (const canonicalKey of canonicalKeys) assert.equal(isCanonicalV1ReviewVoiceKey(canonicalKey), true);
+  for (const inconsistent of [
+    { ...key, voiceIdentityId: 'VN_UNKNOWN_REVIEW_V1' },
+    { ...key, voiceGender: 'MALE' as const },
+    { ...key, voiceRegion: 'NORTH' as const },
+    { ...key, voiceStyle: 'warm' },
+    { ...key, language: 'en-US' as any }
+  ]) {
+    assert.equal(isCanonicalV1ReviewVoiceKey(inconsistent), false);
+    assert.ok(validateVoiceTimingObservation(obs('inconsistent', 'xin chào bạn', 1000, inconsistent)).includes('voice_identity'));
+  }
+});
 test('an empirical timing profile is bound to its exact immutable voice identity', () => {
   const empirical = buildVoiceTimingProfile(samples().map(item => ({ ...item, provenance: 'EMPIRICAL' as const })), policy);
   assert.doesNotThrow(() => assertEmpiricalVoiceTimingProfile(empirical));
   assert.doesNotThrow(() => assertVoiceTimingProfileForKey(empirical, key));
   assert.throws(() => assertVoiceTimingProfileForKey(empirical, { ...key, voiceIdentityId: 'VN_FEMALE_SOUTH_REVIEW_V2' }), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
   assert.throws(() => assertEmpiricalVoiceTimingProfile({ ...empirical, calibrationKey: { ...empirical.calibrationKey, voiceIdentityId: '' } }), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
+  assert.throws(() => assertEmpiricalVoiceTimingProfile({ ...empirical, calibrationKey: { ...empirical.calibrationKey, voiceRegion: 'NORTH' } }), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
 });
 
 test('synthetic profiles remain non-empirical for each V1 gender and region combination', () => {
