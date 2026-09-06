@@ -2,18 +2,18 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `7c5f93c34ce89ee2c63d2ce538fbfd43f79ad26d`
+- Current verified implementation commit: `1f94688483ffe1e7c08dcb60bb4c559dec18d76a`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: RUBRIC-0 benchmark scoring contract
-- Milestone status: PASS / LOCKED — deterministic versioned human-review verdict contract
+- Current milestone: F0-PREP Flexible Benchmark References
+- Milestone status: PASS / LOCKED — dry F0 fixture aligned to arbitrary PRODUCT_REFERENCE intake
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. F0 Manual Omni Confirmatory Canary is NEXT and NOT STARTED. R2-A Product Truth is the next reasoning milestone and NOT STARTED.
+- Next action: STOP. F0-A Manual Omni Confirmatory Canary is NEXT and NOT STARTED. R2-A Product Truth is NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -55,3 +55,5 @@ R1-B3B.2.1 Claim Allowed-State UI at `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`:
 R1-LIVE runtime validation: PASS, recorded from the completed controlled run. The observed path was apps/web → relative `POST /api/product-evidence` → apps/server → Gemini 3.5 Flash → validated ProductEvidence → Product Analysis UI. The backend ran on `127.0.0.1:8787`; the frontend ran on `localhost:5173`; exactly one request returned HTTP 200 and reached `PRODUCT_ANALYSIS_READY`. Identity, geometry, colors, packaging, visible labels, claims with source and allowed state, uncertainties, contradictions, and prohibited inferences rendered. Creative mutations preserved ProductEvidence without a second request; a Product Name mutation immediately cleared it and did not re-run analysis. Gemini live calls: 1. Flow calls, video generation, and action promotions: 0. All physical ActionIds remain `UNTESTED`. R1 Application Path and R1 Product Evidence are FINAL LOCKED. RUBRIC-0 is PASS / LOCKED; R2-A Product Truth is NOT STARTED.
 
 RUBRIC-0 at `7c5f93c34ce89ee2c63d2ce538fbfd43f79ad26d`: BenchmarkObservation now records `rubricVersion: RUBRIC_0`. The deterministic verdict is PASS only when every required existing benchmark dimension passes; missing, duplicate, malformed, version-mismatched, or manually inconsistent results fail validation. Critical-failure fail-closed behavior and the locked capability promotion thresholds remain unchanged. Human reviewer guidance is recorded in `docs/quality/RUBRIC_0.md`; it evaluates one generated benchmark scene and does not introduce cross-scene continuity into F0. Verification: `npm run typecheck` PASS; `npm test` PASS (95 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. RUBRIC-0 is PASS / LOCKED. No new Gemini calls occurred (historical total remains 1); Flow calls, video generation, and action promotions remain 0. F0 Manual Omni Confirmatory Canary is NEXT / NOT STARTED. R2-A Product Truth is the next reasoning milestone / NOT STARTED.
+
+F0-PREP Flexible Benchmark References at `1f94688483ffe1e7c08dcb60bb4c559dec18d76a`: pending GoldenProductFixture expectations and the dry bottle ScenePlan now use the provider-neutral logical `PRODUCT_REFERENCE` / `product-reference` naming locked by R1 intake. Golden fixture validation remains unchanged and fail-closed: a benchmark-ready reference still requires verified ProductTruth, a real UPLOAD image, non-empty SHA-256, and the expected PRODUCT_REFERENCE role. The pending fixture remains not benchmark-ready because it has no real references, and dry feasibility remains blocked by `action_untested:PICK_UP`. Verification: `npm run typecheck` PASS; `npm test` PASS (97 tests); `npm run benchmark:dry` PASS with expected fail-closed output; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. F0-PREP is PASS / LOCKED. No new Gemini calls occurred (historical total remains 1); Flow calls, video generation, and action promotions remain 0. F0-A Manual Omni Confirmatory Canary is NEXT / NOT STARTED. R2-A Product Truth is NOT STARTED.
