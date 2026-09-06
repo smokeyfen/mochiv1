@@ -139,7 +139,7 @@ Goal:
 
 Expose the trusted server-side evidence service through a minimal HTTP boundary without accepting credentials from apps/web. The handler strictly decodes ProductInput, maps multipart images to runtime media, invokes the injected service at most once, and returns only safe responses.
 
-## R1-B3B — apps/web Product Evidence Integration
+## R1-B3B.1 — HTTP Runtime Adapter (PASS)
 
 Prerequisites:
 
@@ -147,13 +147,23 @@ Prerequisites:
 
 Goal:
 
-Connect apps/web to the trusted HTTP boundary without exposing server credentials. This milestone is NOT STARTED.
+Run the locked Web Request handler through a native Node development server and proxy `/api` from Vite to the server-only runtime without exposing credentials.
+
+## R1-B3B.2 — apps/web Product Evidence UI
+
+Prerequisites:
+
+- R1-B3B.1 PASS
+
+Goal:
+
+Connect apps/web to the trusted relative `/api/product-evidence` path. This milestone is NOT STARTED.
 
 ## R1 Application Path Complete
 
 Prerequisites:
 
-- R1-B3B PASS
+- R1-B3B.2 PASS
 
 Goal:
 

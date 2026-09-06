@@ -2,17 +2,17 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `8ab8e002b246b689ba3d80fed074f306b279e20c`
+- Current verified implementation commit: `242cc9b16cecb7a967330b2e20b840f63e4c882c`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B3A Server HTTP Analysis Boundary
-- Milestone status: PASS — strict multipart Product Evidence HTTP boundary verified
-- Next application milestone: R1-B3B apps/web Product Evidence Integration — NOT STARTED
+- Current milestone: R1-B3B.1 HTTP Runtime Adapter
+- Milestone status: PASS — native Node development runtime adapter and Vite proxy verified
+- Next application milestone: R1-B3B.2 apps/web Product Evidence UI — NOT STARTED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. R1-B3B apps/web Product Evidence Integration is NOT STARTED; live runtime validation remains deferred.
+- Next action: STOP. R1-B3B.2 apps/web Product Evidence UI is NOT STARTED; live runtime validation remains deferred.
 
 No action has been promoted from `UNTESTED`.
 
@@ -20,7 +20,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B apps/web Product Evidence Integration → R1 Application Path Complete → Deferred Live Runtime Validation → R2 Product Truth / Blueprint → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path Complete → Deferred Live Runtime Validation → R2 Product Truth / Blueprint → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 
@@ -45,3 +45,4 @@ R1-B2 server-side bridge implementation at `f1dcd3da3aeaa23df1466c5817bc8d91de99
 R1-B2.1 diagnostics correction at `7cfd1dfe360dd35d04bf08169f5a5111690b075c`: Evidence now rethrows normalized provider-neutral `IntelligenceProviderError` categories unchanged while unexpected errors still become `PRODUCT_EVIDENCE_ERROR:PROVIDER_FAILURE`. The smoke runner maps those normalized categories to safe diagnostics and emits `R1_B2_PRODUCT_EVIDENCE_JSON=` containing only explicitly copied validated ProductEvidence fields. Verification: `npm run typecheck` PASS; `npm test` PASS (66 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. The live smoke was not run. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
 R1-B2.2 Flexible Product Reference Intake at `a806ac485732510aa90185fac80d428b12d619be`: `PRODUCT_REFERENCE` is a provider-neutral logical AssetRole for arbitrary user-supplied factual references. The web intake assigns it automatically to every upload and no longer renders a manual per-image role selector. Evidence instructions handle arbitrary order, packaging, text-heavy, in-hand, multi-product, and unrelated-background images conservatively, with uncertainty for ambiguous target attribution. Verification: `npm run typecheck` PASS; `npm test` PASS (69 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0. Live runtime validation is deferred until the R1 application milestone is complete.
 R1-B3A Server HTTP Analysis Boundary at `8ab8e002b246b689ba3d80fed074f306b279e20c`: `POST /api/product-evidence` accepts strict multipart ProductInput JSON plus one image per logical asset. Untrusted JSON is decoded into only canonical ProductInput fields; undeclared properties are rejected. Multipart media is mapped to runtime base64 only after exact asset, image, nonempty, and MIME checks. The injected service is called once at most, and responses expose only sanitized ProductEvidence or stable error codes. Verification: `npm run typecheck` PASS; `npm test` PASS (76 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0. Live runtime validation remains deferred.
+R1-B3B.1 HTTP Runtime Adapter at `242cc9b16cecb7a967330b2e20b840f63e4c882c`: native `node:http` now translates Node requests to the locked Web Request handler and writes the resulting Web Response back without logging request bodies or credentials. It preserves method, path, query, headers, multipart bytes, response status, headers, and body, with a bounded 10 MiB development body limit. `npm run dev -w @mochi/server` composes server-only provider configuration, the locked HTTP handler, and adapter on `127.0.0.1:8787` with an optional `MOCHI_SERVER_PORT` override. Vite proxies `/api` to that local server without exposing credentials. Verification: `npm run typecheck` PASS; `npm test` PASS (78 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
