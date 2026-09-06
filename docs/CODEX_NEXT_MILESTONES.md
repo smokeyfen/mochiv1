@@ -88,7 +88,7 @@ Goal:
 
 Expose the canonical project input boundary through the minimal `apps/web` surface. Do not add a backend or provider runtime in this milestone.
 
-## R1 — Product Evidence / reasoning pipeline
+## R1-A — Product Evidence Engine (PASS)
 
 Prerequisites:
 
@@ -96,13 +96,24 @@ Prerequisites:
 
 Goal:
 
-Introduce the provider-neutral Product Evidence and reasoning path behind the application surface. Gemini 3.5 Flash remains reasoning and multimodal analysis only. Local/free TTS remains the default future voice direction and will be benchmarked separately. This milestone is NOT STARTED.
+Introduce the provider-neutral Product Evidence boundary behind the application surface. It uses the IntelligenceProvider abstraction with mock/stub verification only, and Gemini 3.5 Flash remains reasoning and multimodal analysis only.
+
+## R1-B — Live reasoning bridge
+
+Prerequisites:
+
+- R1-A PASS
+- separately authorized provider configuration
+
+Goal:
+
+Connect the validated evidence boundary to a live intelligence provider without exposing it through apps/web. This milestone is NOT STARTED. Local/free TTS remains the default future voice direction and will be benchmarked separately.
 
 ## M2-B — Flow Video Canary
 
 Prerequisites:
 
-- reasoning pipeline stable
+- R1-B live reasoning bridge stable
 - real product references
 - working Google Flow session/runtime access
 
