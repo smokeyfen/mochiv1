@@ -2,17 +2,17 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `7a0d0a56ddaabdd2235cffa906a19d46977f330c`
+- Current verified implementation commit: `f1dcd3da3aeaa23df1466c5817bc8d91de992efa`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B1.1 Product Evidence Structured Output Schema
-- Milestone status: PASS — complete provider-neutral Product Evidence output schema verified
-- Next application milestone: R1-B2 server-side live Gemini bridge — NOT STARTED
+- Current milestone: R1-B2 Server-side Gemini Product Evidence Bridge
+- Milestone status: IMPLEMENTATION PASS — LIVE SMOKE BLOCKED pending server runtime prerequisites
+- Next application milestone: R1-B3 apps/web integration — NOT STARTED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. R1-B2 server-side live Gemini bridge is NOT STARTED and requires separate authorization.
+- Next action: STOP. R1-B2 live smoke requires both server runtime prerequisites; R1-B3 is NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -20,7 +20,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B3 apps/web integration → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 
@@ -41,3 +41,4 @@ R1-A factual context correction at `70415a3b869cfc577d1e5ca1cfd0dd91f00da2ad`: e
 R1-B1 trust-boundary correction at `d76a4f65d876d9f91e09974b0b03a0efbc35cde7`: `StructuredIntelligenceRequest` now separates authoritative `instruction` from optional untrusted `inputText`. Gemini transport maps only `instruction` to `config.systemInstruction` and emits `inputText` as a distinct user text part with media; it never duplicates policy in user content. Product Evidence passes fixed rules only as instruction and sanitized ProductInput JSON only as input text. Blank instructions and present-but-blank input text fail closed. Verification: `npm run typecheck` PASS; `npm test` PASS (53 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Identifier audits PASS. No live Gemini call, Flow call, or real video generation occurred.
 
 R1-B1.1 Product Evidence Structured Output Schema correction at `7a0d0a56ddaabdd2235cffa906a19d46977f330c`: `buildProductEvidenceSchema(product)` now defines every ProductEvidence field and nested object using the supported structured-output subset. It constrains schema version, product ID, and all provenance asset arrays to the current logical ProductInput values, rejects undeclared top-level and nested object properties, and uses `minItems: 2` for contradiction statements. Deterministic `validateProductEvidence` remains final authority. Verification: `npm run typecheck` PASS; `npm test` PASS (56 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Evidence identifier/schema audit PASS. No live Gemini call, Flow call, or real video generation occurred.
+R1-B2 server-side bridge implementation at `f1dcd3da3aeaa23df1466c5817bc8d91de992efa`: `apps/server` composes the existing provider-neutral evidence path with the concrete Gemini provider only at the trusted server edge. The development-only smoke runner consumes a local runtime manifest, copies only logical ProductInput fields, reads image bytes server-side, makes at most one evidence call, and prints safe counts only. Verification: `npm run typecheck` PASS; `npm test` PASS (63 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. The live smoke was not run: both `GEMINI_API_KEY` and `R1_B2_SMOKE_MANIFEST` were absent. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.

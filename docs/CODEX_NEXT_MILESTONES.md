@@ -108,7 +108,7 @@ Goal:
 
 Separate authoritative intelligence-provider rules from untrusted caller data before any live request. `instruction` carries rules only; optional `inputText` carries sanitized factual data only. The provider transport maps rules to its system-instruction mechanism and does not duplicate them in user content. This milestone makes no live call and does not change apps/web.
 
-## R1-B2 — Server-side live Gemini bridge
+## R1-B2 — Server-side live Gemini bridge (IMPLEMENTATION PASS / LIVE SMOKE BLOCKED)
 
 Prerequisites:
 
@@ -117,13 +117,23 @@ Prerequisites:
 
 Goal:
 
-Connect the validated evidence boundary to a live Gemini intelligence provider through a server-side bridge without exposing credentials or provider details through apps/web. This milestone is NOT STARTED. Local/free TTS remains the default future voice direction and will be benchmarked separately.
+Connect the validated evidence boundary to a live Gemini intelligence provider through a server-side bridge without exposing credentials or provider details through apps/web. The service and one-call smoke runner are implemented and locally verified. The live smoke is blocked until a server-only `GEMINI_API_KEY` and a valid local `R1_B2_SMOKE_MANIFEST` with real product images are present. Local/free TTS remains the default future voice direction and will be benchmarked separately.
+
+## R1-B3 — apps/web integration
+
+Prerequisites:
+
+- R1-B2 live smoke PASS
+
+Goal:
+
+Connect the future user-facing app surface to the trusted server boundary. This milestone is NOT STARTED.
 
 ## M2-B — Flow Video Canary
 
 Prerequisites:
 
-- R1-B2 server-side live Gemini bridge stable
+- R1-B3 integration stable
 - real product references
 - working Google Flow session/runtime access
 
