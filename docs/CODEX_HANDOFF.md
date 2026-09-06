@@ -28,7 +28,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R5 Deterministic State Engine: **PASS / LOCKED**
 - R6 Scene Risk + bounded replan: **PASS / LOCKED**
 - R7-A Human Realism: **PASS / LOCKED**
-- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**`r`n- T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary: **PASS / LOCKED**
+- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
+- T0-IDENTITY HARDENING: **PASS / LOCKED**
+- Saydi VoiceProvider Boundary: **PASS / LOCKED**
 - T0-LIVE Saydi browser automation, empirical timing, and human listening: **NEXT / NOT STARTED**
 - R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
@@ -147,4 +149,4 @@ T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS p
 
 ## T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary
 
-T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 `vi-VN` review identities cover the four gender/region combinations, and timing profiles are accepted only for their exact identity. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.
+T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 i-VN review identities cover the four gender/region combinations. Since $sha, one canonical Core validator requires every identity, language, gender, region, and style field to correspond exactly; observations, persisted profiles, and Saydi binding construction all fail closed on contradiction. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.
