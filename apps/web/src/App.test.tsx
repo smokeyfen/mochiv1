@@ -66,6 +66,37 @@ describe('App', () => {
     expect(preview.creativeDirection).toMatchObject({ voiceGender: 'FEMALE', voiceRegion: 'SOUTH' });
   });
 
+  it('invalidates READY_FOR_ANALYSIS after product edits and requires revalidation', () => {
+    render(<App />);
+    enterValidProjectInput();
+    submitProject();
+    expect(screen.getByText('READY_FOR_ANALYSIS')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Updated Mochi bottle' } });
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('canonical-input-preview')).not.toBeInTheDocument();
+
+    submitProject();
+    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
+    expect(preview.product.name).toBe('Updated Mochi bottle');
+  });
+
+  it('invalidates READY_FOR_ANALYSIS after creative or voice control edits', () => {
+    render(<App />);
+    enterValidProjectInput();
+    submitProject();
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'New audience' } });
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+
+    submitProject();
+    fireEvent.change(screen.getByLabelText('Voice Gender'), { target: { value: 'MALE' } });
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+
+    submitProject();
+    fireEvent.change(screen.getByLabelText('Voice Region'), { target: { value: 'NORTH' } });
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+  });
+
   it('maps supported gender and region values into canonical input', () => {
     render(<App />);
     enterValidProjectInput();
@@ -85,6 +116,7 @@ describe('App', () => {
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
     expect(preview.product.assets[0]).toMatchObject({ role: 'PRODUCT_IN_HAND', source: 'UPLOAD', mimeType: 'image/jpeg' });
     fireEvent.click(screen.getByRole('button', { name: 'Remove reference' }));
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
     submitProject();
     expect(screen.getByRole('alert')).toHaveTextContent('assets required');
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
@@ -101,6 +133,18 @@ describe('App', () => {
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
     expect(preview.product.assets).toHaveLength(1);
     expect(preview.product.assets[0].assetId).not.toBeUndefined();
+  });
+
+  it('invalidates READY_FOR_ANALYSIS when references are added or roles change', () => {
+    render(<App />);
+    enterValidProjectInput();
+    submitProject();
+    selectProductImage('side.jpg');
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+
+    submitProject();
+    fireEvent.change(screen.getAllByLabelText(/Reference role for asset-/)[0]!, { target: { value: 'PRODUCT_SIDE' } });
+    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
   });
 
   it('keeps browser runtime data out of canonical preview and exposes no provider action', () => {

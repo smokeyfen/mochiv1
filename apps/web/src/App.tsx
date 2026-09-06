@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import {
   SCHEMA_VERSION,
   validateMochiProjectInput,
@@ -58,6 +58,12 @@ export function App() {
   const filesByAssetId = useRef(new Map<string, File>());
   const previewUrls = useRef(new Set<string>());
 
+  const invalidateReadyInput = () => setReadyInput(null);
+  const updateInputValue = <T,>(setter: Dispatch<SetStateAction<T>>, value: T) => {
+    invalidateReadyInput();
+    setter(value);
+  };
+
   useEffect(() => () => {
     for (const previewUrl of previewUrls.current) revokePreviewUrl(previewUrl);
     previewUrls.current.clear();
@@ -97,11 +103,13 @@ export function App() {
           previewUrl
         };
       });
+    if (additions.length > 0) invalidateReadyInput();
     setReferenceAssets(current => [...current, ...additions]);
     event.target.value = '';
   };
 
   const updateReferenceRole = (assetId: string, role: ProductReferenceRole) => {
+    invalidateReadyInput();
     setReferenceAssets(current => current.map(reference => reference.asset.assetId === assetId
       ? { ...reference, asset: { ...reference.asset, role } }
       : reference
@@ -116,7 +124,7 @@ export function App() {
       filesByAssetId.current.delete(assetId);
     }
     setReferenceAssets(current => current.filter(reference => reference.asset.assetId !== assetId));
-    setReadyInput(null);
+    invalidateReadyInput();
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -139,10 +147,10 @@ export function App() {
         <section aria-labelledby="product-title">
           <h2 id="product-title">Product</h2>
           <div className="field-grid">
-            <label>Product Name<input value={productName} onChange={event => setProductName(event.target.value)} /></label>
-            <label>Category<input value={category} onChange={event => setCategory(event.target.value)} /></label>
+            <label>Product Name<input value={productName} onChange={event => updateInputValue(setProductName, event.target.value)} /></label>
+            <label>Category<input value={category} onChange={event => updateInputValue(setCategory, event.target.value)} /></label>
           </div>
-          <label>Product Details<textarea rows={4} value={productDetails} onChange={event => setProductDetails(event.target.value)} /></label>
+          <label>Product Details<textarea rows={4} value={productDetails} onChange={event => updateInputValue(setProductDetails, event.target.value)} /></label>
 
           <div className="references" aria-labelledby="references-title">
             <div><h3 id="references-title">Product reference images</h3><p>Images are browser runtime state. The project contract keeps logical asset references only.</p></div>
@@ -171,13 +179,13 @@ export function App() {
         <section aria-labelledby="creative-title">
           <h2 id="creative-title">Creative Direction</h2>
           <div className="field-grid">
-            <label>Audience<input value={audience} onChange={event => setAudience(event.target.value)} /></label>
-            <label>Shooting Context<input value={shootingContext} onChange={event => setShootingContext(event.target.value)} /></label>
-            <label>Reviewer Persona<input value={reviewerPersona} onChange={event => setReviewerPersona(event.target.value)} /></label>
-            <label>Tone<input value={tone} onChange={event => setTone(event.target.value)} /></label>
-            <label>Voice Style<input value={voiceStyle} onChange={event => setVoiceStyle(event.target.value)} /></label>
-            <label>Voice Gender<select value={voiceGender} onChange={event => setVoiceGender(event.target.value as VoiceGender)}><option value="FEMALE">FEMALE</option><option value="MALE">MALE</option></select></label>
-            <label>Voice Region<select value={voiceRegion} onChange={event => setVoiceRegion(event.target.value as VoiceRegion)}><option value="SOUTH">SOUTH</option><option value="NORTH">NORTH</option></select></label>
+            <label>Audience<input value={audience} onChange={event => updateInputValue(setAudience, event.target.value)} /></label>
+            <label>Shooting Context<input value={shootingContext} onChange={event => updateInputValue(setShootingContext, event.target.value)} /></label>
+            <label>Reviewer Persona<input value={reviewerPersona} onChange={event => updateInputValue(setReviewerPersona, event.target.value)} /></label>
+            <label>Tone<input value={tone} onChange={event => updateInputValue(setTone, event.target.value)} /></label>
+            <label>Voice Style<input value={voiceStyle} onChange={event => updateInputValue(setVoiceStyle, event.target.value)} /></label>
+            <label>Voice Gender<select value={voiceGender} onChange={event => updateInputValue(setVoiceGender, event.target.value as VoiceGender)}><option value="FEMALE">FEMALE</option><option value="MALE">MALE</option></select></label>
+            <label>Voice Region<select value={voiceRegion} onChange={event => updateInputValue(setVoiceRegion, event.target.value as VoiceRegion)}><option value="SOUTH">SOUTH</option><option value="NORTH">NORTH</option></select></label>
           </div>
         </section>
 
