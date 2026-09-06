@@ -68,3 +68,28 @@ None. Core remains provider-agnostic; generated output remains Candidate-only; Q
 ## Next action
 
 Perform the M2 prerequisite audit against official provider documentation and local environment configuration. If prerequisites are unavailable, stop M2 at an explicit fail-closed blocker without fabricating evidence.
+
+## Pre-M2 provider boundary correction
+
+Commit: `6ad9d0e` (`fix: harden provider asset boundary`)
+
+The M0 import exposed provider bindings on Core `AssetRef`. The field was removed before M2. `AssetRef` now contains only schema version, logical identity and provider-agnostic metadata; resolved provider references are owned by `packages/providers`.
+
+Files changed:
+
+- `packages/contracts/src/index.ts`
+- `packages/contracts/src/contracts.test.ts`
+- `packages/contracts/src/asset-boundary.typecheck.ts`
+- `packages/contracts/tsconfig.json`
+- `packages/providers/src/index.ts`
+- `docs/CODEX_HANDOFF.md`
+
+Verification:
+
+- `npm run typecheck` — PASS across all five workspaces.
+- `npm test` — PASS (15 tests: web 1, contracts 5, core 9).
+- `npm run benchmark:dry` — PASS; `PICK_UP` remains `UNTESTED` and blocked.
+- `npm run build -w @mochi/web` — PASS.
+- Core/provider identifier search — no Gemini file URI, Flow `mediaId`, operation ID, bearer or session field in Contracts/Core/harness.
+
+Architecture deviations: none. This change restores the locked provider boundary and does not start M2.
