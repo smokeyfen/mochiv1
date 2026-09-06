@@ -5,6 +5,7 @@ import {
   evaluateSceneFeasibility
 } from '@mochi/core';
 import { f0BaselineBenchmarkCases, f0BaselineScenePlans, f0CocoonTurmericSerumFixture } from './f0-canary-fixture';
+import { f0EmpiricalBenchmarkObservations } from './f0-empirical-evidence';
 import { pendingGoldenFixtures } from './golden-fixtures';
 
 const map = createUntestedActionCapabilityMap();
@@ -24,7 +25,7 @@ console.log(JSON.stringify({
       benchmarkCaseId: benchmarkCase.benchmarkCaseId,
       actionId: benchmarkCase.actionId,
       capability: map[benchmarkCase.actionId],
-      evidence: classifyCapabilityEvidence(benchmarkCase.actionId, 'BOTTLE', []),
+      evidence: classifyCapabilityEvidence(benchmarkCase.actionId, 'BOTTLE', f0EmpiricalBenchmarkObservations),
       feasibility: evaluateSceneFeasibility(scene, map)
     };
   }),
@@ -32,6 +33,6 @@ console.log(JSON.stringify({
     fixtureId: bottleFixture.fixtureId,
     readiness: evaluateFixtureReadiness(bottleFixture)
   },
-  benchmarkObservationCount: 0
+  benchmarkObservationCount: f0EmpiricalBenchmarkObservations.length
 }, null, 2));
-// Dry mode intentionally creates no BenchmarkObservation or empirical action promotion.
+// Dry mode reads recorded evidence but creates no new BenchmarkObservation or action promotion.
