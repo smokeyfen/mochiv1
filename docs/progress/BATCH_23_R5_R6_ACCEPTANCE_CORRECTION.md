@@ -1,5 +1,7 @@
 # Batch 23 — R5/R6 Acceptance Correction
 
-Supersedes the premature R6 status in `6897cd8`. R4 now enforces deterministic scene IDs and carries exact R2 reference readiness. R5 preserves readiness; R6 uses readiness rather than limitation count and preserves BLOCKED precedence. Targeted replan accepts only a strict five-field decision and compiles replacement explicitly.
+Implementation commit: `e187ffa57fc2c0018ea86f4517ced09ce769261a`. This checkpoint supersedes the premature R5/R6 claim at `efea9fc2a71c1db1223175633550f05e6dcc3e5b`.
 
-Implementation: `eb7ccd04b1afe5345c4667cefce3ef7fa741039f`. Verification PASS: typecheck, 134 tests, dry benchmark, web build, diff check. No live Gemini/Flow calls; capabilities unchanged. R7-A NOT STARTED.
+R6 preserves `BLOCKED` precedence: an `AVOID` action stays BLOCKED under LIMITED references and complexity 3. R4 validates action/effect consistency and compares continuity fields explicitly, so a serialized equivalent passes while every locked-field mutation fails. Targeted replan rejects zero eligible SAFE actions before provider invocation, has a strict five-field decision boundary, keeps the other scenes unchanged, runs validatePlan → R5 → R6, and exhausts exactly two failed default attempts with `SCENE_PLANNING_BLOCKED`.
+
+Verification PASS: `npm run typecheck`; `npm test` (140 tests); `npm run benchmark:dry` with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web`; `git diff --check`. No Gemini calls, Flow calls, video generation, or action promotions occurred. R3, R4, R5, R6 + bounded replan are PASS / LOCKED. R7-A is NEXT / NOT STARTED.
