@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `680012c10f3f0f92a7744c496350b450c0f9e916`
+- Current verified implementation commit: `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R7-A Human Realism — FINAL LOCKED
-- Milestone status: PASS / LOCKED — R3 through R7-A acceptance coverage complete
+- Current milestone: T0-PREP Voice Timing Calibration Infrastructure — FINAL LOCKED
+- Milestone status: PASS / LOCKED — R3 through R7-A plus T0-PREP acceptance coverage complete
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
@@ -14,7 +14,7 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: STOP. T0 Voice Timing Calibration is NEXT / NOT STARTED. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
+- Next action: STOP. T0-LIVE empirical local-TTS calibration is NEXT / NOT STARTED; R7-B is BLOCKED on T0-LIVE. PRE-F1 INTEGRATION GATE remains the future consolidated runtime check after R8 and P0.
 
 No action has been promoted from `UNTESTED`.
 
@@ -74,3 +74,6 @@ R5/R6 acceptance hardening at `e187ffa57fc2c0018ea86f4517ced09ce769261a`: R6 now
 
 
 R7-A Human Realism at `680012c10f3f0f92a7744c496350b450c0f9e916`: provider-neutral `HumanRealism4ScenePlan` compiles exactly four scene behavior overlays from validated R4, deterministically re-resolved R5 state, and corresponding R6 risk. The gate fails before intelligence for source/state/risk mismatch or any non-READY scene; therefore all actual UNTESTED action maps remain excluded. One global mocked provider call receives authoritative instructions, separate limited inputText, and `media: []`; its strict four-decision output can author only five nonblank behavior strings per scene. Deterministic global constraints prevent face visibility, extra hands, state resets, teleportation, penetration, impossible grip, robotic motion, and cinematic movement. Verification: `npm run typecheck` PASS; `npm test` PASS (144 tests); `npm run benchmark:dry` PASS with expected UNTESTED action failures; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. R7-A PASS / LOCKED; T0 Voice Timing Calibration is NEXT / NOT STARTED. No live Gemini or Flow calls; historical Flow remains 2 generations / 24 credits.
+
+
+T0-PREP Voice Timing Calibration Infrastructure at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`: provider-neutral contracts and a pure core compiler normalize Vietnamese-oriented spoken units, validate exact voice identity, and derive a versioned VoiceTimingProfile from measured durations. Conservative rate uses documented nearest-rank lower-quartile measured rate; policy explicitly supplies margin and minimum observations, and target scene duration remains exactly 8000 ms. The estimator returns FITS/TOO_LONG without rewriting text. Profiles carry explicit SYNTHETIC or EMPIRICAL provenance; synthetic profiles are rejected by the empirical readiness guard. Verification: `npm run typecheck` PASS; `npm test` PASS (150 tests); `npm run benchmark:dry` PASS with expected UNTESTED action failures; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. T0-PREP PASS / LOCKED. T0-LIVE is NEXT / NOT STARTED; R7-B is BLOCKED on T0-LIVE. No TTS engine, audio generation, Gemini/Flow call, or action promotion occurred.

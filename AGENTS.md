@@ -19,7 +19,9 @@ This GitHub repository is the source of truth for MochiV1, the repo-first implem
 - R5 Deterministic State Engine: **PASS / LOCKED**
 - R6 Scene Risk + bounded replan: **PASS / LOCKED**
 - R7-A Human Realism: **PASS / LOCKED**
-- T0 Voice Timing Calibration: **NEXT / NOT STARTED**
+- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
+- T0-LIVE empirical local-TTS calibration: **NEXT / NOT STARTED**
+- R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future consolidated runtime check after R8 and P0
 
 `STATUS.md` is the current milestone record. Earlier M0/M1 feasibility material is historical unless this file or STATUS explicitly identifies it as an active lock.

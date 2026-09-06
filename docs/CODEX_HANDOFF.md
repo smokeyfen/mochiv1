@@ -28,7 +28,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R5 Deterministic State Engine: **PASS / LOCKED**
 - R6 Scene Risk + bounded replan: **PASS / LOCKED**
 - R7-A Human Realism: **PASS / LOCKED**
-- T0 Voice Timing Calibration: **NEXT / NOT STARTED**
+- T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
+- T0-LIVE empirical local-TTS calibration: **NEXT / NOT STARTED**
+- R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -137,3 +139,8 @@ Earlier M0 feasibility-first roadmap text, initial exported-tree descriptions, a
 ## R7-A Human Realism
 
 R7-A is locked at `680012c10f3f0f92a7744c496350b450c0f9e916`. It produces a provider-neutral, versioned four-scene Human Realism overlay after re-validating R4, re-resolving R5, and matching R6 risk. It never changes truth, objectives, actions, states, dialogue, references, continuity, format, or transitions. Any non-READY R6 scene—including the empirical UNTESTED map—fails before intelligence. The single global intelligence request has empty media and can return only five scene behavior strings. Deterministic global constraints remain immutable and preserve POV realism, contact continuity, canonical end states, and the R3 identity/environment locks. T0 is next and is not authorization to begin it.
+
+
+## T0-PREP Voice Timing Calibration Infrastructure
+
+T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE is next and must supply measured local-TTS timing before R7-B may begin.
