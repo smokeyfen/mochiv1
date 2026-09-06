@@ -10,12 +10,12 @@ import { pendingGoldenFixtures } from './golden-fixtures';
 const fixture: ScenePlan = {
   schemaVersion: '1.0.0',
   sceneId: 'benchmark-bottle-pickup', index: 1, role: 'HOOK', durationSeconds: 8, aspectRatio: '9:16',
-  primaryObjective: 'Pick up the bottle and hold the front label toward camera.',
+  primaryObjective: 'Pick up the bottle and hold the product clearly toward camera.',
   dialogue: 'Dry benchmark fixture only.',
   startState: {productState:{cap:'closed'},propState:{},heldBy:'NONE',productOrientation:'FRONT',productPosition:'TABLE'},
   actions: [{action:'PICK_UP',objective:'Pick up bottle with right hand',complexity:1}],
   endState: {productState:{cap:'closed'},propState:{},heldBy:'RIGHT_HAND',productOrientation:'FRONT',productPosition:'CENTER'},
-  transitionToNext:'MATCH_CUT', requiredAssetIds:['product-front']
+  transitionToNext:'MATCH_CUT', requiredAssetIds:['product-reference']
 };
 
 const map = createUntestedActionCapabilityMap();

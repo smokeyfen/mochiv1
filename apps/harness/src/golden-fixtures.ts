@@ -12,7 +12,7 @@ export const pendingGoldenFixtures: readonly GoldenProductFixture[] = archetypes
     allowedClaims: [],
     prohibitedInferences: ['Do not infer any product claim until real references and truth metadata are verified.']
   },
-  expectedReferenceRoles: ['PRODUCT_FRONT'],
+  expectedReferenceRoles: ['PRODUCT_REFERENCE'],
   referenceAssets: [],
   physicalRiskNotes: ['Physical interaction capability remains UNTESTED until real video evidence is reviewed.']
 }));

@@ -307,7 +307,38 @@ test('scene plan locks duration and aspect', () => {
   assert.ok(issues.includes('aspect_must_be_9_16'));
 });
 
-test('golden fixture fails closed without verified truth and real references', () => {
+const validFlexibleGoldenFixture = (): GoldenProductFixture => ({
+  schemaVersion: SCHEMA_VERSION,
+  fixtureId: 'bottle-reference-validation',
+  archetype: 'BOTTLE',
+  productTruth: {
+    verificationStatus: 'VERIFIED',
+    productId: 'product-1',
+    name: 'Verified bottle',
+    identityDescription: 'Validation-only factual identity.',
+    allowedClaims: [],
+    prohibitedInferences: ['No unsupported claims']
+  },
+  expectedReferenceRoles: ['PRODUCT_REFERENCE'],
+  referenceAssets: [{
+    schemaVersion: SCHEMA_VERSION,
+    assetId: 'product-reference',
+    role: 'PRODUCT_REFERENCE',
+    source: 'UPLOAD',
+    mimeType: 'image/jpeg',
+    sha256: 'validation-only-hash'
+  }],
+  physicalRiskNotes: []
+});
+
+test('a valid real PRODUCT_REFERENCE satisfies flexible golden fixture expectations without PRODUCT_FRONT', () => {
+  const fixture = validFlexibleGoldenFixture();
+  assert.deepEqual(validateGoldenProductFixture(fixture), []);
+  assert.equal(fixture.referenceAssets[0]!.role, 'PRODUCT_REFERENCE');
+  assert.equal(fixture.referenceAssets.some(asset => asset.role === 'PRODUCT_FRONT'), false);
+});
+
+test('flexible golden fixture still fails closed without verified truth and real references', () => {
   const fixture: GoldenProductFixture = {
     schemaVersion: SCHEMA_VERSION,
     fixtureId: 'bottle-pending',
@@ -317,39 +348,32 @@ test('golden fixture fails closed without verified truth and real references', (
       allowedClaims: [],
       prohibitedInferences: ['All product claims']
     },
-    expectedReferenceRoles: ['PRODUCT_FRONT'],
+    expectedReferenceRoles: ['PRODUCT_REFERENCE'],
     referenceAssets: [],
     physicalRiskNotes: ['Grip and label fidelity require empirical review.']
   };
   const issues = validateGoldenProductFixture(fixture);
   assert.ok(issues.includes('product_truth_unverified'));
   assert.ok(issues.includes('real_reference_assets_required'));
-  assert.ok(issues.includes('missing_reference_role:PRODUCT_FRONT'));
+  assert.ok(issues.includes('missing_reference_role:PRODUCT_REFERENCE'));
 });
 
-test('generated references cannot satisfy golden fixture evidence', () => {
-  const fixture: GoldenProductFixture = {
-    schemaVersion: SCHEMA_VERSION,
-    fixtureId: 'bottle-generated',
-    archetype: 'BOTTLE',
-    productTruth: {
-      verificationStatus: 'VERIFIED',
-      productId: 'product-1',
-      name: 'Verified bottle',
-      identityDescription: 'Verified only for validation coverage.',
-      allowedClaims: [],
-      prohibitedInferences: ['No unsupported claims']
-    },
-    expectedReferenceRoles: ['PRODUCT_FRONT'],
-    referenceAssets: [{
-      schemaVersion: SCHEMA_VERSION,
-      assetId: 'generated-front',
-      role: 'PRODUCT_FRONT',
-      source: 'GENERATED',
-      mimeType: 'image/png',
-      sha256: 'validation-only-hash'
-    }],
-    physicalRiskNotes: []
-  };
-  assert.ok(validateGoldenProductFixture(fixture).includes('reference_must_be_real_upload:generated-front'));
+test('flexible golden fixture rejects non-upload, missing-hash, and non-image references', () => {
+  const nonUpload = validFlexibleGoldenFixture();
+  nonUpload.referenceAssets = [{ ...nonUpload.referenceAssets[0]!, source: 'GENERATED' }];
+  assert.ok(validateGoldenProductFixture(nonUpload).includes('reference_must_be_real_upload:product-reference'));
+
+  const missingHash = validFlexibleGoldenFixture();
+  missingHash.referenceAssets = [{ ...missingHash.referenceAssets[0]!, sha256: undefined }];
+  assert.ok(validateGoldenProductFixture(missingHash).includes('reference_hash_required:product-reference'));
+
+  const nonImage = validFlexibleGoldenFixture();
+  nonImage.referenceAssets = [{ ...nonImage.referenceAssets[0]!, mimeType: 'application/pdf' }];
+  assert.ok(validateGoldenProductFixture(nonImage).includes('reference_must_be_image:product-reference'));
+});
+
+test('flexible golden fixture rejects unverified product truth even with a real reference', () => {
+  const fixture = validFlexibleGoldenFixture();
+  fixture.productTruth = { ...fixture.productTruth, verificationStatus: 'PENDING_REAL_REFERENCES' };
+  assert.ok(validateGoldenProductFixture(fixture).includes('product_truth_unverified'));
 });
