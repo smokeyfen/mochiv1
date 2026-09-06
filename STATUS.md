@@ -2,7 +2,7 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `3581a87708e2107e35392a2b0ab33cb58bfef9d9`
+- Current verified implementation commit: `eb7ccd04b1afe5345c4667cefce3ef7fa741039f`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
 - Current milestone: R6 Scene Risk + bounded replan
