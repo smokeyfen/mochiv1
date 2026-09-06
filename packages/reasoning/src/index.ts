@@ -27,3 +27,5 @@ export { planGlobal4Scenes, buildPlanningTruthCatalog, validatePlan, PlannerErro
 export { resolveSceneStates, ACTION_SEMANTICS, StatePlanningError } from './state.ts';
 export { evaluateSceneRisk } from './risk.ts';
 export { targetedReplan, MAX_SCENE_REPLAN_ATTEMPTS, ScenePlanningBlockedError } from './replan.ts';
+
+export { planHumanRealism, HUMAN_REALISM_GLOBAL_CONSTRAINTS, buildHumanRealismInstruction, buildHumanRealismInputText, HumanRealismError } from './human-realism.ts';
