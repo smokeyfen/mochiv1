@@ -31,16 +31,30 @@ R1-B3B.2.1 is PASS: each ProductClaim now renders its `source` and direct `allow
 - `npm run benchmark:dry` — PASS with expected fail-closed `action_untested:PICK_UP`
 - `npm run build -w @mochi/web` — PASS
 
+## R1-LIVE runtime validation
+
+Status: PASS, recorded from the completed controlled runtime validation.
+
+- Observed path: apps/web → relative `POST /api/product-evidence` → apps/server → Gemini 3.5 Flash → validated ProductEvidence → Product Analysis UI
+- Backend: `127.0.0.1:8787`; frontend: `localhost:5173`
+- One live request returned HTTP 200 and reached `PRODUCT_ANALYSIS_READY`
+- Identity, geometry, colors, packaging, visible labels, claims, uncertainties, contradictions, and prohibited inferences rendered
+- Claims displayed source and direct `ALLOWED` / `NOT ALLOWED` state
+- Creative mutations preserved visible ProductEvidence and did not create a second request
+- A Product Name mutation immediately cleared ProductEvidence and did not re-run analysis
+
 ## Runtime accounting and locks
 
-- Live Gemini calls: 0
+- Gemini live calls: 1
 - Flow calls: 0
 - Real video generation: 0
 - Action promotions: 0; all ActionIds remain `UNTESTED`
 - Architecture deviations: none
 - R1-B3B.2.1 Claim Allowed-State UI: PASS
-- R1 Application Path: COMPLETE / ready for deferred live runtime validation
-- Deferred Live Runtime Validation: NOT RUN
+- R1 Application Path: FINAL LOCKED
+- R1-LIVE: PASS
+- R1 Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
+- RUBRIC-0: NEXT / NOT STARTED
 - R2 Product Truth / Blueprint: NOT STARTED
 
-STOP. Do not begin R2 or a live runtime validation without explicit authorization.
+STOP. Do not begin RUBRIC-0 or R2 without explicit authorization.

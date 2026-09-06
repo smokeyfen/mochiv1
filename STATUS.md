@@ -5,14 +5,15 @@
 - Current verified implementation commit: `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B3B.2.1 Claim Allowed-State UI
-- Milestone status: PASS — ProductClaim allowed state is visibly rendered from the validated contract
-- Application path: COMPLETE — ready for deferred live runtime validation
+- Current milestone: R1-LIVE runtime validation
+- Milestone status: PASS — completed end-to-end Product Evidence runtime validation
+- Application path: FINAL LOCKED
+- Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
 - Real generation count: 0
 - Architecture deviations: none
-- Next action: STOP. Deferred Live Runtime Validation is NOT RUN. R2 Product Truth / Blueprint is NOT STARTED.
+- Next action: STOP. RUBRIC-0 is NEXT and NOT STARTED. R2 Product Truth / Blueprint is NOT STARTED.
 
 No action has been promoted from `UNTESTED`.
 
@@ -20,7 +21,7 @@ Core `AssetRef` contains only schema version, logical asset identity and provide
 
 M2-A provides `IntelligenceProvider` and a `Gemini35FlashIntelligenceProvider` for typed structured multimodal analysis only. `GEMINI_API_KEY` is read only at the provider configuration edge; a missing or blank key returns `INTELLIGENCE_PROVIDER_ERROR:CONFIGURATION` without exposing configuration values. The provider uses the fixed `gemini-3.5-flash` model and has no `generate` or `edit` video methods.
 
-Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path Complete → Deferred Live Runtime Validation → R2 Product Truth / Blueprint → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
+Locked execution order: M2-A PASS → R0-A Canonical Project Input Contracts → R0-B apps/web Input Surface → R1-A Product Evidence → R1-B1 Intelligence Trust Boundary → R1-B2 server-side live Gemini bridge → R1-B2.2 Flexible Product Reference Intake → R1-B3A Server HTTP Analysis Boundary → R1-B3B.1 HTTP Runtime Adapter → R1-B3B.2 apps/web Product Evidence UI → R1 Application Path FINAL LOCKED → R1-LIVE PASS → RUBRIC-0 → R2 Product Truth / Blueprint → Flow integration. Gemini 3.5 Flash remains reasoning-only. Google Flow remains the only planned video renderer and consumes Flow credits. Local/free TTS is the default future voice direction and will be benchmarked later.
 
 R0-A adds `MochiProjectInput`, which composes factual `ProductInput` with separate `CreativeDirectionInput`. `ProductInput.audience` is intentionally retired; callers must provide the audience in `creativeDirection.audience`. `SCHEMA_VERSION` remains `1.0.0` because this repository has no persisted project-input payloads or external contract consumers; no migration artifact is required at this boundary. All logical assets remain provider-neutral.
 
@@ -50,3 +51,5 @@ R1-B3B.1 HTTP Runtime Adapter at `242cc9b16cecb7a967330b2e20b840f63e4c882c`: nat
 R1-B3B.2 apps/web Product Evidence UI at `e236d02f2a994684dee23f5b8c372ac67a261f86`: apps/web posts only factual `ProductInput` and exact browser `File` values to the relative `/api/product-evidence` endpoint. It validates files locally, never sends creative direction or project data, decodes the response into the explicit ProductEvidence contract, and runs final contract validation before rendering factual analysis sections. Factual changes abort and invalidate evidence immediately; creative changes preserve evidence while still invalidating the canonical project preview. Verification: `npm run typecheck` PASS; `npm test` PASS (86 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Live runtime validation was not run. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
 
 R1-B3B.2.1 Claim Allowed-State UI at `d6b2f4e6cff0fb5bcac1359ef9926c64e17c16b6`: every Product Analysis claim now shows its contract-provided source and direct `ALLOWED` or `NOT ALLOWED` state. Reference-evidence claims show only the count of supporting references; logical asset IDs remain absent from the user-facing claim display. Verification: `npm run typecheck` PASS; `npm test` PASS (87 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. R1 Application Path is COMPLETE and ready for the separately authorized deferred live runtime validation, which remains NOT RUN. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
+
+R1-LIVE runtime validation: PASS, recorded from the completed controlled run. The observed path was apps/web → relative `POST /api/product-evidence` → apps/server → Gemini 3.5 Flash → validated ProductEvidence → Product Analysis UI. The backend ran on `127.0.0.1:8787`; the frontend ran on `localhost:5173`; exactly one request returned HTTP 200 and reached `PRODUCT_ANALYSIS_READY`. Identity, geometry, colors, packaging, visible labels, claims with source and allowed state, uncertainties, contradictions, and prohibited inferences rendered. Creative mutations preserved ProductEvidence without a second request; a Product Name mutation immediately cleared it and did not re-run analysis. Gemini live calls: 1. Flow calls, video generation, and action promotions: 0. All physical ActionIds remain `UNTESTED`. R1 Application Path and R1 Product Evidence are FINAL LOCKED. RUBRIC-0 is NEXT; R2 Product Truth / Blueprint is NOT STARTED.
