@@ -259,6 +259,12 @@ export interface Global4ScenePlan {
   referenceLimitations: readonly ReferenceLimitationCode[];
   scenes: readonly Global4SceneIntent[];
 }
+export type CanonicalPlacement = 'ON_SURFACE'|'IN_HAND'|'NEAR_CAMERA';
+export type CanonicalOrientation = 'FRONT_FACING'|'ROTATED';
+export type CanonicalInteractionState = 'BASELINE'|'OPENED'|'ACTUATED'|'CONTENT_TRANSFERRED'|'APPLIED';
+export interface CanonicalPhysicalState { heldBy: HeldBy; placement: CanonicalPlacement; orientation: CanonicalOrientation; interactionState: CanonicalInteractionState; }
+export interface StateResolvedScene extends Global4SceneIntent { startState: CanonicalPhysicalState; endState: CanonicalPhysicalState; }
+export interface StateResolved4ScenePlan { schemaVersion: SchemaVersion; productId:string; sourceEvidenceVersion:string; canonicalAssetIds:readonly string[]; continuity:GlobalContinuityState; referenceLimitations:readonly ReferenceLimitationCode[]; scenes:readonly StateResolvedScene[]; }
 
 export type ActionId =
   | 'REACH' | 'PICK_UP' | 'HOLD' | 'MOVE_CLOSER' | 'ROTATE_SLOW' | 'PLACE_DOWN'
