@@ -40,6 +40,11 @@ textarea { resize: vertical; }
 .evidence-subsection { background: #fafcf9; border: 1px solid #e5ebe4; border-radius: 8px; margin: 12px 0 0; padding: 14px; }
 .evidence-subsection ul { color: #354239; line-height: 1.5; margin: 8px 0 0; padding-left: 20px; }
 .evidence-source { color: #3b6c53; font-size: .75rem; font-weight: 700; letter-spacing: .04em; }
+.claim-list li { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+.claim-allowed, .claim-references { border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .03em; padding: 2px 7px; }
+.claim-allowed-yes { background: #e0f1e4; color: #24533a; }
+.claim-allowed-no { background: #f7e2e0; color: #8c2f28; }
+.claim-references { background: #edf0ec; color: #59635d; }
 .empty-evidence { font-style: italic; font-size: .9rem; }
 .primary-button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 640px) { .evidence-grid { grid-template-columns: 1fr; } }

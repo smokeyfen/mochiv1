@@ -42,7 +42,7 @@ function submitProject() {
   fireEvent.click(screen.getByRole('button', { name: 'Validate project input' }));
 }
 
-function evidenceResponse(): Response {
+function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetIds: readonly string[]) => readonly Record<string, unknown>[])): Response {
   const request = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
   const body = request.mock.calls.at(-1)?.[1]?.body as FormData;
   const product = JSON.parse(body.get('product') as string) as { productId: string; assets: readonly { assetId: string }[] };
@@ -51,7 +51,7 @@ function evidenceResponse(): Response {
     evidence: {
       schemaVersion: '1.0.0', productId: product.productId, canonicalAssetIds: product.assets.map(asset => asset.assetId),
       identityDescription: 'A compact white bottle', geometryNotes: ['Rounded bottle'], colorNotes: ['White'], packagingNotes: ['Pump top'], labelNotes: ['Front label'],
-      claims: [{ claimId: 'claim-1', text: 'Bottle shown in reference', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: product.assets.map(asset => asset.assetId), allowed: true }],
+      claims: typeof claims === 'function' ? claims(product.assets.map(asset => asset.assetId)) : claims ?? [{ claimId: 'claim-1', text: 'Bottle shown in reference', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: product.assets.map(asset => asset.assetId), allowed: true }],
       prohibitedInferences: ['Do not infer ingredients'], uncertainties: [], contradictions: []
     }
   }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -194,6 +194,9 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
     expect(screen.getByText('A compact white bottle')).toBeInTheDocument();
     expect(screen.getByText('Physical Evidence')).toBeInTheDocument();
+    expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('ALLOWED')).toBeInTheDocument();
+    expect(screen.getByText('1 reference')).toBeInTheDocument();
     expect(screen.getByText('No recorded uncertainties.')).toBeInTheDocument();
     const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
     expect(JSON.parse(body.get('product') as string)).not.toHaveProperty('creativeDirection');
@@ -242,5 +245,26 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ANALYSIS UNAVAILABLE'));
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
     expect(screen.getByRole('alert')).not.toHaveTextContent('Bearer');
+  });
+
+  it('renders each claim allowed state directly without exposing supporting asset IDs', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse(assetIds => [
+      { claimId: 'claim-allowed', text: 'Reference-supported bottle', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: [...assetIds, ...assetIds], allowed: true },
+      { claimId: 'claim-blocked', text: 'Unverified marketing claim', source: 'USER_INPUT', evidenceAssetIds: [], allowed: false }
+    ])));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    await waitFor(() => expect(screen.getByText('Reference-supported bottle')).toBeInTheDocument());
+    expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
+    expect(screen.getByText('USER_INPUT')).toBeInTheDocument();
+    expect(screen.getByText('ALLOWED')).toBeInTheDocument();
+    expect(screen.getByText('NOT ALLOWED')).toBeInTheDocument();
+    expect(screen.getByText('2 references')).toBeInTheDocument();
+    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    const assetId = (JSON.parse(body.get('product') as string) as { assets: readonly { assetId: string }[] }).assets[0]!.assetId;
+    expect(screen.queryByText(assetId)).not.toBeInTheDocument();
+    expect(screen.getByText('Unverified marketing claim').parentElement).toHaveTextContent('NOT ALLOWED');
   });
 });
