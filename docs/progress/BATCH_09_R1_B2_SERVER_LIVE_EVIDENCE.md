@@ -42,3 +42,16 @@ Therefore: live Gemini calls = 0; Flow calls = 0; real video generation = 0; act
 ## Next action
 
 STOP. R1-B2 live smoke remains blocked pending its two server-runtime prerequisites. R1-B3 apps/web integration is NOT STARTED. Do not begin Flow integration.
+## R1-B2.1 — Live-smoke Diagnostics Hardening
+
+- Starting checkpoint: `21bd53df1d35f0e9fd55230b2251f2e1e97a198a`
+- Implementation commit: `7cfd1dfe360dd35d04bf08169f5a5111690b075c`
+- Status: PASS
+
+The Evidence boundary now preserves an existing normalized `IntelligenceProviderError` unchanged, so safe AUTHENTICATION, RATE_LIMIT, UNAVAILABLE, and INVALID_RESPONSE categories survive to the smoke runner. Unexpected errors still become `PRODUCT_EVIDENCE_ERROR:PROVIDER_FAILURE`; no raw provider body, credential, transport detail, request ID, or API key is exposed.
+
+Successful smoke output now includes `R1_B2_PRODUCT_EVIDENCE_JSON=`. The formatter explicitly copies only declared, validated ProductEvidence fields and omits any undeclared runtime, path, credential, or transport metadata. It does not change the one-call smoke policy.
+
+Verification: `npm run typecheck` PASS; `npm test` PASS with 66 tests; `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Evidence identifier audit PASS. No live smoke command was run. Live Gemini calls: 0; Flow calls: 0; real video generation: 0; action promotions: 0.
+
+R1-B2 remains implementation-ready with the live smoke blocked by its existing server runtime prerequisites. R1-B3 apps/web integration remains NOT STARTED.

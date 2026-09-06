@@ -2,11 +2,11 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `f1dcd3da3aeaa23df1466c5817bc8d91de992efa`
+- Current verified implementation commit: `7cfd1dfe360dd35d04bf08169f5a5111690b075c`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: R1-B2 Server-side Gemini Product Evidence Bridge
-- Milestone status: IMPLEMENTATION PASS — LIVE SMOKE BLOCKED pending server runtime prerequisites
+- Current milestone: R1-B2.1 Live-smoke Diagnostics Hardening
+- Milestone status: PASS — normalized error categories and sanitized evidence inspection verified
 - Next application milestone: R1-B3 apps/web integration — NOT STARTED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
@@ -42,3 +42,4 @@ R1-B1 trust-boundary correction at `d76a4f65d876d9f91e09974b0b03a0efbc35cde7`: `
 
 R1-B1.1 Product Evidence Structured Output Schema correction at `7a0d0a56ddaabdd2235cffa906a19d46977f330c`: `buildProductEvidenceSchema(product)` now defines every ProductEvidence field and nested object using the supported structured-output subset. It constrains schema version, product ID, and all provenance asset arrays to the current logical ProductInput values, rejects undeclared top-level and nested object properties, and uses `minItems: 2` for contradiction statements. Deterministic `validateProductEvidence` remains final authority. Verification: `npm run typecheck` PASS; `npm test` PASS (56 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Evidence identifier/schema audit PASS. No live Gemini call, Flow call, or real video generation occurred.
 R1-B2 server-side bridge implementation at `f1dcd3da3aeaa23df1466c5817bc8d91de992efa`: `apps/server` composes the existing provider-neutral evidence path with the concrete Gemini provider only at the trusted server edge. The development-only smoke runner consumes a local runtime manifest, copies only logical ProductInput fields, reads image bytes server-side, makes at most one evidence call, and prints safe counts only. Verification: `npm run typecheck` PASS; `npm test` PASS (63 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. The live smoke was not run: both `GEMINI_API_KEY` and `R1_B2_SMOKE_MANIFEST` were absent. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
+R1-B2.1 diagnostics correction at `7cfd1dfe360dd35d04bf08169f5a5111690b075c`: Evidence now rethrows normalized provider-neutral `IntelligenceProviderError` categories unchanged while unexpected errors still become `PRODUCT_EVIDENCE_ERROR:PROVIDER_FAILURE`. The smoke runner maps those normalized categories to safe diagnostics and emits `R1_B2_PRODUCT_EVIDENCE_JSON=` containing only explicitly copied validated ProductEvidence fields. Verification: `npm run typecheck` PASS; `npm test` PASS (66 tests); `npm run benchmark:dry` PASS with expected `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. The live smoke was not run. Live Gemini calls, Flow calls, real video generation, and action promotions remain 0.
