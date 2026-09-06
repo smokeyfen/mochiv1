@@ -7,6 +7,7 @@ Date: 2026-09-06
 - Branch: `codex/feasibility-lock-candidate`
 - Starting checkpoint: `59070dd2d81454f95521157b0f367885570dac0a`
 - R1-A implementation commit: `4e172b95e335752252da17fae09140a0e0b4ee33`
+- R1-A factual context correction: `70415a3b869cfc577d1e5ca1cfd0dd91f00da2ad`
 - Status: PASS
 
 ## Files changed
@@ -56,6 +57,19 @@ No apps/web, Core, Provider implementation, harness, video runtime, or backend s
 ## Architecture deviations
 
 None. Product Truth remains separate from Creative Direction. The engine uses only the IntelligenceProvider abstraction and does not import a concrete provider. Action capability classifications, VideoProvider behavior, continuity, lifecycle, ScenePlan, and QC locks are unchanged.
+
+## Factual context correction
+
+The initial R1-A instruction did not include ProductInput factual values. A deterministic builder now emits fixed Product Evidence rules, a clearly delimited sanitized `PRODUCT_INPUT_JSON` block, and a closing rule lock. The JSON includes only product ID, name, details, category, and each logical asset's ID, role, source, and MIME type. It excludes creative controls, runtime bytes, local paths, credentials, and runtime identifiers. User text remains JSON data and cannot override the rules.
+
+Regression verification at `70415a3b869cfc577d1e5ca1cfd0dd91f00da2ad`:
+
+- `npm run typecheck` — PASS.
+- `npm test` — PASS, 42 tests total; Product Evidence has 13 tests.
+- `npm run benchmark:dry` — PASS with expected fail-closed `action_untested:PICK_UP`.
+- `npm run build -w @mochi/web` — PASS.
+- Evidence identifier/content audit: PASS. The reasoning context contains factual ProductInput only; media bytes remain in `request.media`.
+- Live Gemini calls: 0; Flow calls: 0; real video generation count: 0.
 
 ## Next action
 

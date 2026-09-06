@@ -2,7 +2,7 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `4e172b95e335752252da17fae09140a0e0b4ee33`
+- Current verified implementation commit: `70415a3b869cfc577d1e5ca1cfd0dd91f00da2ad`
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
 - Current milestone: R1-A Product Evidence Engine
@@ -35,5 +35,7 @@ R0-B state-integrity correction at `190100ba9f27551e09e0371a7a6799e3e29c25ad`: e
 R1-A adds the isolated `@mochi/evidence` package. It accepts factual ProductInput, logical runtime image media, and an `IntelligenceProvider`; it never accepts CreativeDirectionInput. It preflights media, executes one structured evidence pass through the provider abstraction, and rejects malformed or non-provenance-preserving output without retrying. Runtime bytes are never copied to ProductEvidence.
 
 Verification at `4e172b95e335752252da17fae09140a0e0b4ee33`: `npm run typecheck` PASS; `npm test` PASS (39 tests); `npm run benchmark:dry` PASS with expected fail-closed `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Evidence package identifier audit PASS. Live Gemini calls, Flow calls, and real video generation remain 0.
+
+R1-A factual context correction at `70415a3b869cfc577d1e5ca1cfd0dd91f00da2ad`: evidence reasoning now receives a deterministic instruction containing only sanitized factual ProductInput JSON: product ID, name, details, category, and logical asset metadata. The fixed rules remain authoritative before and after the delimited data block; runtime bytes and creative controls remain absent. Verification: `npm run typecheck` PASS; `npm test` PASS (42 tests); `npm run benchmark:dry` PASS with `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. No live provider or video calls occurred.
 
 Verification at `eccdeb2f34cedc471649c2e35f293d1cde85cec7`: `npm run typecheck` PASS; `npm test` PASS (20 tests); `npm run benchmark:dry` PASS with expected fail-closed `action_untested:PICK_UP`; `npm run build -w @mochi/web` PASS. Real generation count remains 0.
