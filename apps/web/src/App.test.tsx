@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
@@ -40,6 +40,21 @@ function enterValidProjectInput() {
 
 function submitProject() {
   fireEvent.click(screen.getByRole('button', { name: 'Validate project input' }));
+}
+
+function evidenceResponse(): Response {
+  const request = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+  const body = request.mock.calls.at(-1)?.[1]?.body as FormData;
+  const product = JSON.parse(body.get('product') as string) as { productId: string; assets: readonly { assetId: string }[] };
+  return new Response(JSON.stringify({
+    ok: true,
+    evidence: {
+      schemaVersion: '1.0.0', productId: product.productId, canonicalAssetIds: product.assets.map(asset => asset.assetId),
+      identityDescription: 'A compact white bottle', geometryNotes: ['Rounded bottle'], colorNotes: ['White'], packagingNotes: ['Pump top'], labelNotes: ['Front label'],
+      claims: [{ claimId: 'claim-1', text: 'Bottle shown in reference', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: product.assets.map(asset => asset.assetId), allowed: true }],
+      prohibitedInferences: ['Do not infer ingredients'], uncertainties: [], contradictions: []
+    }
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
 }
 
 describe('App', () => {
@@ -156,7 +171,7 @@ describe('App', () => {
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
   });
 
-  it('keeps browser runtime data out of canonical preview and exposes no provider action', () => {
+  it('keeps browser runtime data out of canonical preview while exposing the Product Analysis action', () => {
     render(<App />);
     enterValidProjectInput();
     submitProject();
@@ -165,6 +180,67 @@ describe('App', () => {
     expect(preview).not.toContain('front.jpg');
     expect(preview).not.toMatch(/[A-Z]:\\|\/Users\/|\/home\//);
     expect(preview).not.toMatch(/File|Blob|Gemini|Flow|generate/i);
-    expect(screen.queryByRole('button', { name: /analyze|gemini|flow|generate/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeInTheDocument();
+    expect(screen.queryByText(/Gemini|Flow|generate/i)).not.toBeInTheDocument();
+  });
+
+  it('posts factual product input only and renders validated Product Evidence', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse()));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    expect(screen.getByRole('status')).toHaveTextContent('ANALYZING PRODUCT');
+    await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
+    expect(screen.getByText('A compact white bottle')).toBeInTheDocument();
+    expect(screen.getByText('Physical Evidence')).toBeInTheDocument();
+    expect(screen.getByText('No recorded uncertainties.')).toBeInTheDocument();
+    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    expect(JSON.parse(body.get('product') as string)).not.toHaveProperty('creativeDirection');
+    expect([...body.keys()]).toEqual(['product', expect.stringMatching(/^asset:asset-/)]);
+  });
+
+  it('clears product evidence immediately after a factual edit and ignores a late result', async () => {
+    let resolveFetch: ((value: Response) => void) | undefined;
+    const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>(resolve => { resolveFetch = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Changed bottle' } });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
+    resolveFetch!(evidenceResponse());
+    await Promise.resolve();
+    expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('keeps evidence through creative edits but clears it on adding or removing a reference', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse()));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'A new audience' } });
+    expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    selectProductImage('side.jpg');
+    expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
+    expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
+  });
+
+  it('keeps provider and malformed response details out of the user-facing error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, error: { code: 'ANALYSIS_UNAVAILABLE', detail: 'Bearer raw-secret' } }), { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ANALYSIS UNAVAILABLE'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Bearer');
   });
 });
