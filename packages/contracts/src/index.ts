@@ -22,8 +22,36 @@ export interface ProductInput {
   name: string;
   details: string;
   category: string;
-  audience: string;
   assets: readonly AssetRef[];
+}
+
+export type VoiceGender = 'MALE' | 'FEMALE';
+export type VoiceRegion = 'SOUTH' | 'NORTH';
+
+/**
+ * User-controlled creative intent. This is deliberately separate from
+ * ProductInput so creative choices cannot be mistaken for product truth.
+ */
+export interface CreativeDirectionInput {
+  audience: string;
+  shootingContext: string;
+  reviewerPersona: string;
+  tone: string;
+  voiceStyle: string;
+  voiceGender: VoiceGender;
+  voiceRegion: VoiceRegion;
+}
+
+/**
+ * Canonical provider-neutral boundary for a MochiV1 project. Assets remain
+ * logical references; uploads, provider IDs, model settings, and file data
+ * belong outside this contract.
+ */
+export interface MochiProjectInput {
+  schemaVersion: SchemaVersion;
+  projectId: string;
+  product: ProductInput;
+  creativeDirection: CreativeDirectionInput;
 }
 
 export interface ProductClaim {
@@ -225,7 +253,11 @@ export class ContractValidationError extends Error {
   }
 }
 
-const nonBlank = (value: string): boolean => value.trim().length > 0;
+const nonBlank = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 export function validateProductInput(input: ProductInput): readonly string[] {
   const issues: string[] = [];
@@ -242,6 +274,45 @@ export function validateProductInput(input: ProductInput): readonly string[] {
     if (asset.qualityScore !== undefined && (asset.qualityScore < 0 || asset.qualityScore > 1)) issues.push(`asset_quality:${asset.assetId}`);
   }
   return issues;
+}
+
+export function validateCreativeDirectionInput(input: CreativeDirectionInput): readonly string[] {
+  const issues: string[] = [];
+  if (!nonBlank(input.audience)) issues.push('audience');
+  if (!nonBlank(input.shootingContext)) issues.push('shooting_context');
+  if (!nonBlank(input.reviewerPersona)) issues.push('reviewer_persona');
+  if (!nonBlank(input.tone)) issues.push('tone');
+  if (!nonBlank(input.voiceStyle)) issues.push('voice_style');
+  if (input.voiceGender !== 'MALE' && input.voiceGender !== 'FEMALE') issues.push('voice_gender');
+  if (input.voiceRegion !== 'SOUTH' && input.voiceRegion !== 'NORTH') issues.push('voice_region');
+  return issues;
+}
+
+/**
+ * Validates each concern through its own validator. Product validation is
+ * reused verbatim so project validation cannot drift from ProductInput rules.
+ */
+export function validateMochiProjectInput(input: MochiProjectInput): readonly string[] {
+  const issues: string[] = [];
+  if (input.schemaVersion !== SCHEMA_VERSION) issues.push('schema_version');
+  if (!nonBlank(input.projectId)) issues.push('project_id');
+
+  if (isProductInputLike(input.product)) {
+    issues.push(...validateProductInput(input.product));
+  } else {
+    issues.push('product_input');
+  }
+
+  if (isRecord(input.creativeDirection)) {
+    issues.push(...validateCreativeDirectionInput(input.creativeDirection as CreativeDirectionInput));
+  } else {
+    issues.push('creative_direction');
+  }
+  return issues;
+}
+
+function isProductInputLike(value: unknown): value is ProductInput {
+  return isRecord(value) && Array.isArray(value.assets);
 }
 
 export function validateScenePlan(scene: ScenePlan): readonly string[] {
@@ -318,6 +389,11 @@ export function validateBenchmarkObservation(observation: BenchmarkObservation):
 
 export function assertValidProductInput(input: ProductInput): void {
   const issues = validateProductInput(input);
+  if (issues.length > 0) throw new ContractValidationError(issues);
+}
+
+export function assertValidMochiProjectInput(input: MochiProjectInput): void {
+  const issues = validateMochiProjectInput(input);
   if (issues.length > 0) throw new ContractValidationError(issues);
 }
 

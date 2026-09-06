@@ -224,8 +224,21 @@ Includes:
 - name
 - details
 - category
-- audience
 - assets
+
+### CreativeDirectionInput
+
+Contains user-production controls kept separate from product truth:
+
+- audience
+- shooting context
+- reviewer persona
+- tone and voice style
+- voice gender and region
+
+### MochiProjectInput
+
+The canonical project boundary combines schema version, project ID, factual `ProductInput`, and `CreativeDirectionInput`. It contains logical assets only; it never contains provider identifiers, upload bytes, `File`/`Blob` values, credentials, or local file-system paths.
 
 ### ProductEvidence
 
@@ -642,6 +655,10 @@ Implement behind a dedicated intelligence-provider interface. Keep credentials i
 
 Do not implement Product Evidence, Planner or full QC in M2-A. The milestone establishes the boundary only.
 
+### R0 input and reasoning stages
+
+After M2-A, the locked order is R0-A Canonical Project Input Contracts, R0-B apps/web Input Surface, then the reasoning pipeline. Gemini remains intelligence-only throughout. Local/free TTS is the default future voice direction and will be benchmarked separately.
+
 ### M2-B: Google Flow Video Canary
 
 Purpose:
@@ -649,7 +666,7 @@ Purpose:
 - production renderer
 - use Flow credits
 
-Do NOT implement Flow during M2-A.
+Do NOT implement Flow before the R0 stages and reasoning pipeline are stable. Google Flow remains the only planned video renderer and consumes Flow credits.
 
 Later Flow adapter responsibilities include:
 
@@ -941,9 +958,35 @@ Must preserve:
 - no action-capability promotion from intelligence output
 - mock/stub tests only during the provider-foundation milestone
 
+### R0-A — Canonical Project Input Contracts
+
+Only after M2-A PASS.
+
+Objective:
+
+Add provider-neutral `MochiProjectInput` from separate factual ProductInput and CreativeDirectionInput concerns.
+
+Do not implement apps/web, a backend, Flow, voice, Product Evidence, or a planner.
+
+### R0-B — apps/web Input Surface
+
+Only after R0-A PASS.
+
+Objective:
+
+Expose the canonical project input through the minimal application surface.
+
+### Reasoning pipeline
+
+Only after R0-B PASS.
+
+Objective:
+
+Build the provider-neutral reasoning path. Gemini 3.5 Flash remains reasoning-only; no video generation may be added.
+
 ### M2-B — Flow Video Canary
 
-Only after M2-A PASS and when real product references plus Flow runtime access are available.
+Only after the reasoning pipeline is stable and when real product references plus Flow runtime access are available.
 
 Objective:
 

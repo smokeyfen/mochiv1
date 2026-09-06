@@ -73,4 +73,4 @@ None. Intelligence and video responsibilities remain separate; no provider ident
 
 ## Next action
 
-STOP. Do not begin M2-B Flow Video Canary without explicit authorization.
+R0-A Canonical Project Input Contracts. The locked order is R0-A → R0-B apps/web Input Surface → reasoning pipeline → M2-B Flow Video Canary. Gemini remains reasoning-only; Google Flow remains the only planned video renderer using Flow credits; local/free TTS will be benchmarked later.

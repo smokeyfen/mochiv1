@@ -44,7 +44,7 @@ Gate:
 
 M1 PASS before M2-A.
 
-## M2-A — Gemini 3.5 Flash Free Intelligence Provider
+## M2-A — Gemini 3.5 Flash Free Intelligence Provider (PASS)
 
 Prerequisites:
 
@@ -66,17 +66,49 @@ Required behavior:
 
 Do not implement a Product Evidence Engine, Planner, full QC Engine, or any Gemini video generation. Intelligence output cannot promote Action Capability classifications.
 
-## M2-B — Flow Video Canary
+## R0-A — Canonical Project Input Contracts
 
 Prerequisites:
 
 - M2-A PASS
+
+Goal:
+
+Establish the provider-neutral project boundary: factual `ProductInput` plus separate creative/user-production controls in `CreativeDirectionInput`, composed as `MochiProjectInput`.
+
+Do not add provider fields, upload bytes, `File`/`Blob` objects, a backend, Flow, voice, planner, Product Evidence, or production UI.
+
+## R0-B — apps/web Input Surface
+
+Prerequisites:
+
+- R0-A PASS
+
+Goal:
+
+Expose the canonical project input boundary through the minimal `apps/web` surface. Do not add a backend or provider runtime in this milestone.
+
+## Reasoning pipeline
+
+Prerequisites:
+
+- R0-B PASS
+
+Goal:
+
+Introduce the provider-neutral reasoning path behind the application surface. Gemini 3.5 Flash remains reasoning and multimodal analysis only. Local/free TTS remains the default future voice direction and will be benchmarked separately.
+
+## M2-B — Flow Video Canary
+
+Prerequisites:
+
+- reasoning pipeline stable
 - real product references
 - working Google Flow session/runtime access
 
 Goal:
 
-Run the first real 8-second, 9:16, reference-conditioned video canary through a Flow-backed `VideoProvider` while keeping Flow identifiers inside the adapter/infrastructure layer.
+Run the first real 8-second, 9:16, reference-conditioned video canary through a Flow-backed `VideoProvider` while keeping Flow identifiers inside the adapter/infrastructure layer. Google Flow is the only planned video renderer and consumes Flow credits.
 
 Do not auto-promote actions from a single output.
 
