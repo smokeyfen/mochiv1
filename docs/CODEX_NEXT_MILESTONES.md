@@ -78,7 +78,7 @@ Establish the provider-neutral project boundary: factual `ProductInput` plus sep
 
 Do not add provider fields, upload bytes, `File`/`Blob` objects, a backend, Flow, voice, planner, Product Evidence, or production UI.
 
-## R0-B — apps/web Input Surface
+## R0-B — apps/web Input Surface (PASS)
 
 Prerequisites:
 
@@ -88,7 +88,7 @@ Goal:
 
 Expose the canonical project input boundary through the minimal `apps/web` surface. Do not add a backend or provider runtime in this milestone.
 
-## Reasoning pipeline
+## R1 — Product Evidence / reasoning pipeline
 
 Prerequisites:
 
@@ -96,7 +96,7 @@ Prerequisites:
 
 Goal:
 
-Introduce the provider-neutral reasoning path behind the application surface. Gemini 3.5 Flash remains reasoning and multimodal analysis only. Local/free TTS remains the default future voice direction and will be benchmarked separately.
+Introduce the provider-neutral Product Evidence and reasoning path behind the application surface. Gemini 3.5 Flash remains reasoning and multimodal analysis only. Local/free TTS remains the default future voice direction and will be benchmarked separately. This milestone is NOT STARTED.
 
 ## M2-B — Flow Video Canary
 
