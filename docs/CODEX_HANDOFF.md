@@ -31,8 +31,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - T0-PREP Voice Timing Calibration Infrastructure: **PASS / LOCKED**
 - T0-IDENTITY HARDENING: **PASS / LOCKED**
 - Saydi VoiceProvider Boundary: **PASS / LOCKED**
-- T0-LIVE Saydi browser automation, empirical timing, and human listening: **NEXT / NOT STARTED**
-- R7-B Dialogue Finalization: **BLOCKED on T0-LIVE**
+- T0-LIVE Saydi browser automation, empirical timing, and human listening: **FALLBACK / NOT REQUIRED FOR R7-B**
+- R4.1 8-Key-Point Plan: **NEXT / NOT STARTED**
+- R7-B Dialogue Finalization: **BLOCKED on R4.1, not T0-LIVE**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -71,7 +72,8 @@ The frozen V1 target pipeline is:
 → `R6 Scene Risk`
 → bounded R4 replan when blocked
 → `R7-A Human Realism`
-→ `T0 Voice Timing Calibration`
+→ `T0 Voice Timing Calibration` (fallback infrastructure)
+→ `R4.1 8-Key-Point Plan`
 → `R7-B Dialogue Finalization`
 → `R8 Deterministic Production Compiler`
 → `P0 Snapshot Persistence`
@@ -82,9 +84,8 @@ The frozen V1 target pipeline is:
 → `Pairwise Continuity QC`
 → `Selective Repair / Approval`
 → `Global Cumulative QC`
-→ `T1 Authoritative Voice Synthesis`
-→ one-pass `FFmpeg`
-→ Final MP4
+→ `T1 Authoritative Flow Native Speech`
+→ four approved complete scene MP4 files + UTF-8 `key-points.txt`
 
 This is a sequencing and boundary lock. It is not authorization to begin the next stage. Each stage requires an explicit task and acceptance gate.
 
@@ -102,7 +103,7 @@ RUBRIC-0 still evaluates one generated benchmark scene against actual generated 
 
 ### Providers and credentials
 
-- **Google Flow is the only video generator.** Flow / Omni Flash 1.1 usage stays behind a provider/infrastructure boundary.
+- **Google Flow is the only video generator and the V1 primary authoritative native-speech path.** Flow / Omni Flash 1.1 usage stays behind a provider/infrastructure boundary.
 - **Gemini 3.5 Flash is reasoning and QC only.** It must not implement `VideoProvider` or generate video.
 - Core never receives Flow media IDs, Flow project IDs, Gemini file URIs, bearer/session values, provider operation IDs, endpoints, request IDs, upload bytes, or local paths.
 - Credentials are environment-only and server-only. Do not expose, log, or commit secrets.
@@ -122,7 +123,7 @@ RUBRIC-0 still evaluates one generated benchmark scene against actual generated 
 - Every generated video is a Candidate, never automatically Final.
 - QC is fail-closed; a critical QC failure cannot become APPROVED.
 - All physical ActionIds remain `UNTESTED` until repo-local Flow benchmark evidence satisfies the locked promotion policy: 10 reviewed attempts, 0.90 SAFE pass rate, 0.60 RISKY pass rate. `UNTESTED` and `AVOID` fail feasibility preflight.
-- Local/free TTS is the planned V1 voice direction. Final assembly is a one-pass FFmpeg step only after approved production outputs.
+- Flow native speech is the V1 primary authoritative voice path. Saydi remains fallback infrastructure only. Normal V1 delivery is exactly four approved complete scene MP4 files plus one UTF-8 `key-points.txt` containing exactly eight key points, two per scene; no stitched final MP4 is required.
 
 ## Working protocol
 
@@ -145,12 +146,12 @@ R7-A is locked at `680012c10f3f0f92a7744c496350b450c0f9e916`. It produces a prov
 
 ## T0-PREP Voice Timing Calibration Infrastructure
 
-T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE is next and must establish Saydi browser feasibility, exact physical voice binding, empirical VOICE_TIMING_V2 calibration, and human listening before R7-B may begin.
+T0-PREP is locked at `f51a9589ba413243e8b46fb0fad52b28f4ad8ce6`. It has no TTS provider or audio runtime. Its core compiler turns timing observations from exactly one `vi-VN` voice identity into a provider-neutral profile. The conservative rate is the nearest-rank lower-quartile measured rate; only measured data and explicit policy margin affect the eight-second budget. Profiles carry SYNTHETIC or EMPIRICAL provenance, and the empirical guard rejects synthetic fixtures. T0-LIVE Saydi calibration remains fallback work and is not a prerequisite for R7-B.
 
 ## T0-IDENTITY HARDENING + Saydi VoiceProvider Boundary
 
-T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. `VOICE_TIMING_V2` requires an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. Exact V1 vi-VN review identities cover the four gender/region combinations. Corrective implementation `0b818a956b2fc34c2d3d560eba57c090d10dcca2` adds one canonical Core validator that enforces exact correspondence between `voiceIdentityId`, `language`, `voiceGender`, `voiceRegion`, and `voiceStyle` for observations, persisted timing profiles, and Saydi bindings; contradictions fail closed. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary owns optional provider voice IDs, names, settings, and browser mechanics, validates explicit bindings fail-closed, and is tested exclusively with mocks. No production binding is populated or guessed. No browser automation, Saydi request, audio generation, Gemini call, or Flow call occurred. T0-LIVE is next and must establish browser feasibility, exact binding, empirical timing, and human listening quality before R7-B begins.
+T0-SAYDI-PREP is locked at `8e2d6de4d342b3d2c30fb8bf8ebfa1c7d435c1d8`. V1 South Voice Policy at `72c6f656176d298163c7ea030a0b6c48ab1dafcd` makes `VOICE_TIMING_V2` require an immutable provider-neutral `voiceIdentityId` in every timing calibration key and profile. The two canonical V1 identities are `VN_FEMALE_SOUTH_REVIEW_V1` and `VN_MALE_SOUTH_REVIEW_V1`; both use `vi-VN` / `SOUTH` / `review`. Canonical Core validation rejects both retired North identities and every identity/gender/region/style contradiction for observations, persisted timing profiles, and Saydi bindings. The generic VoiceProvider interface has no Saydi-specific fields. The isolated Saydi browser boundary remains fallback infrastructure; it owns optional provider voice IDs, names, settings, and browser mechanics, which never enter Core contracts. T0-LIVE is not on the V1 critical path and cannot block R7-B.
 
 ## Frozen V1 voice architecture
 
-`T1 Authoritative Voice Synthesis` is provider-neutral at the architecture boundary. The V1 primary provider is SaydiVoice via `SaydiBrowserVoiceProvider`; Local TTS is fallback contingency only. Google Flow is video only and is never authoritative speech. Later final audio assembly combines authoritative voice WAV with approved Flow scene video through one FFmpeg pass. Saydi-specific physical voice IDs remain confined to provider infrastructure and never enter Core architecture contracts.
+`T1 Authoritative Flow Native Speech` is the V1 primary authoritative voice path. At the provider roadmap boundary only, `VN_FEMALE_SOUTH_REVIEW_V1` maps to Flow saved voice `Leda Custom`; the human four-scene consistency benchmark is PASS. `VN_MALE_SOUTH_REVIEW_V1` maps to Flow base voice `Achird` using the currently selected default Customize Character; it is selected/config locked and has no four-scene benchmark claim. Saydi remains fallback infrastructure. No Flow voice name or ID belongs in Core contracts. Future normal V1 delivery is exactly four approved complete scene MP4 files plus one UTF-8 `key-points.txt` file containing exactly eight key points, two per scene. Scene 1 Key Point 1 must equal the canonical validated `ProductInput.productName` and may never be LLM-paraphrased. No stitched final MP4 is required; the output folder is user-selected later and is not hard-coded. R4.1 8-Key-Point Plan is the next planning milestone before dialogue finalization.
