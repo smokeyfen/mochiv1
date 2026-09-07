@@ -269,6 +269,133 @@ export interface Global4ScenePlan {
   referenceReadiness: 'READY' | 'LIMITED';
   scenes: readonly Global4SceneIntent[];
 }
+
+/** Provider-neutral, deterministic R4.1 output. */
+export const KEY_POINTS_V1 = 'KEY_POINTS_V1' as const;
+export type KeyPointsVersion = typeof KEY_POINTS_V1;
+export type KeyPointKind = 'PRODUCT_NAME' | 'PRODUCT_TRUTH';
+export interface KeyPoint {
+  index: 1 | 2;
+  kind: KeyPointKind;
+  truthRefId: string | null;
+  text: string;
+}
+export interface KeyPointPlanScene {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  keyPoints: readonly KeyPoint[];
+}
+export interface KeyPointPlan {
+  schemaVersion: SchemaVersion;
+  keyPointsVersion: KeyPointsVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  scenes: readonly KeyPointPlanScene[];
+}
+export interface PlanningTruthCatalogEntry {
+  id: string;
+  text: string;
+}
+
+const keyPointPlanKeys = ['schemaVersion', 'keyPointsVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'scenes'] as const;
+const keyPointSceneKeys = ['sceneId', 'index', 'keyPoints'] as const;
+const keyPointKeys = ['index', 'kind', 'truthRefId', 'text'] as const;
+const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every(key => key in value);
+const sameOrderedStrings = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+/**
+ * Proves the complete R4.1 shape, source binding, canonical truth ownership,
+ * and the fixed four-scene/eight-point layout. The catalog is supplied by the
+ * existing planning authority; this validator intentionally never builds one.
+ */
+export function validateKeyPointPlan(
+  value: unknown,
+  context: R2CommittedProductContext,
+  globalPlan: Global4ScenePlan,
+  catalog: readonly PlanningTruthCatalogEntry[]
+): string[] {
+  const issues: string[] = [];
+  if (!hasExactKeys(value, keyPointPlanKeys)) return ['shape'];
+  const plan = value as unknown as KeyPointPlan;
+  if (plan.schemaVersion !== SCHEMA_VERSION || plan.keyPointsVersion !== KEY_POINTS_V1) issues.push('version');
+  if (plan.productId !== context.productId || plan.sourceEvidenceVersion !== context.sourceEvidenceVersion
+    || !sameOrderedStrings(plan.canonicalAssetIds, context.canonicalAssetIds)) issues.push('source');
+  if (globalPlan.schemaVersion !== SCHEMA_VERSION || globalPlan.productId !== context.productId
+    || globalPlan.sourceEvidenceVersion !== context.sourceEvidenceVersion
+    || !sameOrderedStrings(globalPlan.canonicalAssetIds, context.canonicalAssetIds)) issues.push('upstream_source');
+
+  const truthById = new Map<string, string>();
+  for (const item of catalog) {
+    if (!nonBlankContract(item.id) || !nonBlankContract(item.text) || truthById.has(item.id)) {
+      issues.push('catalog');
+      continue;
+    }
+    truthById.set(item.id, item.text);
+  }
+  if (!Array.isArray(globalPlan.scenes) || globalPlan.scenes.length !== 4) issues.push('upstream_scene_count');
+  if (!Array.isArray(plan.scenes) || plan.scenes.length !== 4) issues.push('scene_count');
+  if (!Array.isArray(plan.scenes)) return issues;
+
+  const establishedTruthIds = new Set<string>();
+  for (let sceneOffset = 0; sceneOffset < 4; sceneOffset += 1) {
+    const scene = plan.scenes[sceneOffset];
+    const upstream = globalPlan.scenes[sceneOffset];
+    if (!hasExactKeys(scene, keyPointSceneKeys)) {
+      issues.push('scene_shape');
+      continue;
+    }
+    if (!upstream || upstream.index !== sceneOffset + 1 || !nonBlankContract(upstream.sceneId)
+      || scene.sceneId !== upstream.sceneId || scene.index !== upstream.index) issues.push('scene_binding');
+    if (!Array.isArray(scene.keyPoints) || scene.keyPoints.length !== 2) {
+      issues.push('point_count');
+      continue;
+    }
+    const primary = upstream?.primaryTruthRefId;
+    if (!primary || !truthById.has(primary)) issues.push('upstream_primary_truth');
+    if (sceneOffset < 3 && primary) establishedTruthIds.add(primary);
+
+    const truthIdsInScene = new Set<string>();
+    for (let pointOffset = 0; pointOffset < 2; pointOffset += 1) {
+      const point = scene.keyPoints[pointOffset];
+      if (!hasExactKeys(point, keyPointKeys)) {
+        issues.push('point_shape');
+        continue;
+      }
+      if (point.index !== pointOffset + 1 || !nonBlankContract(point.text)) issues.push('point_sequence');
+      const requiredPrimary = pointOffset === 0 && sceneOffset > 0
+        ? primary
+        : pointOffset === 1 && sceneOffset === 0 ? primary : undefined;
+      if (sceneOffset === 0 && pointOffset === 0) {
+        if (point.kind !== 'PRODUCT_NAME' || point.truthRefId !== null || point.text !== context.productTruth.name) {
+          issues.push('product_name');
+        }
+        continue;
+      }
+      if (point.kind !== 'PRODUCT_TRUTH' || !nonBlankContract(point.truthRefId)) {
+        issues.push('truth_point');
+        continue;
+      }
+      const canonicalText = truthById.get(point.truthRefId);
+      if (canonicalText === undefined) {
+        issues.push('unknown_truth');
+        continue;
+      }
+      if (point.text !== canonicalText) issues.push('canonical_text');
+      if (truthIdsInScene.has(point.truthRefId)) issues.push('same_scene_duplicate');
+      truthIdsInScene.add(point.truthRefId);
+      if (requiredPrimary !== undefined && point.truthRefId !== requiredPrimary) issues.push('primary_truth');
+      if (sceneOffset === 3 && pointOffset === 1
+        && (!establishedTruthIds.has(point.truthRefId) || point.truthRefId === primary)) {
+        issues.push('scene4_new_truth');
+      }
+    }
+  }
+  return issues;
+}
 export type CanonicalPlacement = 'ON_SURFACE'|'IN_HAND'|'NEAR_CAMERA';
 export type CanonicalOrientation = 'FRONT_FACING'|'ROTATED';
 export type CanonicalInteractionState = 'BASELINE'|'OPENED'|'ACTUATED'|'CONTENT_TRANSFERRED'|'APPLIED';
