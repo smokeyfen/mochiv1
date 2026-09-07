@@ -94,7 +94,7 @@ async function withRuntime(run: (value: { runtime: ReturnType<typeof createProdu
 }
 const runtimeError = (stage: string) => (error: unknown) => error instanceof ProductionRuntimeError && error.stage === stage && error.message === `PRE_F1_RUNTIME_ERROR:${stage}`;
 
-test('PRE-F1 valid dry fixture executes every stage once and returns the persisted validated snapshot', async () => withRuntime(async ({ runtime, requests }) => {
+test('PRE-F1 mocked integration completes only with an explicitly supplied test SAFE fixture', async () => withRuntime(async ({ runtime, requests }) => {
   const result = await runtime.run(request());
   assert.equal(requests.length, 9);
   assert.deepEqual(result.trace.map(entry => entry.stage), PRE_F1_RUNTIME_STAGES);
