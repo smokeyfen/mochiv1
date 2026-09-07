@@ -22,10 +22,10 @@ function caseFor(actionId: 'PICK_UP' | 'HOLD' | 'ROTATE_SLOW', attemptNumber: nu
   return benchmarkCase;
 }
 
-test('current C1 batch compiles exactly three valid packets in locked action order', () => {
+test('next planned batch compiles exactly three valid packets in locked action order', () => {
   const packets = compileNextF0BenchmarkExecutionBatch();
   assert.deepEqual(packets.map(packet => [packet.actionId, packet.attemptNumber]), [
-    ['PICK_UP', 2], ['HOLD', 2], ['ROTATE_SLOW', 1]
+    ['PICK_UP', 3], ['HOLD', 3], ['ROTATE_SLOW', 2]
   ]);
   assert.equal(packets.length, 3);
   assert.ok(packets.every(packet => validateF0BenchmarkExecutionPacket(packet).length === 0));
@@ -110,10 +110,10 @@ test('dry execution report is deterministic, read-only, and performs no generati
   assert.equal(first.geminiCalls, 0);
   assert.equal(first.saydiCalls, 0);
   assert.equal(first.generationsPerformed, 0);
-  assert.equal(first.executionReceiptCount, 0);
-  assert.equal(first.benchmarkObservationCount, 2);
+  assert.equal(first.executionReceiptCount, 3);
+  assert.equal(first.benchmarkObservationCount, 5);
   assert.equal(first.campaignReady, false);
-  assert.ok(formatF0BenchmarkExecutionDryReport(first).includes('PICK_UP attempt=2'));
+  assert.ok(formatF0BenchmarkExecutionDryReport(first).includes('PICK_UP attempt=3'));
   assert.deepEqual(f0BottleBaselineCapabilityCampaign, campaignBefore);
   assert.deepEqual(f0EmpiricalBenchmarkObservations, evidenceBefore);
   assert.deepEqual(f0BenchmarkExecutionReceipts, receiptsBefore);

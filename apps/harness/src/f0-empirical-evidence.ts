@@ -3,9 +3,9 @@ import { RUBRIC_0_VERSION, SCHEMA_VERSION } from '@mochi/contracts';
 import { F0_CANOONICAL_FIXTURE_ID } from './f0-canary-fixture';
 
 /**
- * Recorded human-review evidence for the completed F0-A.2 attempt. This module
- * holds only provider-neutral logical evidence metadata, never video bytes or
- * Flow runtime/session identifiers.
+ * Recorded human-review evidence for completed controlled F0 candidates. This
+ * module holds only provider-neutral logical evidence metadata, never video
+ * bytes or Flow runtime/session identifiers.
  */
 export const f0EmpiricalBenchmarkObservations: readonly BenchmarkObservation[] = [{
   schemaVersion: SCHEMA_VERSION,
@@ -95,4 +95,73 @@ export const f0EmpiricalBenchmarkObservations: readonly BenchmarkObservation[] =
   ],
   verdict: 'PASS',
   reviewerNotes: 'F0 baseline HOLD canary passed. Full-motion review and 16-frame contact-sheet review agreed that the bottle remains stable, upright, and naturally held. This observation is empirical evidence only and must not independently promote HOLD.'
+}, {
+  schemaVersion: SCHEMA_VERSION,
+  rubricVersion: RUBRIC_0_VERSION,
+  observationId: 'f0-cocoon-pick-up-v1-attempt-02-review',
+  benchmarkCaseId: 'f0-cocoon-pick-up-v1-attempt-02',
+  fixtureId: F0_CANOONICAL_FIXTURE_ID,
+  archetype: 'BOTTLE',
+  actionId: 'PICK_UP',
+  evidenceOrigin: 'REAL_MODEL_VIDEO',
+  candidateAssetId: 'f0-cocoon-pick-up-v1-attempt-02-video',
+  reviewerId: 'f0-human-reviewer',
+  reviewedAt: '2026-09-07T18:31:07.000Z',
+  dimensions: [
+    { dimension: 'PRODUCT_FIDELITY', passed: true, critical: true, notes: 'Human reviewer confirmed PRODUCT_FIDELITY PASS for this real Batch 1 candidate.' },
+    { dimension: 'HAND_ANATOMY', passed: true, critical: true, notes: 'Human reviewer confirmed HAND_ANATOMY PASS for this real Batch 1 candidate.' },
+    { dimension: 'ACTION_COMPLETION', passed: true, critical: true, notes: 'Human reviewer confirmed ACTION_COMPLETION PASS for the PICK_UP action in this real Batch 1 candidate.' },
+    { dimension: 'PHYSICS', passed: true, critical: true, notes: 'Human reviewer confirmed PHYSICS PASS for this real Batch 1 candidate.' },
+    { dimension: 'CAMERA_REALISM', passed: true, critical: false, notes: 'Human reviewer confirmed CAMERA_REALISM PASS for this real Batch 1 candidate.' },
+    { dimension: 'UNEXPECTED_CUTS', passed: true, critical: true, notes: 'Human reviewer confirmed UNEXPECTED_CUTS PASS for this real Batch 1 candidate.' },
+    { dimension: 'VISIBLE_ARTIFACTS', passed: true, critical: true, notes: 'Human reviewer confirmed VISIBLE_ARTIFACTS PASS for this real Batch 1 candidate.' }
+  ],
+  verdict: 'PASS',
+  reviewerNotes: 'This was the user-authorized controlled Flow Batch 1. Human Rubric-0 review returned PASS. This observation is empirical evidence and does not independently promote PICK_UP.'
+}, {
+  schemaVersion: SCHEMA_VERSION,
+  rubricVersion: RUBRIC_0_VERSION,
+  observationId: 'f0-cocoon-hold-v1-attempt-02-review',
+  benchmarkCaseId: 'f0-cocoon-hold-v1-attempt-02',
+  fixtureId: F0_CANOONICAL_FIXTURE_ID,
+  archetype: 'BOTTLE',
+  actionId: 'HOLD',
+  evidenceOrigin: 'REAL_MODEL_VIDEO',
+  candidateAssetId: 'f0-cocoon-hold-v1-attempt-02-video',
+  reviewerId: 'f0-human-reviewer',
+  reviewedAt: '2026-09-07T18:31:07.000Z',
+  dimensions: [
+    { dimension: 'PRODUCT_FIDELITY', passed: true, critical: true, notes: 'Human reviewer confirmed PRODUCT_FIDELITY PASS for this real Batch 1 candidate.' },
+    { dimension: 'HAND_ANATOMY', passed: true, critical: true, notes: 'Human reviewer confirmed HAND_ANATOMY PASS for this real Batch 1 candidate.' },
+    { dimension: 'ACTION_COMPLETION', passed: true, critical: true, notes: 'Human reviewer confirmed ACTION_COMPLETION PASS for the HOLD action in this real Batch 1 candidate.' },
+    { dimension: 'PHYSICS', passed: true, critical: true, notes: 'Human reviewer confirmed PHYSICS PASS for this real Batch 1 candidate.' },
+    { dimension: 'CAMERA_REALISM', passed: true, critical: false, notes: 'Human reviewer confirmed CAMERA_REALISM PASS for this real Batch 1 candidate.' },
+    { dimension: 'UNEXPECTED_CUTS', passed: true, critical: true, notes: 'Human reviewer confirmed UNEXPECTED_CUTS PASS for this real Batch 1 candidate.' },
+    { dimension: 'VISIBLE_ARTIFACTS', passed: true, critical: true, notes: 'Human reviewer confirmed VISIBLE_ARTIFACTS PASS for this real Batch 1 candidate.' }
+  ],
+  verdict: 'PASS',
+  reviewerNotes: 'This was the user-authorized controlled Flow Batch 1. Human Rubric-0 review returned PASS. This observation is empirical evidence and does not independently promote HOLD.'
+}, {
+  schemaVersion: SCHEMA_VERSION,
+  rubricVersion: RUBRIC_0_VERSION,
+  observationId: 'f0-cocoon-rotate-slow-v1-attempt-01-review',
+  benchmarkCaseId: 'f0-cocoon-rotate-slow-v1',
+  fixtureId: F0_CANOONICAL_FIXTURE_ID,
+  archetype: 'BOTTLE',
+  actionId: 'ROTATE_SLOW',
+  evidenceOrigin: 'REAL_MODEL_VIDEO',
+  candidateAssetId: 'f0-cocoon-rotate-slow-v1-attempt-01-video',
+  reviewerId: 'f0-human-reviewer',
+  reviewedAt: '2026-09-07T18:31:07.000Z',
+  dimensions: [
+    { dimension: 'PRODUCT_FIDELITY', passed: true, critical: true, notes: 'Human reviewer confirmed PRODUCT_FIDELITY PASS for this real Batch 1 candidate.' },
+    { dimension: 'HAND_ANATOMY', passed: true, critical: true, notes: 'Human reviewer confirmed HAND_ANATOMY PASS for this real Batch 1 candidate.' },
+    { dimension: 'ACTION_COMPLETION', passed: true, critical: true, notes: 'Human reviewer confirmed ACTION_COMPLETION PASS for the ROTATE_SLOW action in this real Batch 1 candidate.' },
+    { dimension: 'PHYSICS', passed: true, critical: true, notes: 'Human reviewer confirmed PHYSICS PASS for this real Batch 1 candidate.' },
+    { dimension: 'CAMERA_REALISM', passed: true, critical: false, notes: 'Human reviewer confirmed CAMERA_REALISM PASS for this real Batch 1 candidate.' },
+    { dimension: 'UNEXPECTED_CUTS', passed: true, critical: true, notes: 'Human reviewer confirmed UNEXPECTED_CUTS PASS for this real Batch 1 candidate.' },
+    { dimension: 'VISIBLE_ARTIFACTS', passed: true, critical: true, notes: 'Human reviewer confirmed VISIBLE_ARTIFACTS PASS for this real Batch 1 candidate.' }
+  ],
+  verdict: 'PASS',
+  reviewerNotes: 'This was the user-authorized controlled Flow Batch 1. Human Rubric-0 review returned PASS. This observation is empirical evidence and does not independently promote ROTATE_SLOW.'
 }];

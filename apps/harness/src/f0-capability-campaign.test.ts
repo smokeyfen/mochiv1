@@ -64,16 +64,23 @@ test('F0 attempt one cases and exact ScenePlan bindings remain canonical', () =>
   }
 });
 
-test('current reviewed historical evidence has no trusted promotions', () => {
+test('controlled Batch 1 reviewed evidence has no trusted promotions', () => {
   const status = deriveF0CapabilityStatus(f0EmpiricalBenchmarkObservations);
-  assert.deepEqual(status.actions.PICK_UP.acceptedObservationIds, ['f0-cocoon-pick-up-v1-attempt-01-review']);
-  assert.deepEqual(status.actions.HOLD.acceptedObservationIds, ['f0-cocoon-hold-v1-attempt-01-review']);
-  assert.equal(status.actions.ROTATE_SLOW.reviewedAttemptCount, 0);
+  assert.deepEqual(status.actions.PICK_UP.acceptedObservationIds, [
+    'f0-cocoon-pick-up-v1-attempt-01-review', 'f0-cocoon-pick-up-v1-attempt-02-review'
+  ]);
+  assert.deepEqual(status.actions.HOLD.acceptedObservationIds, [
+    'f0-cocoon-hold-v1-attempt-01-review', 'f0-cocoon-hold-v1-attempt-02-review'
+  ]);
+  assert.deepEqual(status.actions.ROTATE_SLOW.acceptedObservationIds, ['f0-cocoon-rotate-slow-v1-attempt-01-review']);
+  assert.equal(status.actions.PICK_UP.reviewedAttemptCount, 2);
+  assert.equal(status.actions.HOLD.reviewedAttemptCount, 2);
+  assert.equal(status.actions.ROTATE_SLOW.reviewedAttemptCount, 1);
   assert.ok(Object.values(status.actionCapabilityMap).every(level => level === 'UNTESTED'));
   assert.equal(status.campaignReady, false);
   assert.equal(status.totalPromotionsFromUntested, 0);
-  assert.deepEqual(F0_BASELINE_ACTION_IDS.map(actionId => status.actions[actionId].attemptsRemainingToMinimum), [9, 9, 10]);
-  assert.equal(F0_BASELINE_ACTION_IDS.reduce((total, actionId) => total + status.actions[actionId].attemptsRemainingToMinimum, 0), 28);
+  assert.deepEqual(F0_BASELINE_ACTION_IDS.map(actionId => status.actions[actionId].attemptsRemainingToMinimum), [8, 8, 9]);
+  assert.equal(F0_BASELINE_ACTION_IDS.reduce((total, actionId) => total + status.actions[actionId].attemptsRemainingToMinimum, 0), 25);
 });
 
 test('trusted derivation rejects out-of-campaign, malformed, synthetic, and duplicate evidence', () => {

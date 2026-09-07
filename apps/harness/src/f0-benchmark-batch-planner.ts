@@ -26,8 +26,38 @@ export interface F0BenchmarkExecutionReceipt {
   readonly status: typeof F0_BENCHMARK_EXECUTION_RECEIPT_STATUS;
 }
 
-/** No historical execution receipts are fabricated for the locked F0-B evidence. */
-export const f0BenchmarkExecutionReceipts: readonly F0BenchmarkExecutionReceipt[] = [];
+/**
+ * Controlled Batch 1 execution accounting. These provider-neutral logical
+ * receipts remain in history after their human-reviewed observations exist.
+ */
+export const f0BenchmarkExecutionReceipts: readonly F0BenchmarkExecutionReceipt[] = [{
+  executionReceiptVersion: F0_BENCHMARK_EXECUTION_RECEIPT_VERSION,
+  campaignId: F0_BOTTLE_BASELINE_CAPABILITY_V1,
+  benchmarkCaseId: 'f0-cocoon-pick-up-v1-attempt-02',
+  fixtureId: 'f0-cocoon-turmeric-serum-bottle-v1',
+  actionId: 'PICK_UP',
+  attemptNumber: 2,
+  candidateAssetId: 'f0-cocoon-pick-up-v1-attempt-02-video',
+  status: F0_BENCHMARK_EXECUTION_RECEIPT_STATUS
+}, {
+  executionReceiptVersion: F0_BENCHMARK_EXECUTION_RECEIPT_VERSION,
+  campaignId: F0_BOTTLE_BASELINE_CAPABILITY_V1,
+  benchmarkCaseId: 'f0-cocoon-hold-v1-attempt-02',
+  fixtureId: 'f0-cocoon-turmeric-serum-bottle-v1',
+  actionId: 'HOLD',
+  attemptNumber: 2,
+  candidateAssetId: 'f0-cocoon-hold-v1-attempt-02-video',
+  status: F0_BENCHMARK_EXECUTION_RECEIPT_STATUS
+}, {
+  executionReceiptVersion: F0_BENCHMARK_EXECUTION_RECEIPT_VERSION,
+  campaignId: F0_BOTTLE_BASELINE_CAPABILITY_V1,
+  benchmarkCaseId: 'f0-cocoon-rotate-slow-v1',
+  fixtureId: 'f0-cocoon-turmeric-serum-bottle-v1',
+  actionId: 'ROTATE_SLOW',
+  attemptNumber: 1,
+  candidateAssetId: 'f0-cocoon-rotate-slow-v1-attempt-01-video',
+  status: F0_BENCHMARK_EXECUTION_RECEIPT_STATUS
+}];
 
 export type F0BenchmarkCaseState =
   | 'REVIEWED'

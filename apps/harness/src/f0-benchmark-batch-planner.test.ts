@@ -57,25 +57,33 @@ function rejectedObservation(actionId: ActionId, attemptNumber: number): Benchma
   };
 }
 
-test('current historical cases derive REVIEWED, REVIEWED, and PENDING', () => {
-  assert.deepEqual(f0BenchmarkExecutionReceipts, []);
+test('controlled Batch 1 receipts validate and accepted review evidence takes precedence', () => {
+  assert.equal(f0BenchmarkExecutionReceipts.length, 3);
+  assert.ok(f0BenchmarkExecutionReceipts.every(receipt => validateF0BenchmarkExecutionReceipt(receipt).length === 0));
   assert.equal(deriveF0BenchmarkCaseState(caseFor('PICK_UP', 1)), 'REVIEWED');
   assert.equal(deriveF0BenchmarkCaseState(caseFor('HOLD', 1)), 'REVIEWED');
-  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 1)), 'PENDING');
+  assert.equal(deriveF0BenchmarkCaseState(caseFor('PICK_UP', 2)), 'REVIEWED');
+  assert.equal(deriveF0BenchmarkCaseState(caseFor('HOLD', 2)), 'REVIEWED');
+  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 1)), 'REVIEWED');
 });
 
-test('current next batch is one lowest pending case per action in locked order', () => {
+test('next batch is one lowest pending case per action in locked order with no duplicate eligible generation', () => {
   const batch = planNextF0BenchmarkBatch();
   assert.deepEqual(batch.map(item => [item.actionId, item.attemptNumber]), [
-    ['PICK_UP', 2], ['HOLD', 2], ['ROTATE_SLOW', 1]
+    ['PICK_UP', 3], ['HOLD', 3], ['ROTATE_SLOW', 2]
   ]);
   assert.equal(new Set(batch.map(item => item.actionId)).size, batch.length);
+  const reviewedOrReceiptedCaseIds = new Set([
+    ...f0EmpiricalBenchmarkObservations.map(observation => observation.benchmarkCaseId),
+    ...f0BenchmarkExecutionReceipts.map(receipt => receipt.benchmarkCaseId)
+  ]);
+  assert.ok(batch.every(item => !reviewedOrReceiptedCaseIds.has(item.benchmarkCaseId)));
 });
 
 test('planner selects the lowest PENDING attempt for each action', () => {
-  const batch = planNextF0BenchmarkBatch({ executionReceipts: [receiptFor('PICK_UP', 2)] });
+  const batch = planNextF0BenchmarkBatch({ executionReceipts: [...f0BenchmarkExecutionReceipts, receiptFor('PICK_UP', 3)] });
   assert.deepEqual(batch.map(item => [item.actionId, item.attemptNumber]), [
-    ['PICK_UP', 3], ['HOLD', 2], ['ROTATE_SLOW', 1]
+    ['PICK_UP', 4], ['HOLD', 3], ['ROTATE_SLOW', 2]
   ]);
 });
 
@@ -84,12 +92,12 @@ test('planner rejects a requested batch larger than three', () => {
 });
 
 test('a valid receipt is AWAITING_REVIEW and blocks regeneration', () => {
-  const receipt = receiptFor('ROTATE_SLOW', 1);
+  const receipt = receiptFor('ROTATE_SLOW', 2);
   assert.deepEqual(validateF0BenchmarkExecutionReceipt(receipt), []);
-  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 1), f0EmpiricalBenchmarkObservations, [receipt]), 'AWAITING_REVIEW');
+  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 2), f0EmpiricalBenchmarkObservations, [...f0BenchmarkExecutionReceipts, receipt]), 'AWAITING_REVIEW');
   assert.deepEqual(
-    planNextF0BenchmarkBatch({ executionReceipts: [receipt] }).map(item => [item.actionId, item.attemptNumber]),
-    [['PICK_UP', 2], ['HOLD', 2], ['ROTATE_SLOW', 2]]
+    planNextF0BenchmarkBatch({ executionReceipts: [...f0BenchmarkExecutionReceipts, receipt] }).map(item => [item.actionId, item.attemptNumber]),
+    [['PICK_UP', 3], ['HOLD', 3], ['ROTATE_SLOW', 3]]
   );
 });
 
@@ -115,18 +123,18 @@ test('duplicate case or candidate receipts and fixture or attempt mismatches fai
 });
 
 test('rejected case evidence is REVIEW_EVIDENCE_INVALID and blocks regeneration', () => {
-  const observations = [...f0EmpiricalBenchmarkObservations, rejectedObservation('ROTATE_SLOW', 1)];
-  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 1), observations), 'REVIEW_EVIDENCE_INVALID');
+  const observations = [...f0EmpiricalBenchmarkObservations, rejectedObservation('ROTATE_SLOW', 2)];
+  assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 2), observations), 'REVIEW_EVIDENCE_INVALID');
   assert.deepEqual(
     planNextF0BenchmarkBatch({ observations }).map(item => [item.actionId, item.attemptNumber]),
-    [['PICK_UP', 2], ['HOLD', 2], ['ROTATE_SLOW', 2]]
+    [['PICK_UP', 3], ['HOLD', 3], ['ROTATE_SLOW', 3]]
   );
 });
 
 test('planner is deterministic and does not mutate F0-B campaign data or evidence', () => {
   const campaignBefore = structuredClone(f0CapabilityCampaignCases);
   const evidenceBefore = structuredClone(f0EmpiricalBenchmarkObservations);
-  const receipts = [receiptFor('ROTATE_SLOW', 1)];
+  const receipts = [...f0BenchmarkExecutionReceipts, receiptFor('ROTATE_SLOW', 2)];
   const receiptsBefore = structuredClone(receipts);
   assert.deepEqual(planNextF0BenchmarkBatch({ executionReceipts: receipts }), planNextF0BenchmarkBatch({ executionReceipts: receipts }));
   assert.deepEqual(f0CapabilityCampaignCases, campaignBefore);
