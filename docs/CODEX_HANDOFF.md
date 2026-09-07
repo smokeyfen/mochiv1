@@ -35,8 +35,10 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R4.1 Four-Scene / Eight-Key-Point Plan: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `026f3a217f3283d09007019714358054ea0983bd`
 - R7-B Dialogue Finalization: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `696ffea000c4f804472ffaebdd180ec236e68546`
 - R8: **FINAL LOCKED / DIRECTLY AUDITED** at corrective implementation `d13b6b307377189af40d2e14dd699ddc8341e748`
-- P0 Production Snapshot Persistence: **PASS / LOCKED locally / awaiting external audit** at implementation `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`
-- PRE-F1 INTEGRATION GATE: **NEXT / NOT STARTED**
+- P0 Production Snapshot Persistence: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`
+- PRE-F1-A Integration Harness: **PASS / LOCKED locally / awaiting external audit** at implementation `89d722206955a251ca1f295ed643cc994a147e68`
+- PRE-F1-LIVE: **NOT RUN**
+- F1: **NOT STARTED**
 
 The completed live path is:
 
@@ -173,3 +175,7 @@ R8 is FINAL LOCKED / DIRECTLY AUDITED at corrective implementation `d13b6b307377
 ## P0 Production Snapshot Persistence V1
 
 P0 is PASS / LOCKED locally / awaiting external audit at implementation `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`. It adds the provider-neutral `PRODUCTION_SNAPSHOT_V1` contract, which contains exact R8 `PRODUCTION_CONTRACT_V1` output plus project and committed source identity only. A server-only injected-root store recompiles R8 rather than accepting a manually constructed contract, validates the full snapshot, derives `ps_<64 lowercase hex SHA-256>` from sorted-key canonical JSON excluding `snapshotId`, and persists canonical UTF-8 JSON immutably. Temporary same-root writes publish with atomic no-overwrite semantics; valid duplicate saves are idempotent, while corrupt or conflicting existing paths fail closed. Loads validate the strict snapshot and R8 contract, source binding, and recomputed content ID before return. Verification: `npm run typecheck` PASS; `npm test` PASS (206 tests); `npm run benchmark:dry` PASS with all benchmark actions fail-closed `UNTESTED`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No IntelligenceProvider, Gemini, Flow, or Saydi calls; no video generations or ActionCapability promotions. PRE-F1 INTEGRATION GATE is NEXT / NOT STARTED.
+
+## PRE-F1-A Consolidated Production Runtime Integration Harness
+
+PRE-F1-A is PASS / LOCKED locally / awaiting external audit at implementation `89d722206955a251ca1f295ed643cc994a147e68`. The server-only runtime composes the existing R1→P0 authorities in the locked order, uses one injected provider-neutral IntelligenceProvider, requires all R6 scenes READY, persists/reloads/compares P0 snapshots, and exposes only a safe ordered trace. It retains runtime media solely at R1 and R2-B and has no Flow or Saydi path. The mocked complete fixture makes exactly 9 intelligence requests; all deterministic stages remain deterministic and snapshot IDs are stable. The development-only `pre-f1:live` runner is explicit-opt-in (`PRE_F1_LIVE=1` plus `GEMINI_API_KEY`, manifest, real image files, source version/project ID in that manifest, and snapshot root). Missing enablement/config prints `PRE_F1_LIVE_NOT_RUN` without calls; success reports only request count/stages, snapshot/product/scene IDs, READY statuses, and logical voice identity. Verification: `npm run typecheck` PASS; `npm test` PASS (216 tests); `npm run benchmark:dry` PASS with all actions still `UNTESTED`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. P0 is FINAL LOCKED / DIRECTLY AUDITED at `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`. PRE-F1-LIVE is NOT RUN; F1 is NOT STARTED. This does not claim PRE-F1 overall PASS. New live Gemini, Flow, and Saydi calls: 0; generations: 0; ActionCapability promotions: 0.
