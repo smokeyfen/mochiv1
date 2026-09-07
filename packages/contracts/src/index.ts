@@ -878,9 +878,9 @@ export function validateCreativeDirectionInput(input: CreativeDirectionInput): r
   if (!nonBlank(input.shootingContext)) issues.push('shooting_context');
   if (!nonBlank(input.reviewerPersona)) issues.push('reviewer_persona');
   if (!nonBlank(input.tone)) issues.push('tone');
-  if (!nonBlank(input.voiceStyle)) issues.push('voice_style');
+  if (input.voiceStyle !== 'review') issues.push('voice_style');
   if (input.voiceGender !== 'MALE' && input.voiceGender !== 'FEMALE') issues.push('voice_gender');
-  if (input.voiceRegion !== 'SOUTH' && input.voiceRegion !== 'NORTH') issues.push('voice_region');
+  if (input.voiceRegion !== 'SOUTH') issues.push('voice_region');
   return issues;
 }
 

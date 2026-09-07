@@ -61,20 +61,17 @@ test('T0 duration estimator preserves text and has deterministic FITS/TOO_LONG b
   assert.equal(fits.normalizedText, 'xin chào bạn bạn bạn bạn bạn');
 });
 
-test('the four exact V1 review identities resolve deterministically and unsupported styles fail closed', () => {
+test('only the two South V1 review identities resolve deterministically', () => {
   assert.equal(resolveV1ReviewVoiceIdentity('vi-VN', 'FEMALE', 'SOUTH', 'review'), 'VN_FEMALE_SOUTH_REVIEW_V1');
-  assert.equal(resolveV1ReviewVoiceIdentity('vi-VN', 'FEMALE', 'NORTH', 'review'), 'VN_FEMALE_NORTH_REVIEW_V1');
   assert.equal(resolveV1ReviewVoiceIdentity('vi-VN', 'MALE', 'SOUTH', 'review'), 'VN_MALE_SOUTH_REVIEW_V1');
-  assert.equal(resolveV1ReviewVoiceIdentity('vi-VN', 'MALE', 'NORTH', 'review'), 'VN_MALE_NORTH_REVIEW_V1');
+  for (const gender of ['FEMALE', 'MALE'] as const) assert.throws(() => resolveV1ReviewVoiceIdentity('vi-VN', gender, 'NORTH', 'review'), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
   assert.throws(() => resolveV1ReviewVoiceIdentity('vi-VN', 'FEMALE', 'SOUTH', 'warm'), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
 });
 
 test('canonical V1 voice keys require identity and metadata to correspond exactly', () => {
   const canonicalKeys: readonly VoiceTimingCalibrationKey[] = [
     { language: 'vi-VN', voiceIdentityId: 'VN_FEMALE_SOUTH_REVIEW_V1', voiceGender: 'FEMALE', voiceRegion: 'SOUTH', voiceStyle: 'review' },
-    { language: 'vi-VN', voiceIdentityId: 'VN_FEMALE_NORTH_REVIEW_V1', voiceGender: 'FEMALE', voiceRegion: 'NORTH', voiceStyle: 'review' },
-    { language: 'vi-VN', voiceIdentityId: 'VN_MALE_SOUTH_REVIEW_V1', voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' },
-    { language: 'vi-VN', voiceIdentityId: 'VN_MALE_NORTH_REVIEW_V1', voiceGender: 'MALE', voiceRegion: 'NORTH', voiceStyle: 'review' }
+    { language: 'vi-VN', voiceIdentityId: 'VN_MALE_SOUTH_REVIEW_V1', voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' }
   ];
   for (const canonicalKey of canonicalKeys) assert.equal(isCanonicalV1ReviewVoiceKey(canonicalKey), true);
   for (const inconsistent of [
@@ -87,6 +84,11 @@ test('canonical V1 voice keys require identity and metadata to correspond exactl
     assert.equal(isCanonicalV1ReviewVoiceKey(inconsistent), false);
     assert.ok(validateVoiceTimingObservation(obs('inconsistent', 'xin chào bạn', 1000, inconsistent)).includes('voice_identity'));
   }
+  for (const retiredIdentity of ['VN_FEMALE_NORTH_REVIEW_V1', 'VN_MALE_NORTH_REVIEW_V1']) {
+    const retired = { ...key, voiceIdentityId: retiredIdentity, voiceRegion: 'NORTH' as const };
+    assert.equal(isCanonicalV1ReviewVoiceKey(retired), false);
+    assert.ok(validateVoiceTimingObservation(obs(`retired-${retiredIdentity}`, 'xin chào bạn', 1000, retired)).includes('voice_identity'));
+  }
 });
 test('an empirical timing profile is bound to its exact immutable voice identity', () => {
   const empirical = buildVoiceTimingProfile(samples().map(item => ({ ...item, provenance: 'EMPIRICAL' as const })), policy);
@@ -97,12 +99,12 @@ test('an empirical timing profile is bound to its exact immutable voice identity
   assert.throws(() => assertEmpiricalVoiceTimingProfile({ ...empirical, calibrationKey: { ...empirical.calibrationKey, voiceRegion: 'NORTH' } }), (error: unknown) => error instanceof VoiceTimingError && error.code === 'INVALID_POLICY');
 });
 
-test('synthetic profiles remain non-empirical for each V1 gender and region combination', () => {
-  for (const gender of ['MALE', 'FEMALE'] as const) for (const region of ['SOUTH', 'NORTH'] as const) {
-    const identity = resolveV1ReviewVoiceIdentity('vi-VN', gender, region, 'review');
-    const profile = buildVoiceTimingProfile(samples().map(item => ({ ...item, calibrationKey: { ...key, voiceIdentityId: identity, voiceGender: gender, voiceRegion: region } })), policy);
+test('synthetic profiles remain non-empirical for each canonical V1 gender', () => {
+  for (const gender of ['MALE', 'FEMALE'] as const) {
+    const identity = resolveV1ReviewVoiceIdentity('vi-VN', gender, 'SOUTH', 'review');
+    const profile = buildVoiceTimingProfile(samples().map(item => ({ ...item, calibrationKey: { ...key, voiceIdentityId: identity, voiceGender: gender, voiceRegion: 'SOUTH' } })), policy);
     assert.equal(profile.calibrationKey.voiceGender, gender);
-    assert.equal(profile.calibrationKey.voiceRegion, region);
+    assert.equal(profile.calibrationKey.voiceRegion, 'SOUTH');
     assert.throws(() => assertEmpiricalVoiceTimingProfile(profile), (error: unknown) => error instanceof VoiceTimingError && error.code === 'NOT_EMPIRICAL');
   }
 });

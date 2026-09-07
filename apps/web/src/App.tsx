@@ -6,8 +6,7 @@ import {
   type MochiProjectInput,
   type ProductEvidence,
   type ProductInput,
-  type VoiceGender,
-  type VoiceRegion
+  type VoiceGender
 } from '@mochi/contracts';
 import { analyzeProductEvidence, ProductEvidenceClientError, type ProductEvidenceClientErrorCode } from './product-evidence-client';
 
@@ -59,9 +58,7 @@ export function App() {
   const [shootingContext, setShootingContext] = useState('');
   const [reviewerPersona, setReviewerPersona] = useState('');
   const [tone, setTone] = useState('');
-  const [voiceStyle, setVoiceStyle] = useState('');
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('FEMALE');
-  const [voiceRegion, setVoiceRegion] = useState<VoiceRegion>('SOUTH');
   const [referenceAssets, setReferenceAssets] = useState<readonly ReferenceAssetState[]>([]);
   const [validationIssues, setValidationIssues] = useState<readonly string[]>([]);
   const [readyInput, setReadyInput] = useState<MochiProjectInput | null>(null);
@@ -105,7 +102,7 @@ export function App() {
   });
   const buildProjectInput = (): MochiProjectInput => ({
     schemaVersion: SCHEMA_VERSION, projectId, product: buildProductInput(),
-    creativeDirection: { audience, shootingContext, reviewerPersona, tone, voiceStyle, voiceGender, voiceRegion }
+    creativeDirection: { audience, shootingContext, reviewerPersona, tone, voiceStyle: 'review', voiceGender, voiceRegion: 'SOUTH' }
   });
 
   const handleReferenceSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -181,7 +178,7 @@ export function App() {
           {analysisState === 'ANALYZING' && <p role="status" className="analysis-status">ANALYZING PRODUCT</p>}
           {analysisState === 'ERROR' && analysisError !== null && <p role="alert" className="analysis-error">Product analysis could not be completed: {formatAnalysisError(analysisError)}.</p>}
         </section>
-        <section className="form-card" aria-labelledby="creative-title"><h2 id="creative-title">Creative Direction</h2><div className="field-grid"><label>Audience<input value={audience} onChange={event => updateCreativeValue(setAudience, event.target.value)} /></label><label>Shooting Context<input value={shootingContext} onChange={event => updateCreativeValue(setShootingContext, event.target.value)} /></label><label>Reviewer Persona<input value={reviewerPersona} onChange={event => updateCreativeValue(setReviewerPersona, event.target.value)} /></label><label>Tone<input value={tone} onChange={event => updateCreativeValue(setTone, event.target.value)} /></label><label>Voice Style<input value={voiceStyle} onChange={event => updateCreativeValue(setVoiceStyle, event.target.value)} /></label><label>Voice Gender<select value={voiceGender} onChange={event => updateCreativeValue(setVoiceGender, event.target.value as VoiceGender)}><option value="FEMALE">FEMALE</option><option value="MALE">MALE</option></select></label><label>Voice Region<select value={voiceRegion} onChange={event => updateCreativeValue(setVoiceRegion, event.target.value as VoiceRegion)}><option value="SOUTH">SOUTH</option><option value="NORTH">NORTH</option></select></label></div></section>
+        <section className="form-card" aria-labelledby="creative-title"><h2 id="creative-title">Creative Direction</h2><div className="field-grid"><label>Audience<input value={audience} onChange={event => updateCreativeValue(setAudience, event.target.value)} /></label><label>Shooting Context<input value={shootingContext} onChange={event => updateCreativeValue(setShootingContext, event.target.value)} /></label><label>Reviewer Persona<input value={reviewerPersona} onChange={event => updateCreativeValue(setReviewerPersona, event.target.value)} /></label><label>Tone<input value={tone} onChange={event => updateCreativeValue(setTone, event.target.value)} /></label><label>Voice Gender<select value={voiceGender} onChange={event => updateCreativeValue(setVoiceGender, event.target.value as VoiceGender)}><option value="FEMALE">FEMALE</option><option value="MALE">MALE</option></select></label></div></section>
         <button className="primary-button" type="submit">Validate project input</button>
       </form>
       {analysisState === 'IDLE' && <section className="analysis-panel" aria-labelledby="analysis-empty-title"><h2 id="analysis-empty-title">Product Analysis</h2><p className="empty-evidence">Add factual product input and reference images, then analyze the product.</p></section>}

@@ -32,6 +32,11 @@ test('generic voice request has no Saydi-specific field and validates provider-n
   assert.equal('browserSelector' in request, false);
   assert.doesNotThrow(() => validateVoiceSynthesisRequest(request));
   assert.throws(() => validateVoiceSynthesisRequest({ ...request, voiceIdentityId: '' }), (error: unknown) => error instanceof VoiceProviderError && error.code === 'INVALID_REQUEST');
+  for (const retired of [
+    { ...request, voiceIdentityId: 'VN_FEMALE_NORTH_REVIEW_V1', voiceRegion: 'NORTH' as const },
+    { ...request, voiceIdentityId: 'VN_MALE_NORTH_REVIEW_V1', voiceGender: 'MALE' as const, voiceRegion: 'NORTH' as const },
+    { ...request, voiceStyle: 'warm' }
+  ]) assert.throws(() => validateVoiceSynthesisRequest(retired), (error: unknown) => error instanceof VoiceProviderError && error.code === 'INVALID_REQUEST');
 });
 
 test('Saydi boundary forwards only the explicitly bound voice and returns a generic synthesis result', async () => {
@@ -57,11 +62,11 @@ test('Saydi binding registry rejects unsupported and contradictory V1 identity m
   assert.equal(calls.value, 0);
 });
 
-test('unknown and mismatched requests fail before the browser driver is invoked', async () => {
+test('unknown and retired V1 requests fail before the browser driver is invoked', async () => {
   const calls = { value: 0 };
   const provider = new SaydiBrowserVoiceProvider([binding], validDriver(calls));
   await assert.rejects(() => provider.synthesize({ ...request, voiceIdentityId: 'VN_MALE_SOUTH_REVIEW_V1', voiceGender: 'MALE' }), (error: unknown) => error instanceof VoiceProviderError && error.code === 'VOICE_BINDING_MISSING');
-  await assert.rejects(() => provider.synthesize({ ...request, voiceRegion: 'NORTH' }), (error: unknown) => error instanceof VoiceProviderError && error.code === 'VOICE_BINDING_MISMATCH');
+  await assert.rejects(() => provider.synthesize({ ...request, voiceIdentityId: 'VN_FEMALE_NORTH_REVIEW_V1', voiceRegion: 'NORTH' }), (error: unknown) => error instanceof VoiceProviderError && error.code === 'INVALID_REQUEST');
   assert.equal(calls.value, 0);
 });
 

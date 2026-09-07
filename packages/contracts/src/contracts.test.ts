@@ -75,7 +75,7 @@ const validProjectInput = (): MochiProjectInput => ({
     shootingContext: 'Natural daylight vanity review',
     reviewerPersona: 'Practical on-hand reviewer',
     tone: 'Warm and factual',
-    voiceStyle: 'Conversational Vietnamese',
+    voiceStyle: 'review',
     voiceGender: 'FEMALE',
     voiceRegion: 'SOUTH'
   }
@@ -275,26 +275,26 @@ test('project validation rejects blank creative fields', () => {
   }
 });
 
-test('project validation accepts both supported voice genders and regions', () => {
+test('project validation accepts the two V1 voice genders with the fixed South review policy', () => {
   for (const voiceGender of ['MALE', 'FEMALE'] as const) {
-    for (const voiceRegion of ['SOUTH', 'NORTH'] as const) {
-      const project = validProjectInput();
-      project.creativeDirection = { ...project.creativeDirection, voiceGender, voiceRegion };
-      assert.deepEqual(validateMochiProjectInput(project), []);
-    }
+    const project = validProjectInput();
+    project.creativeDirection = { ...project.creativeDirection, voiceGender, voiceRegion: 'SOUTH', voiceStyle: 'review' };
+    assert.deepEqual(validateMochiProjectInput(project), []);
   }
 });
 
-test('project validation rejects unsupported voice gender and region', () => {
+test('project validation rejects retired North and arbitrary V1 voice styles', () => {
   const project = validProjectInput();
   project.creativeDirection = {
     ...project.creativeDirection,
     voiceGender: 'OTHER' as never,
-    voiceRegion: 'CENTRAL' as never
+    voiceRegion: 'NORTH',
+    voiceStyle: 'warm'
   };
   const issues = validateMochiProjectInput(project);
   assert.ok(issues.includes('voice_gender'));
   assert.ok(issues.includes('voice_region'));
+  assert.ok(issues.includes('voice_style'));
 });
 
 test('canonical project input contains no provider-specific identifier fields', () => {

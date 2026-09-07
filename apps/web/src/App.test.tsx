@@ -34,7 +34,6 @@ function enterValidProjectInput() {
   fireEvent.change(screen.getByLabelText('Shooting Context'), { target: { value: 'Vanity in daylight' } });
   fireEvent.change(screen.getByLabelText('Reviewer Persona'), { target: { value: 'Practical reviewer' } });
   fireEvent.change(screen.getByLabelText('Tone'), { target: { value: 'Warm and factual' } });
-  fireEvent.change(screen.getByLabelText('Voice Style'), { target: { value: 'Conversational Vietnamese' } });
   selectProductImage();
 }
 
@@ -60,9 +59,11 @@ function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetI
 describe('App', () => {
   it('renders canonical product and creative form fields', () => {
     render(<App />);
-    for (const label of ['Product Name', 'Product Details', 'Category', 'Add product images', 'Audience', 'Shooting Context', 'Reviewer Persona', 'Tone', 'Voice Style', 'Voice Gender', 'Voice Region']) {
+    for (const label of ['Product Name', 'Product Details', 'Category', 'Add product images', 'Audience', 'Shooting Context', 'Reviewer Persona', 'Tone', 'Voice Gender']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
   });
 
   it('fails closed when blank input is submitted', () => {
@@ -100,7 +101,7 @@ describe('App', () => {
     expect(preview.product.name).toBe('Updated Mochi bottle');
   });
 
-  it('invalidates READY_FOR_ANALYSIS after creative or voice control edits', () => {
+  it('invalidates READY_FOR_ANALYSIS after creative or voice gender edits', () => {
     render(<App />);
     enterValidProjectInput();
     submitProject();
@@ -111,19 +112,18 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Voice Gender'), { target: { value: 'MALE' } });
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
 
-    submitProject();
-    fireEvent.change(screen.getByLabelText('Voice Region'), { target: { value: 'NORTH' } });
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
   });
 
-  it('maps supported gender and region values into canonical input', () => {
+  it('locks the V1 voice surface to Female or Male with South review metadata', () => {
     render(<App />);
     enterValidProjectInput();
     fireEvent.change(screen.getByLabelText('Voice Gender'), { target: { value: 'MALE' } });
-    fireEvent.change(screen.getByLabelText('Voice Region'), { target: { value: 'NORTH' } });
     submitProject();
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.creativeDirection).toMatchObject({ voiceGender: 'MALE', voiceRegion: 'NORTH' });
+    expect(preview.creativeDirection).toMatchObject({ voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' });
+    expect(screen.queryByRole('option', { name: 'NORTH' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
   });
 
   it('creates a generic logical product reference and removes it from canonical input', () => {
