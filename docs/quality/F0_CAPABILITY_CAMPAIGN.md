@@ -12,11 +12,11 @@ The locked `DEFAULT_CAPABILITY_PROMOTION_POLICY` remains the sole classification
 
 | Action | Accepted reviewed observations | Minimum remaining | Classification |
 | --- | ---: | ---: | --- |
-| PICK_UP | 1 | 9 | UNTESTED |
-| HOLD | 1 | 9 | UNTESTED |
-| ROTATE_SLOW | 0 | 10 | UNTESTED |
+| PICK_UP | 2 | 8 | UNTESTED |
+| HOLD | 2 | 8 | UNTESTED |
+| ROTATE_SLOW | 1 | 9 | UNTESTED |
 
-The count target to reach the minimum sample size for all three actions is 28 further reviewed attempts. It does not guarantee SAFE: actual human-reviewed PASS/FAIL outcomes still determine the classifier result. Current promotions are 0 and `campaignReady=false`; this baseline requires all three actions to be SAFE, not merely RISKY, before it is ready.
+The count target to reach the minimum sample size for all three actions is 25 further reviewed attempts. It does not guarantee SAFE: actual human-reviewed PASS/FAIL outcomes still determine the classifier result. Current promotions are 0 and `campaignReady=false`; this baseline requires all three actions to be SAFE, not merely RISKY, before it is ready.
 
 ## Trust boundary
 
@@ -28,14 +28,16 @@ Rubric-0 remains the only review rubric. Its dimensions are PRODUCT_FIDELITY, HA
 
 ## F0-C controlled execution planning
 
-F0-C Controlled Flow Benchmark Execution Planner is FINAL LOCKED / DIRECTLY AUDITED at `812af23a5737c58b60d76ef533e0574e927d6ed3`. It is a deterministic inspection layer, not an execution adapter. The current repository has zero execution receipts. Its case-state guard prevents regeneration of a candidate awaiting review and blocks a case with rejected review evidence. The current controlled next batch is:
+F0-C Controlled Flow Benchmark Execution Planner is FINAL LOCKED / DIRECTLY AUDITED at `812af23a5737c58b60d76ef533e0574e927d6ed3`. It is a deterministic inspection layer, not an execution adapter. F0-D1 retains three `GENERATED_AWAITING_REVIEW` logical receipts in execution history for the reviewed Batch 1 candidates. REVIEWED evidence takes precedence over those receipts, preventing duplicate eligibility. The next controlled batch is planning only:
 
 | Order | Action | Attempt |
 | ---: | --- | ---: |
-| 1 | PICK_UP | 2 |
-| 2 | HOLD | 2 |
-| 3 | ROTATE_SLOW | 1 |
+| 1 | PICK_UP | 3 |
+| 2 | HOLD | 3 |
+| 3 | ROTATE_SLOW | 2 |
 
 The maximum real batch size is 3. `npm run benchmark:execution:dry` compiles and validates one `F0_BENCHMARK_EXECUTION_PACKET_V1` per selected case and prints the selected benchmark case IDs, packet order, plannedGenerations=3, Flow/Gemini/Saydi calls=0, generationsPerformed=0, and `campaignReady=false`. Each packet is bound to the canonical campaign case, Cocoon reference identity/SHA-256/MIME type, and canonical eight-second 9:16 ScenePlan. Its prompt is physical-only and byte-identical across attempts for a given action; it has no speech dependency, voice selection, provider/session data, candidate ID, or attempt identity.
 
-Future operator sequence only: plan batch → inspect packets/prompts → explicit user authorization → generate at most 3 Flow candidates → record execution receipts → STOP → human Rubric-0 review each candidate → record BenchmarkObservations → derive trusted capability status → decide next batch. A generation never becomes PASS evidence automatically. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN and F1 is NOT STARTED. The next action is USER-AUTHORIZED CONTROLLED FLOW BENCHMARK BATCH 1: at most 3 real Flow generations, then mandatory STOP for human Rubric-0 review before any subsequent batch.
+F0-D1 Controlled Flow Benchmark Batch 1 is EMPIRICAL PASS / human Rubric-0 reviewed: PICK_UP attempt 2 PASS, HOLD attempt 2 PASS, and ROTATE_SLOW attempt 1 PASS. These are five total trusted empirical observations with 2 / 2 / 1 accepted counts, all still UNTESTED under the unchanged 10 / 0.90 / 0.60 policy. Total real Flow generations are 5; Batch 1 added three and its exact added credit count is unspecified. It added no Gemini or Saydi calls and no ActionCapability promotions. Future operator sequence only: plan batch → inspect packets/prompts → explicit user authorization → generate at most 3 Flow candidates → record execution receipts → STOP → human Rubric-0 review each candidate → record BenchmarkObservations → derive trusted capability status → decide next batch. A generation never becomes PASS evidence automatically. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN and F1 is NOT STARTED. Batch 2 requires explicit user authorization and is not authorized by this plan.
+
+F0-D1 verification: `npm run typecheck` PASS; `npm test` PASS (246 tests); `npm run benchmark:capability:dry` PASS; `npm run benchmark:execution:dry` PASS with planning-only PICK_UP attempt 3, HOLD attempt 3, and ROTATE_SLOW attempt 2; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No Gemini, Flow, or Saydi calls or video generations occurred during the Codex recording task.

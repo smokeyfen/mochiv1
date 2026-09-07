@@ -5,23 +5,27 @@
 - Current verified implementation commit: `812af23a5737c58b60d76ef533e0574e927d6ed3` (F0-C Controlled Flow Benchmark Execution Planner finalization)
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: F0-C Controlled Flow Benchmark Execution Planner V1
-- Milestone status: FINAL LOCKED / DIRECTLY AUDITED
+- Current milestone: F0-D1 Controlled Flow Benchmark Batch 1
+- Milestone status: EMPIRICAL PASS / human Rubric-0 reviewed
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
 - FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
-- Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
-- Real generation count: 2
+- Historical Flow benchmark generations: 5 (the two prior generations cost 24 credits; Batch 1 added three generations and its exact credit count is unspecified); new Flow calls in this Codex task: 0
+- Real generation count: 5
 - Architecture deviations: none
-- Next action: USER-AUTHORIZED CONTROLLED FLOW BENCHMARK BATCH 1, maximum 3 real Flow generations, then mandatory STOP for human Rubric-0 review before any subsequent batch. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY and is NOT RUN; F1 is NOT STARTED.
-- Documentation correction verification: `npm run typecheck` PASS; `npm test` PASS (225 tests); `npm run benchmark:capability:dry` PASS with all actions fail-closed `UNTESTED`; `npm run benchmark:execution:dry` PASS with the controlled batch of 3; `git diff --check` PASS. Gemini calls: 0; Flow calls: 0; Saydi calls: 0; generations: 0; new execution receipts: 0; new BenchmarkObservations: 0; ActionCapability promotions: 0.
+- Next planned batch is planning only: PICK_UP attempt 3, HOLD attempt 3, and ROTATE_SLOW attempt 2 (maximum 3). Batch 2 requires explicit user authorization. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY and is NOT RUN; F1 is NOT STARTED.
+- Documentation correction: the full suite at the previous verification was 244 PASS, not 225. This corrects only that stale documentation count and does not rewrite older milestone verification counts.
 
 No action has been promoted from `UNTESTED`.
 
-F0-B Trusted Capability Evidence Foundation V1: FINAL LOCKED / DIRECTLY AUDITED at `da3b289c76795e2a33360525c11e1ca4451fcffa`. `F0_BOTTLE_BASELINE_CAPABILITY_V1` binds only the canonical Cocoon bottle fixture and PICK_UP, HOLD, and ROTATE_SLOW. It plans exactly 30 deterministic cases (10 per action), preserves each historical attempt-one case, and derives capability only from explicit human-reviewed REAL_MODEL_VIDEO observations that pass Rubric-0 validation and campaign binding checks. Current accepted evidence is PICK_UP 1, HOLD 1, ROTATE_SLOW 0; every ActionId remains UNTESTED, campaignReady is false, promotions are 0, and 28 reviewed attempts remain to reach minimum sample counts (9 / 9 / 10). This count does not guarantee SAFE.
+F0-B Trusted Capability Evidence Foundation V1: FINAL LOCKED / DIRECTLY AUDITED at `da3b289c76795e2a33360525c11e1ca4451fcffa`. `F0_BOTTLE_BASELINE_CAPABILITY_V1` binds only the canonical Cocoon bottle fixture and PICK_UP, HOLD, and ROTATE_SLOW. It plans exactly 30 deterministic cases (10 per action), preserves each historical attempt-one case, and derives capability only from explicit human-reviewed REAL_MODEL_VIDEO observations that pass Rubric-0 validation and campaign binding checks. Current accepted evidence is PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, and ROTATE_SLOW 1/10 UNTESTED; `campaignReady=false`, promotions=0, and 25 reviewed attempts remain to reach the minimum sample counts (8 / 8 / 9). This count does not guarantee SAFE.
 
-F0-C Controlled Flow Benchmark Execution Planner V1: FINAL LOCKED / DIRECTLY AUDITED at `812af23a5737c58b60d76ef533e0574e927d6ed3`. F0-C1 remains at `533960348da9ba03e29ed259bcdc689522116116` and adds provider-neutral execution receipts, case states, and the pure next-batch planner. F0-C finalization adds strict provider-neutral execution packets and deterministic physical-only prompts, plus `npm run benchmark:execution:dry`; it creates no receipt, BenchmarkObservation, capability promotion, provider call, or generation. Actual new Flow generations during F0-C: 0. The current controlled next batch is PICK_UP attempt 2, HOLD attempt 2, and ROTATE_SLOW attempt 1 (maximum 3). Current trusted evidence remains PICK_UP 1/10 UNTESTED, HOLD 1/10 UNTESTED, ROTATE_SLOW 0/10 UNTESTED; `campaignReady=false`; promotions=0. PRE-F1-LIVE remains BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN and F1 remains NOT STARTED. Next: USER-AUTHORIZED CONTROLLED FLOW BENCHMARK BATCH 1, at most 3 real Flow generations, then mandatory STOP for human Rubric-0 review before any subsequent batch.
+F0-C Controlled Flow Benchmark Execution Planner V1: FINAL LOCKED / DIRECTLY AUDITED at `812af23a5737c58b60d76ef533e0574e927d6ed3`. F0-C1 remains at `533960348da9ba03e29ed259bcdc689522116116` and supplies the provider-neutral receipt guard, REVIEWED precedence, and pure next-batch planner.
+
+F0-D1 Controlled Flow Benchmark Batch 1: EMPIRICAL PASS / human Rubric-0 reviewed. The user-authorized Batch 1 records real Flow PICK_UP attempt 2 PASS, HOLD attempt 2 PASS, and ROTATE_SLOW attempt 1 PASS. Its three `F0_BENCHMARK_EXECUTION_RECEIPT_V1` logical receipts remain `GENERATED_AWAITING_REVIEW` in execution history, while their accepted observations deterministically resolve all three cases as REVIEWED. No video bytes, Flow URLs/project/operation IDs, provider session/browser data, cookies, or credentials are stored. Trusted status is PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, ROTATE_SLOW 1/10 UNTESTED; remaining minimum attempts are 8 / 8 / 9, total 25; `campaignReady=false`; promotions=0. Total real Flow generations are 5. Batch 1 added no Gemini or Saydi calls and no ActionCapability promotion. PRE-F1-LIVE remains BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN; F1 remains NOT STARTED. The next planned batch is PICK_UP attempt 3, HOLD attempt 3, and ROTATE_SLOW attempt 2, planning only; Batch 2 still requires explicit user authorization.
+
+F0-D1 verification: `npm run typecheck` PASS; `npm test` PASS (246 tests); `npm run benchmark:capability:dry` PASS with PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, ROTATE_SLOW 1/10 UNTESTED, `campaignReady=false`, promotions=0, and 25 remaining minimum attempts; `npm run benchmark:execution:dry` PASS with planning-only PICK_UP attempt 3, HOLD attempt 3, and ROTATE_SLOW attempt 2; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. New Codex-task Gemini, Flow, and Saydi calls: 0; new Codex-task video generations: 0.
 
 Core `AssetRef` contains only schema version, logical asset identity and provider-agnostic metadata. Resolved provider asset bindings exist only in `packages/providers`.
 
