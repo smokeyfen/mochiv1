@@ -556,6 +556,94 @@ const nonBlankContract=(value:unknown):value is string=>typeof value==='string'&
 const samePhysicalState=(a:CanonicalPhysicalState,b:CanonicalPhysicalState)=>a.heldBy===b.heldBy&&a.placement===b.placement&&a.orientation===b.orientation&&a.interactionState===b.interactionState;
 export function validateHumanRealism4ScenePlan(value:unknown,state:StateResolved4ScenePlan,expectedConstraints:HumanRealismGlobalConstraints):string[]{if(!value||typeof value!=='object')return ['shape'];const plan=value as HumanRealism4ScenePlan;const errors:string[]=[];if(Object.keys(plan).length!==realismPlanKeys.length||!realismPlanKeys.every(key=>key in plan))errors.push('shape');if(plan.schemaVersion!==SCHEMA_VERSION||plan.realismVersion!==HUMAN_REALISM_VERSION)errors.push('version');if(plan.productId!==state.productId||plan.sourceEvidenceVersion!==state.sourceEvidenceVersion||JSON.stringify(plan.canonicalAssetIds)!==JSON.stringify(state.canonicalAssetIds))errors.push('source');if(JSON.stringify(plan.continuity)!==JSON.stringify(state.continuity))errors.push('continuity');if(plan.referenceReadiness!==state.referenceReadiness||JSON.stringify(plan.referenceLimitations)!==JSON.stringify(state.referenceLimitations))errors.push('references');if(JSON.stringify(plan.globalConstraints)!==JSON.stringify(expectedConstraints))errors.push('constraints');if(!Array.isArray(plan.scenes)||plan.scenes.length!==4)errors.push('scene_count');for(let i=0;i<4;i++){const scene=plan.scenes?.[i],upstream=state.scenes[i];if(!scene||!upstream){errors.push('scene_missing');continue;}if(Object.keys(scene).length!==realismSceneKeys.length||!realismSceneKeys.every(key=>key in scene))errors.push('forbidden');if(scene.sceneId!==upstream.sceneId||scene.index!==upstream.index||scene.primaryAction!==upstream.primaryAction||!samePhysicalState(scene.startState,upstream.startState)||!samePhysicalState(scene.endState,upstream.endState))errors.push('scene_identity');if(!scene.behavior||typeof scene.behavior!=='object'||Object.keys(scene.behavior).length!==realismBehaviorKeys.length||!realismBehaviorKeys.every(key=>nonBlank(scene.behavior[key])))errors.push('behavior');}return errors;}
 
+/** Provider-neutral R8 contract for the four approved-to-produce scene inputs. */
+export const PRODUCTION_CONTRACT_V1 = 'PRODUCTION_CONTRACT_V1' as const;
+export type ProductionContractVersion = typeof PRODUCTION_CONTRACT_V1;
+export interface ProductionInputBindingScene {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  role: Global4SceneRole;
+  physicalObjective: string;
+  primaryAction: ActionId;
+  desiredStateEffect: DesiredStateEffect;
+  startState: CanonicalPhysicalState;
+  endState: CanonicalPhysicalState;
+  referenceAssetIds: readonly string[];
+  keyPoints: readonly [KeyPoint, KeyPoint];
+  humanRealismBehavior: HumanRealismBehavior;
+  dialogue: string;
+  spokenUnitCount: number;
+  voiceIdentityId: VoiceIdentityId;
+}
+export interface ProductionInputBinding {
+  scenes: readonly [ProductionInputBindingScene, ProductionInputBindingScene, ProductionInputBindingScene, ProductionInputBindingScene];
+}
+export interface ProductionSceneContractV1 {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  role: Global4SceneRole;
+  durationSeconds: 8;
+  aspectRatio: '9:16';
+  physicalObjective: string;
+  primaryAction: ActionId;
+  desiredStateEffect: DesiredStateEffect;
+  startState: CanonicalPhysicalState;
+  endState: CanonicalPhysicalState;
+  referenceAssetIds: readonly string[];
+  keyPoints: readonly [KeyPoint, KeyPoint];
+  dialogue: string;
+  spokenUnitCount: number;
+  voiceIdentityId: VoiceIdentityId;
+  humanRealismBehavior: HumanRealismBehavior;
+  productionPrompt: string;
+}
+export interface ProductionContractV1 {
+  schemaVersion: SchemaVersion;
+  productionContractVersion: ProductionContractVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  continuity: GlobalContinuityState;
+  voiceIdentityId: VoiceIdentityId;
+  humanRealismGlobalConstraints: HumanRealismGlobalConstraints;
+  inputBinding: ProductionInputBinding;
+  scenes: readonly [ProductionSceneContractV1, ProductionSceneContractV1, ProductionSceneContractV1, ProductionSceneContractV1];
+}
+const productionContractKeys=['schemaVersion','productionContractVersion','productId','sourceEvidenceVersion','canonicalAssetIds','continuity','voiceIdentityId','humanRealismGlobalConstraints','inputBinding','scenes'] as const;
+const productionBindingKeys=['scenes'] as const;
+const productionBindingSceneKeys=['sceneId','index','role','physicalObjective','primaryAction','desiredStateEffect','startState','endState','referenceAssetIds','keyPoints','humanRealismBehavior','dialogue','spokenUnitCount','voiceIdentityId'] as const;
+const productionSceneKeys=[...productionBindingSceneKeys,'durationSeconds','aspectRatio','productionPrompt'] as const;
+const providerSpecificPattern=/\b(?:flow|gemini|saydi|leda\s+custom|achird)\b/i;
+
+/** Validates R8's standalone exact shape. Current-upstream proof lives in the R8 compiler validator. */
+export function validateProductionContractV1(value: unknown): string[] {
+  const issues: string[]=[];
+  if (!hasExactKeys(value, productionContractKeys)) return ['shape'];
+  const plan=value as unknown as ProductionContractV1;
+  if (plan.schemaVersion!==SCHEMA_VERSION||plan.productionContractVersion!==PRODUCTION_CONTRACT_V1) issues.push('version');
+  if (!nonBlankContract(plan.productId)||!nonBlankContract(plan.sourceEvidenceVersion)||!Array.isArray(plan.canonicalAssetIds)||plan.canonicalAssetIds.some(id=>!nonBlankContract(id))) issues.push('source');
+  if (!nonBlankContract(plan.voiceIdentityId)||!plan.continuity||typeof plan.continuity!=='object'||!plan.humanRealismGlobalConstraints||typeof plan.humanRealismGlobalConstraints!=='object') issues.push('top_level');
+  if (!hasExactKeys(plan.inputBinding,productionBindingKeys)||!Array.isArray(plan.inputBinding.scenes)||plan.inputBinding.scenes.length!==4) issues.push('binding');
+  if (!Array.isArray(plan.scenes)||plan.scenes.length!==4) return [...issues,'scene_count'];
+  for(let offset=0;offset<4;offset+=1){
+    const scene:ProductionSceneContractV1=plan.scenes[offset]!; const binding:ProductionInputBindingScene=plan.inputBinding.scenes?.[offset]!;
+    if(!hasExactKeys(scene,productionSceneKeys)||!hasExactKeys(binding,productionBindingSceneKeys)){issues.push('scene_shape');continue;}
+    if(scene.index!==offset+1||binding.index!==offset+1||scene.sceneId!==binding.sceneId||scene.role!==binding.role
+      ||scene.physicalObjective!==binding.physicalObjective||scene.primaryAction!==binding.primaryAction||scene.desiredStateEffect!==binding.desiredStateEffect
+      ||!samePhysicalState(scene.startState,binding.startState)||!samePhysicalState(scene.endState,binding.endState)
+      ||JSON.stringify(scene.referenceAssetIds)!==JSON.stringify(binding.referenceAssetIds)||JSON.stringify(scene.keyPoints)!==JSON.stringify(binding.keyPoints)
+      ||JSON.stringify(scene.humanRealismBehavior)!==JSON.stringify(binding.humanRealismBehavior)||scene.dialogue!==binding.dialogue
+      ||scene.spokenUnitCount!==binding.spokenUnitCount||scene.voiceIdentityId!==binding.voiceIdentityId) issues.push('binding_mismatch');
+    if(!['HOOK','FEATURE','PROOF','CTA'].includes(scene.role)||scene.durationSeconds!==8||scene.aspectRatio!=='9:16'||!nonBlankContract(scene.physicalObjective)
+      ||!nonBlankContract(scene.primaryAction)||!nonBlankContract(scene.desiredStateEffect)||!Array.isArray(scene.referenceAssetIds)||scene.referenceAssetIds.some(id=>!nonBlankContract(id))
+      ||!Array.isArray(scene.keyPoints)||scene.keyPoints.length!==2||scene.keyPoints.some((point,index)=>!hasExactKeys(point,keyPointKeys)||point.index!==index+1)
+      ||!nonBlankContract(scene.dialogue)||!Number.isInteger(scene.spokenUnitCount)||scene.spokenUnitCount<=0||!nonBlankContract(scene.voiceIdentityId)||!nonBlankContract(scene.productionPrompt)) issues.push('scene_fields');
+    if(scene.voiceIdentityId!==plan.voiceIdentityId) issues.push('voice');
+  }
+  if(providerSpecificPattern.test(JSON.stringify(plan))) issues.push('provider_specific');
+  return issues;
+}
+
 export type ActionId =
   | 'REACH' | 'PICK_UP' | 'HOLD' | 'MOVE_CLOSER' | 'ROTATE_SLOW' | 'PLACE_DOWN'
   | 'OPEN_SIMPLE' | 'PRESS_BUTTON' | 'POUR_SIMPLE' | 'APPLY_SIMPLE' | 'POINT';

@@ -48,3 +48,11 @@ export {
 } from './dialogue.ts';
 
 export { planHumanRealism, HUMAN_REALISM_GLOBAL_CONSTRAINTS, buildHumanRealismInstruction, buildHumanRealismInputText, HumanRealismError } from './human-realism.ts';
+export {
+  buildProductionInputBinding,
+  compileProductionContract,
+  compileProductionPrompt,
+  validateProductionContractAgainstUpstream,
+  ProductionCompilerError,
+  type CompileProductionContractRequest
+} from './production.ts';
