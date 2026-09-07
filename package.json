@@ -7,7 +7,8 @@
     "dev": "npm run dev -w @mochi/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "benchmark:dry": "npm run benchmark:dry -w @mochi/harness"
+    "benchmark:dry": "npm run benchmark:dry -w @mochi/harness",
+    "benchmark:capability:dry": "npm run benchmark:capability:dry -w @mochi/harness"
   },
   "engines": {"node": ">=22"}
 }

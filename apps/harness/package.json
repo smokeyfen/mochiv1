@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "benchmark:dry": "tsx src/index.ts",
+    "benchmark:capability:dry": "tsx src/f0-capability-status.ts",
     "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -1,5 +1,6 @@
 import type {
   ActionId,
+  BenchmarkCase,
   BenchmarkObservation,
   GoldenProductFixture,
   PhysicalState,
@@ -7,7 +8,7 @@ import type {
   QCReport,
   ScenePlan
 } from '@mochi/contracts';
-import { validateBenchmarkObservation, validateGoldenProductFixture } from '@mochi/contracts';
+import { validateBenchmarkCase, validateBenchmarkObservation, validateGoldenProductFixture } from '@mochi/contracts';
 
 export type CapabilityLevel = 'UNTESTED' | 'SAFE' | 'RISKY' | 'AVOID';
 export type ActionCapabilityMap = Record<ActionId, CapabilityLevel>;
@@ -110,6 +111,203 @@ export interface CapabilityEvidenceResult {
   failCount: number;
   passRate: number;
   reasons: readonly string[];
+}
+
+/**
+ * An approved, provider-neutral set of reviewed benchmark cases. The campaign
+ * definition lives outside Core; Core only validates and derives its evidence.
+ */
+export interface TrustedCapabilityCampaignScope {
+  campaignId: string;
+  fixtureId: string;
+  archetype: ProductArchetype;
+  providerTarget: string;
+  modelTarget: string;
+  baselineActionIds: readonly ActionId[];
+  policy: CapabilityPromotionPolicy;
+  benchmarkCases: readonly BenchmarkCase[];
+}
+
+export interface TrustedCapabilityActionStatus {
+  actionId: ActionId;
+  acceptedObservationIds: readonly string[];
+  rejectedObservationIds: readonly string[];
+  reviewedAttemptCount: number;
+  passCount: number;
+  failCount: number;
+  passRate: number;
+  classification: CapabilityLevel;
+  attemptsRemainingToMinimum: number;
+}
+
+export interface TrustedCapabilityStatus {
+  campaignId: string;
+  fixtureId: string;
+  archetype: ProductArchetype;
+  policy: CapabilityPromotionPolicy;
+  baselineActionIds: readonly ActionId[];
+  actions: Readonly<Record<ActionId, TrustedCapabilityActionStatus>>;
+  rejectedObservationIds: readonly string[];
+  actionCapabilityMap: ActionCapabilityMap;
+  totalPromotionsFromUntested: number;
+  campaignReady: boolean;
+}
+
+export class TrustedCapabilityEvidenceError extends Error {
+  readonly issues: readonly string[];
+
+  constructor(issues: readonly string[]) {
+    super(`TRUSTED_CAPABILITY_CAMPAIGN_INVALID:${issues.join(',')}`);
+    this.issues = issues;
+  }
+}
+
+/** Validates the deterministic case scope before it can be treated as authority. */
+export function validateTrustedCapabilityCampaignScope(scope: TrustedCapabilityCampaignScope): readonly string[] {
+  const issues: string[] = [];
+  if (!scope || typeof scope !== 'object') return ['scope'];
+  if (!isNonBlank(scope.campaignId)) issues.push('campaign_id');
+  if (!isNonBlank(scope.fixtureId)) issues.push('fixture_id');
+  if (!isNonBlank(scope.providerTarget)) issues.push('provider_target');
+  if (!isNonBlank(scope.modelTarget)) issues.push('model_target');
+  if (!Array.isArray(scope.baselineActionIds) || scope.baselineActionIds.length === 0) issues.push('baseline_actions');
+  if (!isValidPromotionPolicy(scope.policy)) issues.push('policy');
+  if (!Array.isArray(scope.benchmarkCases)) issues.push('benchmark_cases');
+  if (issues.length > 0) return issues;
+
+  const actionIds = new Set<ActionId>();
+  for (const actionId of scope.baselineActionIds) {
+    if (actionIds.has(actionId)) issues.push(`duplicate_baseline_action:${actionId}`);
+    actionIds.add(actionId);
+  }
+
+  const caseIds = new Set<string>();
+  const attemptsByAction = new Map<ActionId, number[]>();
+  for (const benchmarkCase of scope.benchmarkCases) {
+    for (const issue of validateBenchmarkCase(benchmarkCase)) issues.push(`case:${benchmarkCase.benchmarkCaseId}:${issue}`);
+    if (caseIds.has(benchmarkCase.benchmarkCaseId)) issues.push(`duplicate_case_id:${benchmarkCase.benchmarkCaseId}`);
+    caseIds.add(benchmarkCase.benchmarkCaseId);
+    if (benchmarkCase.fixtureId !== scope.fixtureId) issues.push(`case_fixture:${benchmarkCase.benchmarkCaseId}`);
+    if (benchmarkCase.providerTarget !== scope.providerTarget) issues.push(`case_provider:${benchmarkCase.benchmarkCaseId}`);
+    if (benchmarkCase.modelTarget !== scope.modelTarget) issues.push(`case_model:${benchmarkCase.benchmarkCaseId}`);
+    if (!actionIds.has(benchmarkCase.actionId)) issues.push(`case_action_out_of_scope:${benchmarkCase.benchmarkCaseId}`);
+    const attempts = attemptsByAction.get(benchmarkCase.actionId) ?? [];
+    attempts.push(benchmarkCase.attemptNumber);
+    attemptsByAction.set(benchmarkCase.actionId, attempts);
+  }
+  for (const actionId of scope.baselineActionIds) {
+    const attempts = attemptsByAction.get(actionId) ?? [];
+    if (attempts.length !== scope.policy.minimumReviewedAttempts) issues.push(`case_count:${actionId}`);
+    const uniqueAttempts = new Set(attempts);
+    for (let attempt = 1; attempt <= scope.policy.minimumReviewedAttempts; attempt += 1) {
+      if (!uniqueAttempts.has(attempt)) issues.push(`missing_attempt:${actionId}:${attempt}`);
+    }
+    if (uniqueAttempts.size !== attempts.length) issues.push(`duplicate_attempt:${actionId}`);
+  }
+  return issues;
+}
+
+/**
+ * Derives a complete capability map from only reviewed observations that are
+ * bound to one approved campaign. Rejected records are retained in status and
+ * never silently influence classifier input.
+ */
+export function deriveTrustedCapabilityStatus(
+  archetype: ProductArchetype,
+  scope: TrustedCapabilityCampaignScope,
+  observations: readonly BenchmarkObservation[]
+): TrustedCapabilityStatus {
+  const scopeIssues = validateTrustedCapabilityCampaignScope(scope);
+  if (scopeIssues.length > 0) throw new TrustedCapabilityEvidenceError(scopeIssues);
+  if (archetype !== scope.archetype) throw new TrustedCapabilityEvidenceError(['archetype_mismatch']);
+
+  const caseActionById = new Map(scope.benchmarkCases.map(benchmarkCase => [benchmarkCase.benchmarkCaseId, benchmarkCase.actionId]));
+  const observationIdCounts = countStringField(observations, 'observationId');
+  const candidateAssetIdCounts = countStringField(observations, 'candidateAssetId');
+  const caseIdCounts = countStringField(observations, 'benchmarkCaseId');
+  const acceptedByAction = new Map<ActionId, BenchmarkObservation[]>();
+  const rejectedByAction = new Map<ActionId, string[]>();
+  const rejectedObservationIds: string[] = [];
+
+  for (const [index, observation] of observations.entries()) {
+    const reference = observationReference(observation, index);
+    const actionId = isCampaignAction(scope, observation?.actionId) ? observation.actionId : undefined;
+    const reject = (): void => {
+      rejectedObservationIds.push(reference);
+      if (actionId) (rejectedByAction.get(actionId) ?? rejectedByAction.set(actionId, []).get(actionId)!).push(reference);
+    };
+    if (!observation || typeof observation !== 'object') { reject(); continue; }
+    if (validateBenchmarkObservation(observation).length > 0 || observation.evidenceOrigin !== 'REAL_MODEL_VIDEO' ||
+      observation.fixtureId !== scope.fixtureId || observation.archetype !== archetype || !actionId ||
+      observationIdCounts.get(observation.observationId) !== 1 || candidateAssetIdCounts.get(observation.candidateAssetId) !== 1 ||
+      caseIdCounts.get(observation.benchmarkCaseId) !== 1 || caseActionById.get(observation.benchmarkCaseId) !== actionId) {
+      reject();
+      continue;
+    }
+    const accepted = acceptedByAction.get(actionId) ?? [];
+    accepted.push(observation);
+    acceptedByAction.set(actionId, accepted);
+  }
+
+  const actionCapabilityMap = createUntestedActionCapabilityMap();
+  const actions = {} as Record<ActionId, TrustedCapabilityActionStatus>;
+  for (const actionId of scope.baselineActionIds) {
+    const evidence = classifyCapabilityEvidence(actionId, archetype, acceptedByAction.get(actionId) ?? [], scope.policy);
+    const rejected = [...(rejectedByAction.get(actionId) ?? []), ...evidence.rejectedObservationIds];
+    const reviewedAttemptCount = evidence.validObservationIds.length;
+    actionCapabilityMap[actionId] = evidence.classification;
+    actions[actionId] = {
+      actionId,
+      acceptedObservationIds: evidence.validObservationIds,
+      rejectedObservationIds: rejected,
+      reviewedAttemptCount,
+      passCount: evidence.passCount,
+      failCount: evidence.failCount,
+      passRate: evidence.passRate,
+      classification: evidence.classification,
+      attemptsRemainingToMinimum: Math.max(0, scope.policy.minimumReviewedAttempts - reviewedAttemptCount)
+    };
+  }
+  const totalPromotionsFromUntested = scope.baselineActionIds.filter(actionId => actionCapabilityMap[actionId] !== 'UNTESTED').length;
+  return {
+    campaignId: scope.campaignId,
+    fixtureId: scope.fixtureId,
+    archetype,
+    policy: scope.policy,
+    baselineActionIds: scope.baselineActionIds,
+    actions,
+    rejectedObservationIds,
+    actionCapabilityMap,
+    totalPromotionsFromUntested,
+    campaignReady: scope.baselineActionIds.every(actionId => actionCapabilityMap[actionId] === 'SAFE')
+  };
+}
+
+function isNonBlank(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidPromotionPolicy(policy: CapabilityPromotionPolicy): boolean {
+  return Number.isInteger(policy?.minimumReviewedAttempts) && policy.minimumReviewedAttempts > 0 &&
+    Number.isFinite(policy.safePassRate) && Number.isFinite(policy.riskyPassRate) &&
+    policy.safePassRate >= policy.riskyPassRate && policy.safePassRate <= 1 && policy.riskyPassRate >= 0;
+}
+
+function isCampaignAction(scope: TrustedCapabilityCampaignScope, actionId: unknown): actionId is ActionId {
+  return typeof actionId === 'string' && scope.baselineActionIds.includes(actionId as ActionId);
+}
+
+function countStringField(observations: readonly BenchmarkObservation[], field: 'observationId' | 'candidateAssetId' | 'benchmarkCaseId'): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const observation of observations) {
+    const value = observation?.[field];
+    if (typeof value === 'string' && value.trim()) counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function observationReference(observation: BenchmarkObservation | undefined, index: number): string {
+  return isNonBlank(observation?.observationId) ? observation.observationId : `invalid-observation-${index + 1}`;
 }
 
 export function classifyCapabilityEvidence(

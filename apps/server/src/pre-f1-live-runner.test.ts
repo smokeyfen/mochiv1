@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createUntestedActionCapabilityMap } from '@mochi/core';
-import { runPreF1Live } from './pre-f1-live-runner.ts';
+import { getCurrentTrustedCapabilityMap, runPreF1Live } from './pre-f1-live-runner.ts';
 
 const configuredEnvironment: NodeJS.ProcessEnv = {
   PRE_F1_LIVE: '1',
@@ -9,6 +9,10 @@ const configuredEnvironment: NodeJS.ProcessEnv = {
   PRE_F1_SNAPSHOT_STORAGE_ROOT: 'explicit-snapshot-root',
   GEMINI_API_KEY: 'configured-but-never-read'
 };
+
+test('current PRE-F1 trust source remains all UNTESTED pending the separately audited campaign connection', () => {
+  assert.deepEqual(getCurrentTrustedCapabilityMap(), createUntestedActionCapabilityMap());
+});
 
 test('PRE_F1_LIVE absent is NOT_RUN without consulting a capability or provider source', async () => {
   let capabilityReads = 0;
