@@ -102,6 +102,18 @@ test('unknown or mismatched receipts fail strict campaign binding validation', (
   assert.throws(() => planNextF0BenchmarkBatch({ executionReceipts: [unknown] }), /F0_BENCHMARK_EXECUTION_RECEIPT_INVALID/);
 });
 
+test('duplicate case or candidate receipts and fixture or attempt mismatches fail closed', () => {
+  const first = receiptFor('PICK_UP', 2);
+  const duplicateCase = { ...first, candidateAssetId: 'different-candidate' };
+  const duplicateCandidate = { ...receiptFor('HOLD', 2), candidateAssetId: first.candidateAssetId };
+  const wrongFixture = { ...first, fixtureId: 'wrong-fixture' };
+  const wrongAttempt = { ...first, attemptNumber: 3 };
+  assert.throws(() => planNextF0BenchmarkBatch({ executionReceipts: [first, duplicateCase] }), /duplicate_case_receipt/);
+  assert.throws(() => planNextF0BenchmarkBatch({ executionReceipts: [first, duplicateCandidate] }), /duplicate_candidate_asset/);
+  assert.ok(validateF0BenchmarkExecutionReceipt(wrongFixture).includes('fixture_binding'));
+  assert.ok(validateF0BenchmarkExecutionReceipt(wrongAttempt).includes('attempt_binding'));
+});
+
 test('rejected case evidence is REVIEW_EVIDENCE_INVALID and blocks regeneration', () => {
   const observations = [...f0EmpiricalBenchmarkObservations, rejectedObservation('ROTATE_SLOW', 1)];
   assert.equal(deriveF0BenchmarkCaseState(caseFor('ROTATE_SLOW', 1), observations), 'REVIEW_EVIDENCE_INVALID');

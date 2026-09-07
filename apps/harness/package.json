@@ -6,6 +6,7 @@
   "scripts": {
     "benchmark:dry": "tsx src/index.ts",
     "benchmark:capability:dry": "tsx src/f0-capability-status.ts",
+    "benchmark:execution:dry": "tsx src/f0-benchmark-execution-status.ts",
     "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
