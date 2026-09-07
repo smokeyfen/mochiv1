@@ -642,6 +642,39 @@ export function validateProductionContractV1(value: unknown): string[] {
   return issues;
 }
 
+/** Immutable, provider-neutral server-side record of one validated R8 production contract. */
+export const PRODUCTION_SNAPSHOT_V1 = 'PRODUCTION_SNAPSHOT_V1' as const;
+export type ProductionSnapshotVersion = typeof PRODUCTION_SNAPSHOT_V1;
+export interface ProductionSnapshotV1 {
+  schemaVersion: SchemaVersion;
+  snapshotVersion: ProductionSnapshotVersion;
+  snapshotId: string;
+  projectId: string;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  productionContract: ProductionContractV1;
+}
+const productionSnapshotKeys = ['schemaVersion', 'snapshotVersion', 'snapshotId', 'projectId', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'productionContract'] as const;
+const productionSnapshotIdPattern = /^ps_[0-9a-f]{64}$/;
+
+/** Validates the standalone P0 contract; server storage additionally proves its SHA-256 binding. */
+export function validateProductionSnapshotV1(value: unknown): string[] {
+  if (!hasExactKeys(value, productionSnapshotKeys)) return ['shape'];
+  const snapshot = value as unknown as ProductionSnapshotV1;
+  const issues: string[] = [];
+  if (snapshot.schemaVersion !== SCHEMA_VERSION || snapshot.snapshotVersion !== PRODUCTION_SNAPSHOT_V1) issues.push('version');
+  if (typeof snapshot.snapshotId !== 'string' || !productionSnapshotIdPattern.test(snapshot.snapshotId)) issues.push('snapshot_id');
+  if (!nonBlankContract(snapshot.projectId)) issues.push('project_id');
+  if (!nonBlankContract(snapshot.productId) || !nonBlankContract(snapshot.sourceEvidenceVersion)
+    || !Array.isArray(snapshot.canonicalAssetIds) || snapshot.canonicalAssetIds.some(assetId => !nonBlankContract(assetId))) issues.push('source');
+  if (validateProductionContractV1(snapshot.productionContract).length > 0) issues.push('production_contract');
+  if (snapshot.productionContract?.productId !== snapshot.productId
+    || snapshot.productionContract?.sourceEvidenceVersion !== snapshot.sourceEvidenceVersion
+    || JSON.stringify(snapshot.productionContract?.canonicalAssetIds) !== JSON.stringify(snapshot.canonicalAssetIds)) issues.push('source_binding');
+  return issues;
+}
+
 export type ActionId =
   | 'REACH' | 'PICK_UP' | 'HOLD' | 'MOVE_CLOSER' | 'ROTATE_SLOW' | 'PLACE_DOWN'
   | 'OPEN_SIMPLE' | 'PRESS_BUTTON' | 'POUR_SIMPLE' | 'APPLY_SIMPLE' | 'POINT';

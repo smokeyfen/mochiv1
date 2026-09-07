@@ -12,7 +12,8 @@
   "dependencies": {
     "@mochi/contracts": "*",
     "@mochi/evidence": "*",
-    "@mochi/providers": "*"
+    "@mochi/providers": "*",
+    "@mochi/reasoning": "*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
