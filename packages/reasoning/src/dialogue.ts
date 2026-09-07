@@ -12,6 +12,7 @@ import {
 } from '@mochi/contracts';
 import { countVietnameseSpokenUnits, resolveV1ReviewVoiceIdentity } from '@mochi/core';
 import { type IntelligenceProvider } from '@mochi/providers';
+import { validateGlobalContinuityState } from './continuity.ts';
 import { buildPlanningTruthCatalog, validatePlan } from './planner.ts';
 
 export class DialogueFinalizationError extends Error {
@@ -177,7 +178,8 @@ function validateInput(request: FinalizeDialogueRequest): string {
       && (item.identityConfidence === 'HIGH' || item.identityConfidence === 'MEDIUM'))
     .map(item => item.assetId);
   try {
-    if (validatePlan(request.globalPlan, request.context, request.globalPlan.continuity, catalog.map(item => item.id), usableAssetIds).length > 0
+    if (validateGlobalContinuityState(request.globalPlan.continuity, request.context, request.creativeDirection).length > 0
+      || validatePlan(request.globalPlan, request.context, request.globalPlan.continuity, catalog.map(item => item.id), usableAssetIds).length > 0
       || validateKeyPointPlan(request.keyPointPlan, request.context, request.globalPlan, catalog).length > 0
       || validateCreativeDirectionInput(request.creativeDirection).length > 0) {
       throw new DialogueFinalizationError('INVALID_INPUT');

@@ -54,6 +54,21 @@ const globalPlan = (): Global4ScenePlan => ({
   }))
 });
 
+const alignedGlobalPlan = (direction: CreativeDirectionInput): Global4ScenePlan => {
+  const plan = globalPlan();
+  return {
+    ...plan,
+    continuity: {
+      ...plan.continuity,
+      immutable: {
+        ...plan.continuity.immutable,
+        environment: { ...plan.continuity.immutable.environment, location: direction.shootingContext },
+        voiceIdentity: { voiceGender: direction.voiceGender, voiceRegion: direction.voiceRegion, voiceStyle: direction.voiceStyle }
+      }
+    }
+  };
+};
+
 const keyPointPlan = (plan: Global4ScenePlan): KeyPointPlan => ({
   schemaVersion: SCHEMA_VERSION, keyPointsVersion: KEY_POINTS_V1, productId: context.productId, sourceEvidenceVersion: context.sourceEvidenceVersion, canonicalAssetIds: context.canonicalAssetIds,
   scenes: plan.scenes.map((scene, offset) => ({
@@ -113,7 +128,8 @@ test('R7-B creates four bound DIALOGUE_V1 scenes in exactly two empty-media call
 
 test('R7-B resolves only canonical South-review female and male identities before intelligence', async () => {
   for (const [gender, identity] of [['FEMALE', 'VN_FEMALE_SOUTH_REVIEW_V1'], ['MALE', 'VN_MALE_SOUTH_REVIEW_V1']] as const) {
-    const value = fixture({ creativeDirection: creative(gender) });
+    const direction = creative(gender);
+    const value = fixture({ creativeDirection: direction, global: alignedGlobalPlan(direction) });
     assert.equal((await finalizeDialogue(value.request)).voiceIdentityId, identity);
   }
   for (const invalid of [
@@ -123,6 +139,26 @@ test('R7-B resolves only canonical South-review female and male identities befor
     const value = fixture({ creativeDirection: invalid });
     await assert.rejects(finalizeDialogue(value.request), (error: unknown) => error instanceof DialogueFinalizationError && error.code === 'INVALID_INPUT');
     assert.equal(value.calls.length, 0);
+  }
+});
+
+test('R7-B validates the authoritative R4 continuity snapshot before intelligence', async () => {
+  const maleDirection = creative('MALE');
+  const voiceContradiction = fixture({ creativeDirection: maleDirection });
+  await assert.rejects(finalizeDialogue(voiceContradiction.request), (error: unknown) =>
+    error instanceof DialogueFinalizationError && error.code === 'INVALID_INPUT');
+  assert.equal(voiceContradiction.calls.length, 0);
+
+  const locationContradiction = fixture({ creativeDirection: { ...creative(), shootingContext: 'quầy bếp' } });
+  await assert.rejects(finalizeDialogue(locationContradiction.request), (error: unknown) =>
+    error instanceof DialogueFinalizationError && error.code === 'INVALID_INPUT');
+  assert.equal(locationContradiction.calls.length, 0);
+
+  for (const gender of ['FEMALE', 'MALE'] as const) {
+    const direction = creative(gender);
+    const value = fixture({ creativeDirection: direction, global: alignedGlobalPlan(direction) });
+    assert.equal((await finalizeDialogue(value.request)).voiceIdentityId,
+      gender === 'FEMALE' ? 'VN_FEMALE_SOUTH_REVIEW_V1' : 'VN_MALE_SOUTH_REVIEW_V1');
   }
 });
 
