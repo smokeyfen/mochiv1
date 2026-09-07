@@ -51,6 +51,8 @@ export function buildKeyPointPlanInputText(request: Pick<PlanKeyPointsRequest, '
     scenes: request.globalPlan.scenes.map(scene => ({
       sceneId: scene.sceneId,
       index: scene.index,
+      role: scene.role,
+      physicalObjective: scene.physicalObjective,
       primaryTruthRefId: scene.primaryTruthRefId
     })),
     truthCatalog: catalog

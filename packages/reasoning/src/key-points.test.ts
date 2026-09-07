@@ -29,7 +29,7 @@ const context: R2CommittedProductContext = {
     facts: [
       { factId: 'geometry:0', kind: 'GEOMETRY', text: 'Round pieces', evidenceAssetIds: ['asset-1'] },
       { factId: 'color:0', kind: 'COLOR', text: 'White coating', evidenceAssetIds: ['asset-1'] },
-      { factId: 'material:0', kind: 'MATERIAL', text: 'Rice-based dough', evidenceAssetIds: ['asset-1'] }
+      { factId: 'packaging:0', kind: 'PACKAGING', text: 'Individually wrapped', evidenceAssetIds: ['asset-1'] }
     ],
     allowedClaims: [],
     prohibitedInferences: [],
@@ -123,12 +123,15 @@ test('R4.1 creates the exact four-scene, eight-key-point provider-neutral plan i
   assert.ok(validateKeyPointPlan({ ...output, unexpected: true }, context, fixture.plan, buildPlanningTruthCatalog(context)).length > 0);
 });
 
-test('R4.1 preserves Product Name byte-for-byte and excludes it from sanitized provider input', async () => {
+test('R4.1 preserves Product Name byte-for-byte and exposes only role and physical objective context', async () => {
   const fixture = request();
   const output = await planKeyPoints(fixture.value);
+  const inputText = buildKeyPointPlanInputText(fixture.value);
   assert.equal(output.scenes[0]?.keyPoints[0]?.text, context.productTruth.name);
   assert.equal(output.scenes[0]?.keyPoints[0]?.kind, 'PRODUCT_NAME');
-  assert.equal(buildKeyPointPlanInputText(fixture.value).includes(context.productTruth.name), false);
+  assert.ok(inputText.includes('"role":"HOOK"'));
+  assert.ok(inputText.includes('"physicalObjective":"show product"'));
+  assert.equal(inputText.includes(context.productTruth.name), false);
 });
 
 test('R4.1 rejects a model Product Name override, leaving no override output to survive', async () => {
@@ -151,9 +154,17 @@ test('R4.1 rejects a same-scene duplicate truth', async () => {
 });
 
 test('R4.1 rejects Scene 4 new truth introduction', async () => {
-  const fixture = request({ secondaryTruthRefIds: ['identity', 'geometry:0', 'material:0'] });
+  const fixture = request({ secondaryTruthRefIds: ['identity', 'geometry:0', 'packaging:0'] });
   await assert.rejects(planKeyPoints(fixture.value), (error: unknown) =>
     error instanceof KeyPointPlanError && error.code === 'INVALID_MODEL_OUTPUT');
+});
+
+test('R4.1 allows Scene 4 to reuse a non-primary truth actually established by Scene 2', async () => {
+  const fixture = request({ secondaryTruthRefIds: ['packaging:0', 'geometry:0', 'packaging:0'] });
+  const output = await planKeyPoints(fixture.value);
+  assert.equal(output.scenes[1]?.keyPoints[1]?.truthRefId, 'packaging:0');
+  assert.equal(output.scenes[3]?.keyPoints[1]?.truthRefId, 'packaging:0');
+  assert.deepEqual(validateKeyPointPlan(output, context, fixture.plan, buildPlanningTruthCatalog(context)), []);
 });
 
 test('R4.1 rejects wrong upstream source or scene binding before provider', async () => {

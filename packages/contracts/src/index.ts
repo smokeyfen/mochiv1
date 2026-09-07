@@ -356,8 +356,6 @@ export function validateKeyPointPlan(
     }
     const primary = upstream?.primaryTruthRefId;
     if (!primary || !truthById.has(primary)) issues.push('upstream_primary_truth');
-    if (sceneOffset < 3 && primary) establishedTruthIds.add(primary);
-
     const truthIdsInScene = new Set<string>();
     for (let pointOffset = 0; pointOffset < 2; pointOffset += 1) {
       const point = scene.keyPoints[pointOffset];
@@ -387,6 +385,7 @@ export function validateKeyPointPlan(
       if (point.text !== canonicalText) issues.push('canonical_text');
       if (truthIdsInScene.has(point.truthRefId)) issues.push('same_scene_duplicate');
       truthIdsInScene.add(point.truthRefId);
+      if (sceneOffset < 3) establishedTruthIds.add(point.truthRefId);
       if (requiredPrimary !== undefined && point.truthRefId !== requiredPrimary) issues.push('primary_truth');
       if (sceneOffset === 3 && pointOffset === 1
         && (!establishedTruthIds.has(point.truthRefId) || point.truthRefId === primary)) {
