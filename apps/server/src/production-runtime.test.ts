@@ -11,7 +11,7 @@ import {
 } from '@mochi/contracts';
 import { createUntestedActionCapabilityMap, type ActionCapabilityMap } from '@mochi/core';
 import { type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
-import { compileProductionContract } from '@mochi/reasoning';
+import { compileProductionContract, MAX_SCENE_REPLAN_ATTEMPTS } from '@mochi/reasoning';
 import { createProductionSnapshotStore, ProductionSnapshotError, type ProductionSnapshotStore } from './production-snapshot.ts';
 import {
   PRE_F1_RUNTIME_STAGES,
@@ -38,15 +38,23 @@ const request = (capabilityMap = safeMap()): ProductionRuntimeRequest => ({
   media: [{ assetId: 'reference-1', mimeType: 'image/jpeg', dataBase64: 'AQ==' }],
   sourceEvidenceVersion: 'product-evidence-v1', capabilityMap
 });
+const riskyRotateMap = (): ActionCapabilityMap => ({ ...safeMap(), ROTATE_SLOW: 'RISKY' });
 
-type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean };
+type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean };
 function createMockIntelligence(options: MockOptions = {}) {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
+  let normalCalls = 0;
   const provider: IntelligenceProvider = {
     id: 'mock-intelligence',
     async analyzeStructured<T>(input: StructuredIntelligenceRequest<T>) {
-      const call = requests.length;
       requests.push(input as StructuredIntelligenceRequest<unknown>);
+      if (input.instruction.startsWith('TARGETED REPLAN:')) {
+        return { data: input.parse(options.invalidReplan ? {} : {
+          physicalObjective: 'mục tiêu replanned', primaryAction: 'HOLD', desiredStateEffect: 'REMAIN_HELD',
+          dialogueDraft: 'R4 replanned draft', referenceAssetIds: ['reference-1']
+        }) };
+      }
+      const call = normalCalls++;
       if (call === options.failOnCall) throw new Error('untrusted provider detail');
       const data = [
         {
@@ -70,12 +78,13 @@ function createMockIntelligence(options: MockOptions = {}) {
             ['PROOF', 'color:0', 'ROTATE_SLOW', 'CHANGE_ORIENTATION'], ['CTA', 'identity', 'PLACE_DOWN', 'BECOME_PLACED']
           ].map(([role, primaryTruthRefId, primaryAction, desiredStateEffect], offset) => ({
             index: offset + 1, role, primaryTruthRefId, physicalObjective: `mục tiêu ${offset + 1}`,
-            primaryAction, desiredStateEffect, dialogueDraft: 'R4 draft', referenceAssetIds: ['reference-1'],
+            primaryAction, desiredStateEffect, dialogueDraft: 'R4 draft',
+            referenceAssetIds: options.staleReplanReference && offset === 2 ? ['reference-1', 'reference-1'] : ['reference-1'],
             ...(offset < 3 ? { transitionToNext: 'MATCH_CUT' } : {})
           }))
         },
-        { secondaryTruthRefIds: ['identity', 'geometry:0', 'geometry:0'] },
         { scenes: Array.from({ length: 4 }, () => ({ approachBehavior: 'Đưa tay tự nhiên.', gripAndContactBehavior: 'Giữ chắc.', actionExecutionBehavior: 'Thực hiện chậm.', postActionSettleBehavior: 'Dừng nhẹ.', cameraBehavior: 'Rung tay nhẹ.' })) },
+        { secondaryTruthRefIds: ['identity', 'geometry:0', 'geometry:0'] },
         { scenes: Array.from({ length: 4 }, (_, offset) => ({ sceneId: `${product.productId}:scene:${offset + 1}`, index: offset + 1, dialogue: `Mochi Original cảnh ${offset + 1} nha.`, addressedKeyPointIndexes: [1, 2] })) },
         { scenes: Array.from({ length: 4 }, () => ({ coversKeyPoint1: true, coversKeyPoint2: true, introducesUnsupportedProductFact: false, naturalSouthernConversationalVietnamese: true, containsStageDirectionOrNonSpeechText: false })), sameReviewerPersonaAcrossScenes: true }
       ][call];
@@ -123,7 +132,7 @@ test('PRE-F1 returns the exact P0 reloaded snapshot and exact R8 production cont
 });
 
 test('R1 through R4.1 failures stop immediately at their safe boundary', async () => {
-  const cases: readonly [number, string, number][] = [[0, 'R1_PRODUCT_EVIDENCE', 1], [1, 'R2_A_PRODUCT_TRUTH', 2], [2, 'R2_B_REFERENCE_ASSESSMENT', 3], [3, 'R3_CONTINUITY', 4], [4, 'R4_GLOBAL_PLAN', 5], [5, 'R4_1_KEY_POINTS', 6]];
+  const cases: readonly [number, string, number][] = [[0, 'R1_PRODUCT_EVIDENCE', 1], [1, 'R2_A_PRODUCT_TRUTH', 2], [2, 'R2_B_REFERENCE_ASSESSMENT', 3], [3, 'R3_CONTINUITY', 4], [4, 'R4_GLOBAL_PLAN', 5], [6, 'R4_1_KEY_POINTS', 7]];
   for (const [failOnCall, stage, expectedCalls] of cases) await withRuntime(async ({ runtime, requests }) => {
     await assert.rejects(runtime.run(request()), runtimeError(stage));
     assert.equal(requests.length, expectedCalls);
@@ -137,13 +146,39 @@ test('R2 atomic commit failure stops before R3', async () => withRuntime(async (
 
 test('R6 non-READY stops before R7-A, R7-B, R8, and P0 without mutating capability input', async () => withRuntime(async ({ runtime, requests }) => {
   const map = createUntestedActionCapabilityMap(); const before = structuredClone(map);
-  await assert.rejects(runtime.run(request(map)), runtimeError('R6_READY_GATE'));
-  assert.equal(requests.length, 6);
+  await assert.rejects(runtime.run(request(map)), runtimeError('R6_BOUNDED_REPLAN'));
+  assert.equal(requests.length, 5);
   assert.deepEqual(map, before);
 }));
 
+test('a RISKY planned action is replanned through the existing bounded authority before final R4.1 and R7 artifacts', async () => withRuntime(async ({ runtime, requests }) => {
+  const map = riskyRotateMap(); const before = structuredClone(map);
+  const result = await runtime.run(request(map));
+  assert.equal(requests.length, 10);
+  const replanIndex = requests.findIndex(item => item.instruction.startsWith('TARGETED REPLAN:'));
+  const realismIndex = requests.findIndex(item => item.instruction.startsWith('HUMAN REALISM RULES:'));
+  const keyPointsIndex = requests.findIndex(item => item.instruction.startsWith('KEY POINTS RULES:'));
+  const dialogueIndex = requests.findIndex(item => item.instruction.startsWith('DIALOGUE FINALIZATION RULES:'));
+  assert.ok(replanIndex > 0 && replanIndex < realismIndex && realismIndex < keyPointsIndex && keyPointsIndex < dialogueIndex);
+  assert.match(requests[realismIndex]!.inputText ?? '', /"primaryAction":"HOLD"/);
+  assert.match(requests[keyPointsIndex]!.inputText ?? '', /mục tiêu replanned/);
+  assert.match(requests[dialogueIndex]!.inputText ?? '', /"primaryAction":"HOLD"/);
+  assert.equal(result.snapshot.productionContract.scenes[2]?.primaryAction, 'HOLD');
+  assert.equal(result.snapshot.productionContract.inputBinding.scenes[2]?.physicalObjective, 'mục tiêu replanned');
+  assert.equal(result.snapshot.productionContract.scenes[2]?.productionPrompt.includes('mục tiêu 3'), false);
+  assert.deepEqual(result.snapshot.productionContract.scenes[2]?.referenceAssetIds, ['reference-1']);
+  assert.deepEqual(map, before);
+}, { staleReplanReference: true }));
+
+test('a bounded replan never exceeds the locked MAX_SCENE_REPLAN_ATTEMPTS and fails before downstream artifacts', async () => withRuntime(async ({ runtime, requests }) => {
+  await assert.rejects(runtime.run(request(riskyRotateMap())), runtimeError('R6_BOUNDED_REPLAN'));
+  assert.equal(requests.filter(item => item.instruction.startsWith('TARGETED REPLAN:')).length, MAX_SCENE_REPLAN_ATTEMPTS);
+  assert.equal(requests.some(item => item.instruction.startsWith('HUMAN REALISM RULES:')), false);
+  assert.equal(requests.some(item => item.instruction.startsWith('KEY POINTS RULES:')), false);
+}, { invalidReplan: true }));
+
 test('R7-A and R7-B failures stop downstream', async () => {
-  for (const [failOnCall, stage, expectedCalls] of [[6, 'R7_A_HUMAN_REALISM', 7], [7, 'R7_B_DIALOGUE', 8]] as const) await withRuntime(async ({ runtime, requests }) => {
+  for (const [failOnCall, stage, expectedCalls] of [[5, 'R7_A_HUMAN_REALISM', 6], [7, 'R7_B_DIALOGUE', 8]] as const) await withRuntime(async ({ runtime, requests }) => {
     await assert.rejects(runtime.run(request()), runtimeError(stage));
     assert.equal(requests.length, expectedCalls);
   }, { failOnCall });
@@ -152,7 +187,7 @@ test('R7-A and R7-B failures stop downstream', async () => {
 test('R8 failure prevents any P0 persistence', async () => {
   let reads = 0; const stable = safeMap();
   const capabilityMap = new Proxy(stable, { get(target, property, receiver) {
-    if (typeof property === 'string' && property in target) return ++reads > 19 ? 'UNTESTED' : Reflect.get(target, property, receiver);
+    if (typeof property === 'string' && property in target) return ++reads > 23 ? 'UNTESTED' : Reflect.get(target, property, receiver);
     return Reflect.get(target, property, receiver);
   } }) as ActionCapabilityMap;
   let creates = 0;

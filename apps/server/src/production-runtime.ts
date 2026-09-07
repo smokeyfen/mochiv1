@@ -21,7 +21,9 @@ import {
   planHumanRealism,
   planKeyPoints,
   resolveSceneStates,
-  synthesizeGlobalContinuity
+  synthesizeGlobalContinuity,
+  targetedReplan,
+  MAX_SCENE_REPLAN_ATTEMPTS
 } from '@mochi/reasoning';
 import { type ProductionSnapshotStore } from './production-snapshot.ts';
 
@@ -34,11 +36,14 @@ export const PRE_F1_RUNTIME_STAGES = [
   'R2_COMMIT',
   'R3_CONTINUITY',
   'R4_GLOBAL_PLAN',
-  'R4_1_KEY_POINTS',
-  'R5_STATE',
-  'R6_RISK',
+  'R5_INITIAL_STATE',
+  'R6_INITIAL_RISK',
+  'R6_BOUNDED_REPLAN',
+  'R5_FINAL_STATE',
+  'R6_FINAL_RISK',
   'R6_READY_GATE',
   'R7_A_HUMAN_REALISM',
+  'R4_1_KEY_POINTS',
   'R7_B_DIALOGUE',
   'R8_PRODUCTION_CONTRACT',
   'P0_CREATE_PERSIST',
@@ -145,23 +150,43 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
       const globalPlan = await stage('R4_GLOBAL_PLAN', () => planGlobal4Scenes({
         context, continuity, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
       }));
-      const keyPointPlan = await stage('R4_1_KEY_POINTS', () => planKeyPoints({
-        context, globalPlan, intelligence: dependencies.intelligence
-      }));
-      const statePlan = await stage('R5_STATE', () => resolveSceneStates(globalPlan));
-      const riskAssessment = await stage('R6_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap));
+      const initialStatePlan = await stage('R5_INITIAL_STATE', () => resolveSceneStates(globalPlan));
+      const initialRiskAssessment = await stage('R6_INITIAL_RISK', () => evaluateSceneRisk(initialStatePlan, request.capabilityMap));
+      const finalGlobalPlan = await stage('R6_BOUNDED_REPLAN', async () => {
+        let candidatePlan = globalPlan;
+        let candidateStatePlan = initialStatePlan;
+        let candidateRiskAssessment = initialRiskAssessment;
+        const replannedIndexes = new Set<number>();
+        while (candidateRiskAssessment.scenes.some(scene => scene.status !== 'READY')) {
+          const target = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY' && !replannedIndexes.has(scene.index));
+          if (!target) throw new Error('risk_unresolved');
+          replannedIndexes.add(target.index);
+          candidatePlan = await targetedReplan(
+            candidatePlan, context, continuity, request.capabilityMap, target.index,
+            dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS
+          );
+          candidateStatePlan = resolveSceneStates(candidatePlan);
+          candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap);
+        }
+        return candidatePlan;
+      });
+      const statePlan = await stage('R5_FINAL_STATE', () => resolveSceneStates(finalGlobalPlan));
+      const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap));
       await stage('R6_READY_GATE', () => {
         if (riskAssessment.scenes.some(scene => scene.status !== 'READY')) throw new Error('risk_not_ready');
       });
       const humanRealismPlan = await stage('R7_A_HUMAN_REALISM', () => planHumanRealism({
-        context, plan: globalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,
+        context, plan: finalGlobalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,
         capabilityMap: request.capabilityMap, intelligence: dependencies.intelligence
       }));
+      const keyPointPlan = await stage('R4_1_KEY_POINTS', () => planKeyPoints({
+        context, globalPlan: finalGlobalPlan, intelligence: dependencies.intelligence
+      }));
       const dialoguePlan = await stage('R7_B_DIALOGUE', () => finalizeDialogue({
-        context, globalPlan, keyPointPlan, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
+        context, globalPlan: finalGlobalPlan, keyPointPlan, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
       }));
       const productionRequest = {
-        context, creativeDirection: request.creativeDirection, globalPlan, keyPointPlan, statePlan,
+        context, creativeDirection: request.creativeDirection, globalPlan: finalGlobalPlan, keyPointPlan, statePlan,
         riskAssessment, capabilityMap: request.capabilityMap, humanRealismPlan, dialoguePlan
       };
       const productionContract = await stage('R8_PRODUCTION_CONTRACT', () => compileProductionContract(productionRequest));
