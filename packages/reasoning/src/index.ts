@@ -37,10 +37,12 @@ export {
 
 export {
   finalizeDialogue,
+  buildDialogueInputBinding,
   buildDialogueGenerationInstruction,
   buildDialogueGenerationInputText,
   buildDialogueSemanticValidationInstruction,
   buildDialogueSemanticValidationInputText,
+  validateDialogueUpstreamBinding,
   DialogueFinalizationError,
   type FinalizeDialogueRequest
 } from './dialogue.ts';

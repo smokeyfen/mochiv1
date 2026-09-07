@@ -9,7 +9,7 @@ import {
   type R2CommittedProductContext
 } from '@mochi/contracts';
 import { countVietnameseSpokenUnits } from '@mochi/core';
-import { DialogueFinalizationError, finalizeDialogue } from './index.ts';
+import { DialogueFinalizationError, buildDialogueInputBinding, finalizeDialogue, validateDialogueUpstreamBinding } from './index.ts';
 
 const context: R2CommittedProductContext = {
   schemaVersion: SCHEMA_VERSION, productId: 'product-1', sourceEvidenceVersion: 'evidence-v1', canonicalAssetIds: ['asset-1'],
@@ -122,6 +122,7 @@ test('R7-B creates four bound DIALOGUE_V1 scenes in exactly two empty-media call
   assert.equal(output.dialogueVersion, 'DIALOGUE_V1');
   assert.equal(output.language, 'vi-VN');
   assert.equal(output.voiceIdentityId, 'VN_FEMALE_SOUTH_REVIEW_V1');
+  assert.deepEqual(output.inputBinding, buildDialogueInputBinding(value.plan, value.request.keyPointPlan, value.request.creativeDirection));
   assert.deepEqual(output.canonicalAssetIds, context.canonicalAssetIds);
   assert.deepEqual(output.scenes.map(scene => [scene.sceneId, scene.index, scene.addressedKeyPointIndexes]), value.plan.scenes.map(scene => [scene.sceneId, scene.index, [1, 2]]));
 });
@@ -198,7 +199,8 @@ test('R7-B rejects every malformed or unauthorized generation decision without s
     { scenes: valid.scenes.map((scene, offset) => offset === 0 ? { ...scene, sceneId: 'wrong' } : scene) },
     { scenes: valid.scenes.map((scene, offset) => offset === 0 ? { ...scene, dialogue: '  ' } : scene) },
     { scenes: valid.scenes.map((scene, offset) => offset === 0 ? { ...scene, addressedKeyPointIndexes: [2, 1] } : scene) },
-    { scenes: valid.scenes.map((scene, offset) => offset === 0 ? { ...scene, spokenUnitCount: 999 } : scene) }
+    { scenes: valid.scenes.map((scene, offset) => offset === 0 ? { ...scene, spokenUnitCount: 999 } : scene) },
+    { ...valid, inputBinding: { model: 'override' } }
   ];
   for (const invalid of variants) {
     const value = fixture({ global: plan, generation: invalid });
@@ -211,6 +213,44 @@ test('R7-B compiles spoken units deterministically rather than accepting a model
   const value = fixture();
   const output = await finalizeDialogue(value.request);
   for (const scene of output.scenes) assert.equal(scene.spokenUnitCount, countVietnameseSpokenUnits(scene.dialogue));
+});
+
+test('R7-B upstream binding fails closed for generation-relevant changes without provider calls', async () => {
+  const value = fixture();
+  const dialogue = await finalizeDialogue(value.request);
+  assert.deepEqual(validateDialogueUpstreamBinding(dialogue, context, value.plan, value.request.keyPointPlan, value.request.creativeDirection), []);
+  const changedAudience = { ...creative(), audience: 'khán giả khác' };
+  const changedPersona = { ...creative(), reviewerPersona: 'người review khác' };
+  const changedTone = { ...creative(), tone: 'tông khác' };
+  const changedObjective = { ...value.plan, scenes: value.plan.scenes.map((scene, offset) => offset === 1 ? { ...scene, physicalObjective: 'mục tiêu khác' } : scene) };
+  const changedAction = { ...value.plan, scenes: value.plan.scenes.map((scene, offset) => offset === 1 ? { ...scene, primaryAction: 'PICK_UP' as const } : scene) };
+  const changedRole = { ...value.plan, scenes: value.plan.scenes.map((scene, offset) => offset === 1 ? { ...scene, role: 'HOOK' as const } : scene) };
+  const changedTruth = { ...value.request.keyPointPlan, scenes: value.request.keyPointPlan.scenes.map((scene, offset) => offset === 1 ? { ...scene, keyPoints: scene.keyPoints.map((point, pointOffset) => pointOffset === 1 ? { ...point, truthRefId: 'geometry:0' } : point) } : scene) };
+  const changedText = { ...value.request.keyPointPlan, scenes: value.request.keyPointPlan.scenes.map((scene, offset) => offset === 1 ? { ...scene, keyPoints: scene.keyPoints.map((point, pointOffset) => pointOffset === 1 ? { ...point, text: 'văn bản khác' } : point) } : scene) };
+  const reorderedScenes = { ...value.plan, scenes: [value.plan.scenes[1]!, value.plan.scenes[0]!, value.plan.scenes[2]!, value.plan.scenes[3]!] };
+  const reorderedPoints = { ...value.request.keyPointPlan, scenes: value.request.keyPointPlan.scenes.map((scene, offset) => offset === 1 ? { ...scene, keyPoints: [scene.keyPoints[1]!, scene.keyPoints[0]!] } : scene) };
+  for (const [plan, points, direction] of [
+    [value.plan, value.request.keyPointPlan, changedAudience],
+    [value.plan, value.request.keyPointPlan, changedPersona],
+    [value.plan, value.request.keyPointPlan, changedTone],
+    [changedObjective, value.request.keyPointPlan, creative()],
+    [changedAction, value.request.keyPointPlan, creative()],
+    [changedRole, value.request.keyPointPlan, creative()],
+    [value.plan, changedTruth, creative()],
+    [value.plan, changedText, creative()],
+    [reorderedScenes, value.request.keyPointPlan, creative()],
+    [value.plan, reorderedPoints, creative()]
+  ] as const) {
+    assert.ok(validateDialogueUpstreamBinding(dialogue, context, plan, points, direction).length > 0);
+  }
+  assert.equal(value.calls.length, 2);
+});
+
+test('R7-B binding and provider input exclude the retired R4 dialogue draft', async () => {
+  const value = fixture();
+  const dialogue = await finalizeDialogue(value.request);
+  assert.equal(JSON.stringify(dialogue.inputBinding).includes('retired R4 dialogue draft'), false);
+  assert.equal(value.calls[0]!.inputText!.includes('retired R4 dialogue draft'), false);
 });
 
 test('R7-B semantic gate sees only dialogue/key-points/role/style and cannot rewrite dialogue', async () => {

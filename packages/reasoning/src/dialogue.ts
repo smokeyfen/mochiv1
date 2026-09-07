@@ -2,6 +2,7 @@ import {
   DIALOGUE_V1,
   SCHEMA_VERSION,
   type CreativeDirectionInput,
+  type DialogueInputBinding,
   type DialoguePlan,
   type Global4ScenePlan,
   type KeyPointPlan,
@@ -72,10 +73,41 @@ const nonBlank = (value: unknown): value is string => typeof value === 'string' 
 export const buildDialogueGenerationInstruction = (): string =>
   'DIALOGUE FINALIZATION RULES: Return structured JSON only. Return exactly four scene decisions in the supplied order, with only sceneId, index, dialogue, and addressedKeyPointIndexes. Each addressedKeyPointIndexes value must be [1,2]. Write Vietnamese spoken dialogue only: natural Southern Vietnamese, informal authentic product-review delivery, subtle regional wording without caricature, natural reactions and sentence rhythm, and the same reviewer persona throughout. Use one concise utterance intended to fit naturally inside an 8-second scene. Do not write formal Vietnamese, announcer or commercial-narrator delivery, stage directions, quotation labels, subtitles, visual instructions, or non-speech text. Address both supplied key points in every scene. Do not invent prices, discounts, promotions, mechanisms, benefits, or any product fact outside the two supplied key points. Let HOOK express natural reaction or curiosity, FEATURE give conversational explanation, PROOF give hands-on realization, and CTA give a soft personal recommendation without hard sell. Speaker identity must not vary.';
 
+/** Single pure authority for the exact non-source context consumed by R7-B generation. */
+export function buildDialogueInputBinding(
+  globalPlan: Global4ScenePlan,
+  keyPointPlan: KeyPointPlan,
+  creativeDirection: CreativeDirectionInput
+): DialogueInputBinding {
+  return {
+    creative: {
+      audience: creativeDirection.audience,
+      reviewerPersona: creativeDirection.reviewerPersona,
+      tone: creativeDirection.tone,
+      voiceGender: creativeDirection.voiceGender,
+      voiceRegion: creativeDirection.voiceRegion,
+      voiceStyle: creativeDirection.voiceStyle
+    },
+    scenes: globalPlan.scenes.map((scene, offset) => ({
+      sceneId: scene.sceneId,
+      index: scene.index,
+      role: scene.role,
+      physicalObjective: scene.physicalObjective,
+      primaryAction: scene.primaryAction,
+      keyPoints: keyPointPlan.scenes[offset]!.keyPoints.map(point => ({
+        index: point.index,
+        kind: point.kind,
+        truthRefId: point.truthRefId,
+        text: point.text
+      })) as unknown as DialogueInputBinding['scenes'][number]['keyPoints']
+    })) as unknown as DialogueInputBinding['scenes']
+  };
+}
+
 /** Bounded global context: no ProductTruth catalog, R4 dialogue draft, media, or runtime provider metadata. */
 export function buildDialogueGenerationInputText(
   request: Pick<FinalizeDialogueRequest, 'context' | 'globalPlan' | 'keyPointPlan' | 'creativeDirection'>,
-  voiceIdentityId: string
+  inputBinding = buildDialogueInputBinding(request.globalPlan, request.keyPointPlan, request.creativeDirection)
 ): string {
   return `DIALOGUE_GENERATION_INPUT_JSON:\n${JSON.stringify({
     source: {
@@ -83,30 +115,8 @@ export function buildDialogueGenerationInputText(
       sourceEvidenceVersion: request.context.sourceEvidenceVersion,
       canonicalAssetIds: request.context.canonicalAssetIds
     },
-    voice: {
-      language: 'vi-VN',
-      voiceIdentityId,
-      voiceGender: request.creativeDirection.voiceGender,
-      voiceRegion: request.creativeDirection.voiceRegion,
-      voiceStyle: request.creativeDirection.voiceStyle
-    },
-    creative: {
-      audience: request.creativeDirection.audience,
-      reviewerPersona: request.creativeDirection.reviewerPersona,
-      tone: request.creativeDirection.tone
-    },
-    scenes: request.globalPlan.scenes.map((scene, offset) => ({
-      sceneId: scene.sceneId,
-      index: scene.index,
-      role: scene.role,
-      physicalObjective: scene.physicalObjective,
-      primaryAction: scene.primaryAction,
-      keyPoints: request.keyPointPlan.scenes[offset]!.keyPoints.map(point => ({
-        index: point.index,
-        kind: point.kind,
-        text: point.text
-      }))
-    }))
+    creative: inputBinding.creative,
+    scenes: inputBinding.scenes
   })}\nEND_DIALOGUE_GENERATION_INPUT_JSON.`;
 }
 
@@ -137,11 +147,12 @@ export function buildDialogueSemanticValidationInputText(
 
 export async function finalizeDialogue(request: FinalizeDialogueRequest): Promise<DialoguePlan> {
   const voiceIdentityId = validateInput(request);
+  const inputBinding = buildDialogueInputBinding(request.globalPlan, request.keyPointPlan, request.creativeDirection);
   let decision: unknown;
   try {
     decision = (await request.intelligence.analyzeStructured<unknown>({
       instruction: buildDialogueGenerationInstruction(),
-      inputText: buildDialogueGenerationInputText(request, voiceIdentityId),
+      inputText: buildDialogueGenerationInputText(request, inputBinding),
       media: [],
       outputSchema: generationSchema(request),
       parse: value => value
@@ -151,8 +162,11 @@ export async function finalizeDialogue(request: FinalizeDialogueRequest): Promis
   }
   if (!isDialogueDecision(decision, request.globalPlan)) throw new DialogueFinalizationError('INVALID_MODEL_OUTPUT');
 
-  const dialogue = compileDialogue(request, voiceIdentityId, decision);
-  if (validateDialoguePlan(dialogue).length > 0) throw new DialogueFinalizationError('INVALID_MODEL_OUTPUT');
+  const dialogue = compileDialogue(request, voiceIdentityId, inputBinding, decision);
+  if (validateDialoguePlan(dialogue).length > 0
+    || validateDialogueUpstreamBinding(dialogue, request.context, request.globalPlan, request.keyPointPlan, request.creativeDirection).length > 0) {
+    throw new DialogueFinalizationError('INVALID_MODEL_OUTPUT');
+  }
 
   let verdict: unknown;
   try {
@@ -172,28 +186,64 @@ export async function finalizeDialogue(request: FinalizeDialogueRequest): Promis
 }
 
 function validateInput(request: FinalizeDialogueRequest): string {
-  const catalog = buildPlanningTruthCatalog(request.context);
-  const usableAssetIds = request.context.referenceAssessment.assetAssessments
+  return validateDialogueUpstreamInputs(request.context, request.globalPlan, request.keyPointPlan, request.creativeDirection);
+}
+
+function validateDialogueUpstreamInputs(
+  context: R2CommittedProductContext,
+  globalPlan: Global4ScenePlan,
+  keyPointPlan: KeyPointPlan,
+  creativeDirection: CreativeDirectionInput
+): string {
+  const catalog = buildPlanningTruthCatalog(context);
+  const usableAssetIds = context.referenceAssessment.assetAssessments
     .filter(item => (item.targetVisibility === 'CLEAR' || item.targetVisibility === 'PARTIAL')
       && (item.identityConfidence === 'HIGH' || item.identityConfidence === 'MEDIUM'))
     .map(item => item.assetId);
   try {
-    if (validateGlobalContinuityState(request.globalPlan.continuity, request.context, request.creativeDirection).length > 0
-      || validatePlan(request.globalPlan, request.context, request.globalPlan.continuity, catalog.map(item => item.id), usableAssetIds).length > 0
-      || validateKeyPointPlan(request.keyPointPlan, request.context, request.globalPlan, catalog).length > 0
-      || validateCreativeDirectionInput(request.creativeDirection).length > 0) {
+    if (validateGlobalContinuityState(globalPlan.continuity, context, creativeDirection).length > 0
+      || validatePlan(globalPlan, context, globalPlan.continuity, catalog.map(item => item.id), usableAssetIds).length > 0
+      || validateKeyPointPlan(keyPointPlan, context, globalPlan, catalog).length > 0
+      || validateCreativeDirectionInput(creativeDirection).length > 0) {
       throw new DialogueFinalizationError('INVALID_INPUT');
     }
     return resolveV1ReviewVoiceIdentity(
       'vi-VN',
-      request.creativeDirection.voiceGender,
-      request.creativeDirection.voiceRegion,
-      request.creativeDirection.voiceStyle
+      creativeDirection.voiceGender,
+      creativeDirection.voiceRegion,
+      creativeDirection.voiceStyle
     );
   } catch (error) {
     if (error instanceof DialogueFinalizationError) throw error;
     throw new DialogueFinalizationError('INVALID_INPUT');
   }
+}
+
+/** Pure proof that a finalized dialogue still belongs to the supplied current upstream inputs. */
+export function validateDialogueUpstreamBinding(
+  dialogue: DialoguePlan,
+  context: R2CommittedProductContext,
+  globalPlan: Global4ScenePlan,
+  keyPointPlan: KeyPointPlan,
+  creativeDirection: CreativeDirectionInput
+): string[] {
+  const issues: string[] = [];
+  let voiceIdentityId: string;
+  try {
+    voiceIdentityId = validateDialogueUpstreamInputs(context, globalPlan, keyPointPlan, creativeDirection);
+  } catch {
+    return ['invalid_upstream'];
+  }
+  if (validateDialoguePlan(dialogue).length > 0) issues.push('dialogue_contract');
+  if (dialogue.productId !== context.productId || dialogue.sourceEvidenceVersion !== context.sourceEvidenceVersion
+    || !sameOrderedStrings(dialogue.canonicalAssetIds, context.canonicalAssetIds)) issues.push('source');
+  if (dialogue.language !== 'vi-VN' || dialogue.voiceIdentityId !== voiceIdentityId) issues.push('voice');
+  if (dialogue.scenes.length !== 4 || dialogue.scenes.some((scene, offset) =>
+    scene.sceneId !== globalPlan.scenes[offset]?.sceneId || scene.index !== globalPlan.scenes[offset]?.index)) issues.push('scene_binding');
+  if (JSON.stringify(dialogue.inputBinding) !== JSON.stringify(buildDialogueInputBinding(globalPlan, keyPointPlan, creativeDirection))) {
+    issues.push('input_binding');
+  }
+  return issues;
 }
 
 function generationSchema(request: FinalizeDialogueRequest): Readonly<Record<string, unknown>> {
@@ -259,7 +309,12 @@ function isDialogueDecision(value: unknown, globalPlan: Global4ScenePlan): value
   });
 }
 
-function compileDialogue(request: FinalizeDialogueRequest, voiceIdentityId: string, decision: DialogueDecision): DialoguePlan {
+function compileDialogue(
+  request: FinalizeDialogueRequest,
+  voiceIdentityId: string,
+  inputBinding: DialogueInputBinding,
+  decision: DialogueDecision
+): DialoguePlan {
   return {
     schemaVersion: SCHEMA_VERSION,
     dialogueVersion: DIALOGUE_V1,
@@ -268,6 +323,7 @@ function compileDialogue(request: FinalizeDialogueRequest, voiceIdentityId: stri
     canonicalAssetIds: request.context.canonicalAssetIds,
     language: 'vi-VN',
     voiceIdentityId,
+    inputBinding,
     scenes: decision.scenes.map(scene => ({
       sceneId: scene.sceneId,
       index: scene.index,

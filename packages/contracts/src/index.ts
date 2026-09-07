@@ -304,6 +304,32 @@ export interface DialogueScene {
   addressedKeyPointIndexes: readonly [1, 2];
   spokenUnitCount: number;
 }
+/** Exact deterministic context consumed by R7-B dialogue generation, excluding top-level source identity. */
+export interface DialogueInputBindingKeyPoint {
+  index: 1 | 2;
+  kind: KeyPointKind;
+  truthRefId: string | null;
+  text: string;
+}
+export interface DialogueInputBindingScene {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  role: Global4SceneRole;
+  physicalObjective: string;
+  primaryAction: ActionId;
+  keyPoints: readonly [DialogueInputBindingKeyPoint, DialogueInputBindingKeyPoint];
+}
+export interface DialogueInputBinding {
+  creative: {
+    audience: string;
+    reviewerPersona: string;
+    tone: string;
+    voiceGender: VoiceGender;
+    voiceRegion: VoiceRegion;
+    voiceStyle: string;
+  };
+  scenes: readonly [DialogueInputBindingScene, DialogueInputBindingScene, DialogueInputBindingScene, DialogueInputBindingScene];
+}
 export interface DialoguePlan {
   schemaVersion: SchemaVersion;
   dialogueVersion: DialogueVersion;
@@ -312,6 +338,7 @@ export interface DialoguePlan {
   canonicalAssetIds: readonly string[];
   language: 'vi-VN';
   voiceIdentityId: VoiceIdentityId;
+  inputBinding: DialogueInputBinding;
   scenes: readonly DialogueScene[];
 }
 export interface PlanningTruthCatalogEntry {
@@ -322,8 +349,12 @@ export interface PlanningTruthCatalogEntry {
 const keyPointPlanKeys = ['schemaVersion', 'keyPointsVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'scenes'] as const;
 const keyPointSceneKeys = ['sceneId', 'index', 'keyPoints'] as const;
 const keyPointKeys = ['index', 'kind', 'truthRefId', 'text'] as const;
-const dialoguePlanKeys = ['schemaVersion', 'dialogueVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'language', 'voiceIdentityId', 'scenes'] as const;
+const dialoguePlanKeys = ['schemaVersion', 'dialogueVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'language', 'voiceIdentityId', 'inputBinding', 'scenes'] as const;
 const dialogueSceneKeys = ['sceneId', 'index', 'dialogue', 'addressedKeyPointIndexes', 'spokenUnitCount'] as const;
+const dialogueInputBindingKeys = ['creative', 'scenes'] as const;
+const dialogueBindingCreativeKeys = ['audience', 'reviewerPersona', 'tone', 'voiceGender', 'voiceRegion', 'voiceStyle'] as const;
+const dialogueBindingSceneKeys = ['sceneId', 'index', 'role', 'physicalObjective', 'primaryAction', 'keyPoints'] as const;
+const dialogueBindingKeyPointKeys = ['index', 'kind', 'truthRefId', 'text'] as const;
 const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every(key => key in value);
@@ -428,6 +459,7 @@ export function validateDialoguePlan(value: unknown): string[] {
   if (!nonBlankContract(plan.productId) || !nonBlankContract(plan.sourceEvidenceVersion)) issues.push('source');
   if (!Array.isArray(plan.canonicalAssetIds) || plan.canonicalAssetIds.some(id => !nonBlankContract(id))) issues.push('assets');
   if (plan.language !== 'vi-VN' || !nonBlankContract(plan.voiceIdentityId)) issues.push('voice');
+  issues.push(...validateDialogueInputBinding(plan.inputBinding));
   if (!Array.isArray(plan.scenes) || plan.scenes.length !== 4) {
     issues.push('scene_count');
     return issues;
@@ -452,6 +484,57 @@ export function validateDialoguePlan(value: unknown): string[] {
       || coverage[1] !== 2) issues.push('coverage');
     const spokenUnitCount = candidate.spokenUnitCount;
     if (typeof spokenUnitCount !== 'number' || !Number.isInteger(spokenUnitCount) || spokenUnitCount <= 0) issues.push('spoken_units');
+  }
+  return issues;
+}
+
+/** Validates the exact, typed, ordered R7-B generation-context binding shape. */
+export function validateDialogueInputBinding(value: unknown): string[] {
+  const issues: string[] = [];
+  if (!hasExactKeys(value, dialogueInputBindingKeys)) return ['input_binding_shape'];
+  const binding = value as Record<string, unknown>;
+  if (!hasExactKeys(binding.creative, dialogueBindingCreativeKeys)) {
+    issues.push('input_binding_creative');
+  } else {
+    const creative = binding.creative as Record<string, unknown>;
+    if (!nonBlankContract(creative.audience) || !nonBlankContract(creative.reviewerPersona)
+      || !nonBlankContract(creative.tone) || !nonBlankContract(creative.voiceStyle)
+      || (creative.voiceGender !== 'FEMALE' && creative.voiceGender !== 'MALE')
+      || (creative.voiceRegion !== 'SOUTH' && creative.voiceRegion !== 'NORTH')) issues.push('input_binding_creative');
+  }
+  const scenes = binding.scenes;
+  if (!Array.isArray(scenes) || scenes.length !== 4) return [...issues, 'input_binding_scene_count'];
+  for (let sceneOffset = 0; sceneOffset < 4; sceneOffset += 1) {
+    const scene = scenes[sceneOffset];
+    if (!hasExactKeys(scene, dialogueBindingSceneKeys)) {
+      issues.push('input_binding_scene_shape');
+      continue;
+    }
+    const candidate = scene as Record<string, unknown>;
+    if (!nonBlankContract(candidate.sceneId) || candidate.index !== sceneOffset + 1
+      || !['HOOK', 'FEATURE', 'PROOF', 'CTA'].includes(candidate.role as string)
+      || !nonBlankContract(candidate.physicalObjective) || !nonBlankContract(candidate.primaryAction)) {
+      issues.push('input_binding_scene');
+    }
+    const keyPoints = candidate.keyPoints;
+    if (!Array.isArray(keyPoints) || keyPoints.length !== 2) {
+      issues.push('input_binding_key_point_count');
+      continue;
+    }
+    for (let pointOffset = 0; pointOffset < 2; pointOffset += 1) {
+      const point = keyPoints[pointOffset];
+      if (!hasExactKeys(point, dialogueBindingKeyPointKeys)) {
+        issues.push('input_binding_key_point_shape');
+        continue;
+      }
+      const keyPoint = point as Record<string, unknown>;
+      if (keyPoint.index !== pointOffset + 1 || !nonBlankContract(keyPoint.text)
+        || (keyPoint.kind !== 'PRODUCT_NAME' && keyPoint.kind !== 'PRODUCT_TRUTH')
+        || (keyPoint.kind === 'PRODUCT_NAME' && keyPoint.truthRefId !== null)
+        || (keyPoint.kind === 'PRODUCT_TRUTH' && !nonBlankContract(keyPoint.truthRefId))) {
+        issues.push('input_binding_key_point');
+      }
+    }
   }
   return issues;
 }
