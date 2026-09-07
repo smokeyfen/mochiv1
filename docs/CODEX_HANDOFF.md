@@ -32,8 +32,9 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - T0-IDENTITY HARDENING: **PASS / LOCKED**
 - Saydi VoiceProvider Boundary: **PASS / LOCKED**
 - T0-LIVE Saydi browser automation, empirical timing, and human listening: **FALLBACK / NOT REQUIRED FOR R7-B**
-- R4.1 Four-Scene / Eight-Key-Point Plan: **PASS / LOCKED locally / awaiting external audit**
-- R7-B Dialogue Finalization: **NEXT / NOT STARTED**
+- R4.1 Four-Scene / Eight-Key-Point Plan: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `026f3a217f3283d09007019714358054ea0983bd`
+- R7-B Dialogue Finalization: **PASS / LOCKED locally / awaiting external audit**
+- R8: **NEXT / NOT STARTED**
 - PRE-F1 INTEGRATION GATE: future runtime check after R8 and P0
 
 The completed live path is:
@@ -162,4 +163,4 @@ R4.1 corrective implementation is FINAL LOCKED / DIRECTLY AUDITED at implementat
 
 ## R7-B Dialogue Finalization V1
 
-R7-B implementation is locked locally at `5b55cba`. `DIALOGUE_V1` is a provider-neutral production input with the committed product/evidence/version/ordered-asset identity, `vi-VN`, one deterministic canonical South review voice identity, and exactly four ordered finalized dialogues. Each scene retains its R4 scene ID and index, declares exactly `[1, 2]` key-point coverage, and receives a deterministic Vietnamese spoken-unit count from Core; the model cannot author that count or the voice identity. R7-B validates R4 and `KEY_POINTS_V1` before any intelligence call, uses one empty-media global generation call followed by one empty-media semantic gate, and fails closed without retries. It is independent of R5, R6, and R7-A. Verification: `npm run typecheck` PASS; `npm test` PASS (184 tests); `npm run benchmark:dry` PASS with action capability state unchanged and all benchmark actions fail-closed UNTESTED; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No live Gemini, Flow, or Saydi calls occurred; no video generations or promotions occurred. R7-B is PASS / LOCKED locally / awaiting external audit. R8 is NEXT / NOT STARTED.
+R7-B corrective implementation is locked locally at `041719b0e2cc93ace334c60772e4b229c694524c`. `DIALOGUE_V1` is a provider-neutral production input with the committed product/evidence/version/ordered-asset identity, `vi-VN`, one deterministic canonical South review voice identity, and exactly four ordered finalized dialogues. Each scene retains its R4 scene ID and index, declares exactly `[1, 2]` key-point coverage, and receives a deterministic Vietnamese spoken-unit count from Core; the model cannot author that count or the voice identity. Before any intelligence call, R7-B reuses `validateGlobalContinuityState(globalPlan.continuity, context, creativeDirection)` alongside R4 and `KEY_POINTS_V1` validation, so continuity voice, location, and committed-source contradictions fail closed. It uses one empty-media global generation call followed by one empty-media semantic gate, and fails closed without retries. It is independent of R5, R6, and R7-A. Verification: `npm run typecheck` PASS; `npm test` PASS (185 tests); `npm run benchmark:dry` PASS with action capability state unchanged and all benchmark actions fail-closed UNTESTED; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No new live Gemini, Flow, or Saydi calls occurred; no new generations or promotions occurred. R7-B is PASS / LOCKED locally / awaiting external audit. R8 is NEXT / NOT STARTED.
