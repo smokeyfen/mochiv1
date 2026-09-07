@@ -35,4 +35,14 @@ export {
   type PlanKeyPointsRequest
 } from './key-points.ts';
 
+export {
+  finalizeDialogue,
+  buildDialogueGenerationInstruction,
+  buildDialogueGenerationInputText,
+  buildDialogueSemanticValidationInstruction,
+  buildDialogueSemanticValidationInputText,
+  DialogueFinalizationError,
+  type FinalizeDialogueRequest
+} from './dialogue.ts';
+
 export { planHumanRealism, HUMAN_REALISM_GLOBAL_CONSTRAINTS, buildHumanRealismInstruction, buildHumanRealismInputText, HumanRealismError } from './human-realism.ts';

@@ -9,6 +9,7 @@
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "dependencies": {
+    "@mochi/core": "*",
     "@mochi/contracts": "*",
     "@mochi/providers": "*"
   },

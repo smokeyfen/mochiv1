@@ -293,6 +293,27 @@ export interface KeyPointPlan {
   canonicalAssetIds: readonly string[];
   scenes: readonly KeyPointPlanScene[];
 }
+
+/** Provider-neutral, deterministic R7-B output for downstream production compilation. */
+export const DIALOGUE_V1 = 'DIALOGUE_V1' as const;
+export type DialogueVersion = typeof DIALOGUE_V1;
+export interface DialogueScene {
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  dialogue: string;
+  addressedKeyPointIndexes: readonly [1, 2];
+  spokenUnitCount: number;
+}
+export interface DialoguePlan {
+  schemaVersion: SchemaVersion;
+  dialogueVersion: DialogueVersion;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  language: 'vi-VN';
+  voiceIdentityId: VoiceIdentityId;
+  scenes: readonly DialogueScene[];
+}
 export interface PlanningTruthCatalogEntry {
   id: string;
   text: string;
@@ -301,6 +322,8 @@ export interface PlanningTruthCatalogEntry {
 const keyPointPlanKeys = ['schemaVersion', 'keyPointsVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'scenes'] as const;
 const keyPointSceneKeys = ['sceneId', 'index', 'keyPoints'] as const;
 const keyPointKeys = ['index', 'kind', 'truthRefId', 'text'] as const;
+const dialoguePlanKeys = ['schemaVersion', 'dialogueVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'language', 'voiceIdentityId', 'scenes'] as const;
+const dialogueSceneKeys = ['sceneId', 'index', 'dialogue', 'addressedKeyPointIndexes', 'spokenUnitCount'] as const;
 const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every(key => key in value);
@@ -392,6 +415,43 @@ export function validateKeyPointPlan(
         issues.push('scene4_new_truth');
       }
     }
+  }
+  return issues;
+}
+
+/** Validates the self-contained DIALOGUE_V1 contract shape and fixed scene layout. */
+export function validateDialoguePlan(value: unknown): string[] {
+  const issues: string[] = [];
+  if (!hasExactKeys(value, dialoguePlanKeys)) return ['shape'];
+  const plan = value as unknown as DialoguePlan;
+  if (plan.schemaVersion !== SCHEMA_VERSION || plan.dialogueVersion !== DIALOGUE_V1) issues.push('version');
+  if (!nonBlankContract(plan.productId) || !nonBlankContract(plan.sourceEvidenceVersion)) issues.push('source');
+  if (!Array.isArray(plan.canonicalAssetIds) || plan.canonicalAssetIds.some(id => !nonBlankContract(id))) issues.push('assets');
+  if (plan.language !== 'vi-VN' || !nonBlankContract(plan.voiceIdentityId)) issues.push('voice');
+  if (!Array.isArray(plan.scenes) || plan.scenes.length !== 4) {
+    issues.push('scene_count');
+    return issues;
+  }
+  const seen = new Set<string>();
+  for (let offset = 0; offset < 4; offset += 1) {
+    const scene = plan.scenes[offset];
+    if (!hasExactKeys(scene, dialogueSceneKeys)) {
+      issues.push('scene_shape');
+      continue;
+    }
+    const candidate = scene as Record<string, unknown>;
+    const sceneId = candidate.sceneId;
+    const hasSceneId = nonBlankContract(sceneId);
+    if (candidate.index !== offset + 1 || !hasSceneId || (hasSceneId && seen.has(sceneId))) issues.push('scene_binding');
+    if (hasSceneId) seen.add(sceneId);
+    if (!nonBlankContract(candidate.dialogue)) issues.push('dialogue');
+    const coverage = candidate.addressedKeyPointIndexes;
+    if (!Array.isArray(coverage)
+      || coverage.length !== 2
+      || coverage[0] !== 1
+      || coverage[1] !== 2) issues.push('coverage');
+    const spokenUnitCount = candidate.spokenUnitCount;
+    if (typeof spokenUnitCount !== 'number' || !Number.isInteger(spokenUnitCount) || spokenUnitCount <= 0) issues.push('spoken_units');
   }
   return issues;
 }
