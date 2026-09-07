@@ -37,6 +37,7 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - R8: **FINAL LOCKED / DIRECTLY AUDITED** at corrective implementation `d13b6b307377189af40d2e14dd699ddc8341e748`
 - P0 Production Snapshot Persistence: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`
 - PRE-F1-A Integration Harness: **PASS / LOCKED locally / awaiting external audit** at implementation `b1bf248c1eabacaf4a6c88abd67de138f6a98169`
+- F0-B Trusted Capability Evidence Foundation: **PASS / LOCKED locally / awaiting external audit**
 - PRE-F1-LIVE: **BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN**
 - F1: **NOT STARTED**
 
@@ -60,6 +61,7 @@ R2-B Reference Assessment is locked. It analyzes exactly one runtime image per c
 - `packages/reasoning`: provider-neutral reasoning modules; R2-A deterministically compiles ProductTruth from ProductEvidence.
 - `packages/providers`: Gemini 3.5 Flash intelligence adapter only. It is not a video provider.
 - `apps/harness`: dry feasibility runner; its expected output remains fail-closed `action_untested:PICK_UP`.
+- `apps/harness/src/f0-capability-campaign.ts`: approved deterministic 30-case Cocoon bottle capability campaign and trusted status entry point.
 - `docs/quality/RUBRIC_0.md`: human-review instructions for one real generated benchmark scene.
 
 ## Frozen V1 architecture
@@ -100,6 +102,12 @@ Baseline transfer confidence is accepted for roadmap continuation because the co
 F0-A.4 ROTATE_SLOW is DEFERRED. No additional per-action runtime validation is required while implementing R2-A, R2-B, R2 Commit Gate, R3, R4, R5, R6, R7-A, T0, R7-B, R8, and P0. These milestones must retain strict contracts, deterministic validation, unit/integration tests, provider-neutral boundaries, and fail-closed behavior.
 
 The next consolidated runtime checkpoint is **PRE-F1 INTEGRATION GATE**, only after R8 and P0 are PASS / LOCKED. At PRE-F1, perform one consolidated real-runtime validation of the completed reasoning/compiler pipeline before implementing or enabling the final Flow runtime path.
+
+## F0-B Trusted Capability Evidence Foundation
+
+`F0_BOTTLE_BASELINE_CAPABILITY_V1` is the isolated, provider-neutral campaign authority for the canonical Cocoon bottle fixture. It contains only PICK_UP, HOLD, and ROTATE_SLOW, with 10 planned cases per action (30 total), and preserves the exact historical attempt-one case objects. The core trusted derivation accepts only explicitly supplied human-reviewed `BenchmarkObservation` records that pass `validateBenchmarkObservation`, have REAL_MODEL_VIDEO origin, match the fixture/archetype/action/case scope, and have globally unique observation, candidate-asset, and case IDs. It delegates all classification math to `classifyCapabilityEvidence` and `DEFAULT_CAPABILITY_PROMOTION_POLICY`; rejected evidence is reported rather than silently counted.
+
+Current trusted evidence remains PICK_UP 1 reviewed PASS, HOLD 1 reviewed PASS, ROTATE_SLOW 0. All actions remain UNTESTED, current promotions are 0, campaignReady is false, and 28 reviewed attempts remain to reach the three minimum sample counts (9 / 9 / 10). This count does not guarantee SAFE. Rubric-0 remains the only human review rubric; no automatic review, observation creation, promotion, provider call, or PRE-F1 map connection exists. `npm run benchmark:capability:dry` is deterministic and repository-only. PRE-F1-A is FINAL LOCKED / DIRECTLY AUDITED at `b1bf248c1eabacaf4a6c88abd67de138f6a98169`; PRE-F1-LIVE remains BLOCKED / NOT RUN; F1 is NOT STARTED. Next after F0-B external audit: controlled Flow benchmark execution planning.
 
 RUBRIC-0 still evaluates one generated benchmark scene against actual generated video, real product references, and the benchmark contract. It does not add artificial cross-scene continuity to F0. Pairwise and global continuity QC belong to the later production pipeline.
 

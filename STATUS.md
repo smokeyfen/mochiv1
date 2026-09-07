@@ -5,7 +5,7 @@
 - Current verified implementation commit: `b1bf248c1eabacaf4a6c88abd67de138f6a98169` (PRE-F1-A bounded-replan correction)
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: PRE-F1-A Consolidated Production Runtime Integration Harness — LOCAL LOCKED
+- Current milestone: F0-B Trusted Action Capability Evidence Foundation V1 — LOCAL LOCKED
 - Milestone status: PASS / LOCKED locally / awaiting external audit
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
@@ -14,10 +14,12 @@
 - Historical Flow benchmark generations: 2 (24 credits); new Flow calls in this Codex task: 0
 - Real generation count: 2
 - Architecture deviations: none
-- Next action: Flow benchmark/capability evidence foundation needed to obtain trusted empirical ActionCapability classifications without weakening the locked 10-attempt / 0.90 SAFE / 0.60 RISKY policy. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY and is NOT RUN; it is not the immediate next action. R4.1 is FINAL LOCKED / DIRECTLY AUDITED at `026f3a217f3283d09007019714358054ea0983bd`; R7-B at `696ffea000c4f804472ffaebdd180ec236e68546`; R8 at `d13b6b307377189af40d2e14dd699ddc8341e748`; P0 at `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`. F1 is NOT STARTED.
+- Next action: F0-B external audit followed by controlled Flow benchmark execution planning. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY and is NOT RUN; it is not the immediate next action. R4.1 is FINAL LOCKED / DIRECTLY AUDITED at `026f3a217f3283d09007019714358054ea0983bd`; R7-B at `696ffea000c4f804472ffaebdd180ec236e68546`; R8 at `d13b6b307377189af40d2e14dd699ddc8341e748`; P0 at `21de4528e318cf8d48ea8b0752fe0217a2ea1a0b`. F1 is NOT STARTED.
 - P0 verification: `npm run typecheck` PASS; `npm test` PASS (206 tests); `npm run benchmark:dry` PASS with all actions fail-closed `UNTESTED`; `npm run build -w @mochi/web` PASS; `git diff --check` PASS. No IntelligenceProvider, live Gemini, Flow, or Saydi calls; no video generations or ActionCapability promotions.
 
 No action has been promoted from `UNTESTED`.
+
+F0-B Trusted Capability Evidence Foundation V1: PASS / LOCKED locally / awaiting external audit. `F0_BOTTLE_BASELINE_CAPABILITY_V1` binds only the canonical Cocoon bottle fixture and PICK_UP, HOLD, and ROTATE_SLOW. It plans exactly 30 deterministic cases (10 per action), preserves each historical attempt-one case, and derives capability only from explicit human-reviewed REAL_MODEL_VIDEO observations that pass Rubric-0 validation and campaign binding checks. Current accepted evidence is PICK_UP 1, HOLD 1, ROTATE_SLOW 0; every ActionId remains UNTESTED, campaignReady is false, promotions are 0, and 28 reviewed attempts remain to reach minimum sample counts (9 / 9 / 10). This count does not guarantee SAFE. `npm run benchmark:capability:dry` is repository-only and makes no external calls. PRE-F1-A is FINAL LOCKED / DIRECTLY AUDITED at `b1bf248c1eabacaf4a6c88abd67de138f6a98169`; PRE-F1-LIVE remains BLOCKED / NOT RUN; F1 is NOT STARTED. No new empirical result, Gemini call, Flow call, Saydi call, video generation, or ActionCapability promotion occurred. Next after external audit: controlled Flow benchmark execution planning.
 
 Core `AssetRef` contains only schema version, logical asset identity and provider-agnostic metadata. Resolved provider asset bindings exist only in `packages/providers`.
 
