@@ -11,7 +11,8 @@ import {
   type Global4ScenePlan,
   type HumanRealism4ScenePlan,
   type KeyPointPlan,
-  type R2CommittedProductContext
+  type R2CommittedProductContext,
+  validateProductionContractV1
 } from '@mochi/contracts';
 import { countVietnameseSpokenUnits, createUntestedActionCapabilityMap } from '@mochi/core';
 import {
@@ -73,6 +74,14 @@ function fixture() {
   return { context, creativeDirection: creative, globalPlan: plan, keyPointPlan: pointPlan, statePlan, riskAssessment: evaluateSceneRisk(statePlan, capabilityMap), capabilityMap, humanRealismPlan, dialoguePlan };
 }
 const invalidInput = (request: ReturnType<typeof fixture>) => assert.throws(() => compileProductionContract(request), (error: unknown) => error instanceof ProductionCompilerError && error.code === 'INVALID_INPUT');
+function rebuildDialogueBinding(request: ReturnType<typeof fixture>) {
+  request.dialoguePlan = { ...request.dialoguePlan, inputBinding: buildDialogueInputBinding(request.globalPlan, request.keyPointPlan, request.creativeDirection) };
+}
+function collectObjectKeys(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return [];
+  if (Array.isArray(value)) return value.flatMap(collectObjectKeys);
+  return Object.keys(value).flatMap(key => [key, ...collectObjectKeys((value as Record<string, unknown>)[key])]);
+}
 
 test('R8 compiles exactly four ordered provider-neutral contracts from no provider dependency', () => {
   const request = fixture(); const output = compileProductionContract(request);
@@ -121,12 +130,39 @@ test('R8 binding makes every production-relevant upstream change invalidate an o
   assert.ok(validateProductionContractAgainstUpstream(output, changed).length > 0);
 });
 
-test('R8 excludes retired R4 drafts and rejects malformed, reordered, voice-contradictory, and provider-specific contracts', () => {
+test('R8 permits a legitimate Product Name containing Flow and remains byte-repeatable', () => {
+  const request = fixture();
+  request.context = { ...request.context, productTruth: { ...request.context.productTruth, name: 'Flow Mochi Original' } };
+  request.keyPointPlan = { ...request.keyPointPlan, scenes: request.keyPointPlan.scenes.map((scene, sceneIndex) => sceneIndex === 0 ? { ...scene, keyPoints: scene.keyPoints.map((point, pointIndex) => pointIndex === 0 ? { ...point, text: 'Flow Mochi Original' } : point) } : scene) };
+  rebuildDialogueBinding(request);
+  assert.deepEqual(compileProductionContract(request), compileProductionContract(request));
+});
+
+test('R8 preserves legitimate provider-like assigned key-point text exactly', () => {
+  const request = fixture();
+  request.context = { ...request.context, productTruth: { ...request.context.productTruth, identityDescription: 'Flow factual identity' } };
+  request.keyPointPlan = { ...request.keyPointPlan, scenes: request.keyPointPlan.scenes.map(scene => ({ ...scene, keyPoints: scene.keyPoints.map(point => point.truthRefId === 'identity' ? { ...point, text: 'Flow factual identity' } : point) })) };
+  rebuildDialogueBinding(request);
+  const output = compileProductionContract(request);
+  assert.equal(output.scenes[0].keyPoints[1].text, 'Flow factual identity');
+});
+
+test('R8 preserves legitimate provider-like finalized dialogue text char-for-char', () => {
+  const request = fixture();
+  request.dialoguePlan = { ...request.dialoguePlan, scenes: request.dialoguePlan.scenes.map((scene, index) => index === 0 ? { ...scene, dialogue: 'Món này có chữ Flow trên nhãn nè.', spokenUnitCount: countVietnameseSpokenUnits('Món này có chữ Flow trên nhãn nè.') } : scene) };
+  rebuildDialogueBinding(request);
+  const output = compileProductionContract(request);
+  assert.equal(output.scenes[0].dialogue, 'Món này có chữ Flow trên nhãn nè.');
+  assert.ok(output.scenes[0].productionPrompt.includes('Món này có chữ Flow trên nhãn nè.'));
+});
+
+test('R8 excludes retired R4 drafts, preserves structural provider neutrality, and rejects malformed contracts', () => {
   const request = fixture(); const output = compileProductionContract(request); const encoded = JSON.stringify(output);
   assert.equal(encoded.includes('retired-r4-draft-must-not-appear'), false);
-  assert.equal(/\b(?:flow|gemini|saydi|leda\s+custom|achird)\b/i.test(encoded), false);
+  assert.equal(collectObjectKeys(output).some(key => ['provider', 'providerId', 'model', 'modelId', 'endpoint', 'credentials', 'sessionId', 'providerMediaId', 'voiceBinding', 'savedVoiceName', 'generationConfiguration'].includes(key)), false);
   assert.ok(validateProductionContractAgainstUpstream({ ...output, voiceIdentityId: 'other' }, request).length > 0);
   assert.ok(validateProductionContractAgainstUpstream({ ...output, scenes: [output.scenes[1]!, output.scenes[0]!, output.scenes[2]!, output.scenes[3]!] }, request).length > 0);
-  assert.ok(validateProductionContractAgainstUpstream({ ...output, scenes: output.scenes.map((scene, index) => index === 0 ? { ...scene, extra: true } : scene) as typeof output.scenes }, request).length > 0);
-  assert.ok(validateProductionContractAgainstUpstream({ ...output, scenes: output.scenes.map((scene, index) => index === 0 ? { ...scene, productionPrompt: 'Gemini' } : scene) as typeof output.scenes }, request).length > 0);
+  const injectedProviderField = { ...output, scenes: output.scenes.map((scene, index) => index === 0 ? { ...scene, provider: 'untrusted' } : scene) as typeof output.scenes };
+  assert.ok(validateProductionContractV1(injectedProviderField).length > 0);
+  assert.ok(validateProductionContractAgainstUpstream(injectedProviderField, request).length > 0);
 });

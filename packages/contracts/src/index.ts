@@ -613,7 +613,6 @@ const productionContractKeys=['schemaVersion','productionContractVersion','produ
 const productionBindingKeys=['scenes'] as const;
 const productionBindingSceneKeys=['sceneId','index','role','physicalObjective','primaryAction','desiredStateEffect','startState','endState','referenceAssetIds','keyPoints','humanRealismBehavior','dialogue','spokenUnitCount','voiceIdentityId'] as const;
 const productionSceneKeys=[...productionBindingSceneKeys,'durationSeconds','aspectRatio','productionPrompt'] as const;
-const providerSpecificPattern=/\b(?:flow|gemini|saydi|leda\s+custom|achird)\b/i;
 
 /** Validates R8's standalone exact shape. Current-upstream proof lives in the R8 compiler validator. */
 export function validateProductionContractV1(value: unknown): string[] {
@@ -640,7 +639,6 @@ export function validateProductionContractV1(value: unknown): string[] {
       ||!nonBlankContract(scene.dialogue)||!Number.isInteger(scene.spokenUnitCount)||scene.spokenUnitCount<=0||!nonBlankContract(scene.voiceIdentityId)||!nonBlankContract(scene.productionPrompt)) issues.push('scene_fields');
     if(scene.voiceIdentityId!==plan.voiceIdentityId) issues.push('voice');
   }
-  if(providerSpecificPattern.test(JSON.stringify(plan))) issues.push('provider_specific');
   return issues;
 }
 
