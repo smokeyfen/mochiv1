@@ -43,7 +43,8 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - V1 Simple-Action Fast-Track: **IMPLEMENTATION PASS** at `8e11464`
 - Task 2 Visual Rhythm + SceneAnchor + Compact Flow Prompt Compiler: **FINAL LOCKED / DIRECTLY AUDITED** at `098c15f7200a50eb2a82062113045da99df71368`; no provider calls or generation
 - Task 3 Flow production boundary + native voice binding: **FINAL LOCKED / DIRECTLY AUDITED** at `5422a2d765c1d02fc72d031fbf8f352cd4470f27`; no Flow runtime or generation
-- Task 4 Unified Scene QC V1: **IMPLEMENTATION PASS** at `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756`; deterministic mocked validation only, no live QC
+- Task 4 Unified Scene QC V1: **FINAL LOCKED / DIRECTLY AUDITED** at `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756`; deterministic mocked validation only, no live QC
+- Task 5 Four-scene Production + Pairwise/Global Continuity QC: **IMPLEMENTATION PASS** at `721766f9438bf909fe97e98f9f41aa32d794997a`; no live generation or QC
 - PRE-F1-LIVE: **BLOCKED_BY_ENVIRONMENT** — missing `PRE_F1_LIVE=1`, `GEMINI_API_KEY`, `PRE_F1_LIVE_MANIFEST`, and `PRE_F1_SNAPSHOT_STORAGE_ROOT`; 0 Gemini/Flow/Saydi calls
 - F1: **NOT STARTED**
 

@@ -2,10 +2,10 @@
 
 - Branch: `codex/feasibility-lock-candidate`
 - Main bootstrap commit: `75fd0e5d80531de9d1bb8cbec9899c32d269fab4`
-- Current verified implementation commit: `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756` (Task 4 Unified Scene QC V1)
+- Current verified implementation commit: `721766f9438bf909fe97e98f9f41aa32d794997a` (Task 5 Four-Scene Production + Continuity QC)
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: Task 4 Unified Scene QC V1 + PRE-F1-LIVE
+- Current milestone: Task 5 Four-Scene Production + Continuity QC + PRE-F1-LIVE
 - Milestone status: IMPLEMENTATION PASS; PRE-F1-LIVE BLOCKED_BY_ENVIRONMENT
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
@@ -27,7 +27,9 @@ Task 3 Flow production boundary at implementation `5422a2d765c1d02fc72d031fbf8f3
 
 Task 4 Unified Scene QC V1 at implementation `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756`: provider-neutral `GENERATED_SCENE_CANDIDATE_V1` retains only logical candidate identity, exact dialogue, logical voice, and `QC_PENDING`; the Flow mapper drops operation, artifact, and resolved-reference metadata. `SCENE_QC_V1` consumes the candidate video and exact ordered authoritative reference images in one structured IntelligenceProvider call, then deterministically compiles all critical Frame (`PRODUCT_FIDELITY`, `HAND_ANATOMY`, `VISIBLE_ARTIFACTS`, `REVIEWER_FACE_VISIBILITY`), Temporal (`ACTION_COMPLETION`, `PHYSICS`, `CAMERA_REALISM`, `UNEXPECTED_CUTS`, `START_STATE_MATCH`, `END_STATE_MATCH`), and Speech gates. Vietnamese lexical comparison is NFC normalization, `vi-VN` lowercase, punctuation/symbol removal, whitespace collapse, and trim; diacritics and lexical words remain significant. Every critical gate must pass; presentation dynamics is independent, non-critical `PASS`/`WARN`. Invalid deterministic input makes zero calls; a normal candidate makes exactly one; malformed model output and provider failures fail closed. Reports contain no Base64 or Flow runtime metadata and never approve a candidate. Gemini 3.5 Flash validation now accepts nonblank text-only requests with `media=[]`, while no-input and invalid-media requests still fail closed. No live QC, Gemini, Flow, or Saydi call occurred.
 
-Current remaining roadmap: Task 5 Four-scene Orchestrator + Pairwise + Global Continuity QC; Task 6 Selective Repair + Final Acceptance; Task 7 Delivery + Production UI + V1 E2E. A supported real Flow runtime and live canary remain required before final V1 acceptance.
+Task 5 Four-Scene Production + Continuity QC at implementation `721766f9438bf909fe97e98f9f41aa32d794997a`: `FOUR_SCENE_PRODUCTION_V1` validates exact P0/anchor binding, role order, identical hard continuity, and deterministic state handoffs before sequential compile → generate → candidate-map → media-resolve → `SCENE_QC_V1`. A scene failure stops subsequent generation and makes no sequence call. After four scene passes, exactly one unified Sequence QC call assesses three ordered pairs using `PRODUCT_IDENTITY_CONTINUITY`, `HAND_IDENTITY_CONTINUITY`, `ENVIRONMENT_CONTINUITY`, `LIGHTING_CONTINUITY`, `VISIBLE_STATE_HANDOFF`, and `NO_UNEXPLAINED_IDENTITY_RESET`, plus global `PRODUCT_CONSISTENCY`, `HAND_CONSISTENCY`, `ENVIRONMENT_LIGHTING_CONSISTENCY`, `SPEAKER_CONSISTENCY`, `SEQUENCE_COHERENCE`, and `NARRATIVE_ROLE_COHERENCE`. Audible speaker/timbre identity is critical; allowed role-appropriate prosody and soft framing variation are not failures. `VISUAL_VARIATION` is non-critical PASS/WARN. No live Flow, Gemini, or Saydi call occurred.
+
+Current remaining roadmap: Task 6 Selective Repair + Final Acceptance; Task 7 Delivery + Production UI + Runtime Activation + V1 E2E. A supported real Flow runtime and live canary remain required before final V1 acceptance.
 
 F0-B Trusted Capability Evidence Foundation V1: FINAL LOCKED / DIRECTLY AUDITED at `da3b289c76795e2a33360525c11e1ca4451fcffa`. `F0_BOTTLE_BASELINE_CAPABILITY_V1` binds only the canonical Cocoon bottle fixture and PICK_UP, HOLD, and ROTATE_SLOW. It plans exactly 30 deterministic cases (10 per action), preserves each historical attempt-one case, and derives capability only from explicit human-reviewed REAL_MODEL_VIDEO observations that pass Rubric-0 validation and campaign binding checks. Current accepted evidence is PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, and ROTATE_SLOW 1/10 UNTESTED; `campaignReady=false`, promotions=0, and 25 reviewed attempts remain to reach the minimum sample counts (8 / 8 / 9). This count does not guarantee SAFE.
 
