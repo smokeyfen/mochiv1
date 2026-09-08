@@ -30,10 +30,8 @@ function enterValidProjectInput() {
   fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Mochi bottle' } });
   fireEvent.change(screen.getByLabelText('Product Details'), { target: { value: 'Factual bottle description' } });
   fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Beauty' } });
-  fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'Skincare shoppers' } });
-  fireEvent.change(screen.getByLabelText('Shooting Context'), { target: { value: 'Vanity in daylight' } });
-  fireEvent.change(screen.getByLabelText('Reviewer Persona'), { target: { value: 'Practical reviewer' } });
-  fireEvent.change(screen.getByLabelText('Tone'), { target: { value: 'Warm and factual' } });
+  fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'PRACTICAL_BUYERS' } });
+  fireEvent.change(screen.getByLabelText('Shooting Context'), { target: { value: 'INDOOR_TABLE_REVIEW' } });
   selectProductImage();
 }
 
@@ -62,11 +60,20 @@ function mockReadyRuntime(analysis:(()=>Response)|undefined=undefined) {
 }
 
 describe('App', () => {
-  it('renders canonical product and creative form fields', () => {
+  it('renders the simplified deterministic creative controls', () => {
     render(<App />);
-    for (const label of ['Product Name', 'Product Details', 'Category', 'Add product images', 'Audience', 'Shooting Context', 'Reviewer Persona', 'Tone', 'Voice Gender']) {
+    for (const label of ['Product Name', 'Product Details', 'Category', 'Add product images', 'Audience', 'Shooting Context']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    expect(screen.getByLabelText('Audience').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('Shooting Context').tagName).toBe('SELECT');
+    expect(screen.getAllByRole('option', { name: /Tự động theo sản phẩm/ })).toHaveLength(2);
+    expect(screen.getByLabelText('Audience')).toHaveValue('AUTO_PRODUCT_FIT');
+    expect(screen.getByLabelText('Shooting Context')).toHaveValue('AUTO_PRODUCT_FIT');
+    expect(screen.queryByLabelText('Reviewer Persona')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Tone')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NỮ' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'NAM' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
   });
@@ -86,7 +93,7 @@ describe('App', () => {
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
     expect(preview.projectId).toMatch(/^project-/);
     expect(preview.product.productId).toMatch(/^product-/);
-    expect(preview.creativeDirection.audience).toBe('Skincare shoppers');
+    expect(preview.creativeDirection.audience).toBe('PRACTICAL_BUYERS');
     expect(preview.product.audience).toBeUndefined();
     expect(preview.creativeDirection).toMatchObject({ voiceGender: 'FEMALE', voiceRegion: 'SOUTH' });
   });
@@ -110,11 +117,11 @@ describe('App', () => {
     render(<App />);
     enterValidProjectInput();
     submitProject();
-    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'New audience' } });
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'GIFT_BUYERS' } });
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
 
     submitProject();
-    fireEvent.change(screen.getByLabelText('Voice Gender'), { target: { value: 'MALE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
     expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
 
   });
@@ -122,7 +129,7 @@ describe('App', () => {
   it('locks the V1 voice surface to Female or Male with South review metadata', () => {
     render(<App />);
     enterValidProjectInput();
-    fireEvent.change(screen.getByLabelText('Voice Gender'), { target: { value: 'MALE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
     submitProject();
     const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
     expect(preview.creativeDirection).toMatchObject({ voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' });
@@ -233,7 +240,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'A new audience' } });
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'YOUNG_ADULTS_GEN_Z' } });
     expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
     selectProductImage('side.jpg');
