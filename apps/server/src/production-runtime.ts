@@ -2,7 +2,10 @@ import {
   validateCreativeDirectionInput,
   validateProductInput,
   validateProductionSnapshotV1,
+  PRE_F1_RUNTIME_STAGES,
+  isPreF1RuntimeStage,
   type CreativeDirectionInput,
+  type PreF1RuntimeStage,
   type ProductInput,
   type ProductionSnapshotV1
 } from '@mochi/contracts';
@@ -28,31 +31,8 @@ import {
 import { type ProductionSnapshotStore } from './production-snapshot.ts';
 
 /** Ordered safe evidence for the one controlled PRE-F1 runtime invocation. */
-export const PRE_F1_RUNTIME_STAGES = [
-  'VALIDATE_INPUT',
-  'R1_PRODUCT_EVIDENCE',
-  'R2_A_PRODUCT_TRUTH',
-  'R2_B_REFERENCE_ASSESSMENT',
-  'R2_COMMIT',
-  'R3_CONTINUITY',
-  'R4_GLOBAL_PLAN',
-  'R5_INITIAL_STATE',
-  'R6_INITIAL_RISK',
-  'R6_BOUNDED_REPLAN',
-  'R5_FINAL_STATE',
-  'R6_FINAL_RISK',
-  'R6_READY_GATE',
-  'R7_A_HUMAN_REALISM',
-  'R4_1_KEY_POINTS',
-  'R7_B_DIALOGUE',
-  'R8_PRODUCTION_CONTRACT',
-  'P0_CREATE_PERSIST',
-  'P0_LOAD',
-  'P0_EQUALITY',
-  'RETURN_VALIDATE'
-] as const;
-
-export type PreF1RuntimeStage = typeof PRE_F1_RUNTIME_STAGES[number];
+export { PRE_F1_RUNTIME_STAGES, isPreF1RuntimeStage };
+export type { PreF1RuntimeStage };
 export interface PreF1RuntimeTraceEntry { readonly stage: PreF1RuntimeStage; readonly status: 'COMPLETED'; }
 
 /** All caller-controlled runtime input. No computed R2–R8 artifact can enter here. */

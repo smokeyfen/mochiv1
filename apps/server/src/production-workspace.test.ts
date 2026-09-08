@@ -17,9 +17,9 @@ const global=['PRODUCT_CONSISTENCY','HAND_CONSISTENCY','ENVIRONMENT_LIGHTING_CON
 const pass=(gates:readonly string[])=>gates.map(gate=>({gate,status:'PASS'}));
 
 function createMock() {
-  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false; let sceneQcThrows=false;
+  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false; let sceneQcThrows=false; let targetedReplanThrows=false;
   const provider: IntelligenceProvider={id:'mock-delivery',async analyzeStructured<T>(input:StructuredIntelligenceRequest<T>){requests.push(input as StructuredIntelligenceRequest<unknown>); const parsed=(input.instruction.startsWith('SCENE_QC_V1:')||input.instruction.startsWith('SEQUENCE_QC_V1:'))?JSON.parse(input.inputText??'{}') as Record<string,unknown>:{};
-    if(input.instruction.startsWith('TARGETED REPLAN:')) return {data:input.parse({physicalObjective:'mục tiêu replanned',primaryAction:'HOLD',desiredStateEffect:'REMAIN_HELD',dialogueDraft:'R4 replanned draft',referenceAssetIds:['reference-1']})};
+    if(input.instruction.startsWith('TARGETED REPLAN:')) { if(targetedReplanThrows) throw new Error('raw provider exception must not leave the server'); return {data:input.parse({physicalObjective:'mục tiêu replanned',primaryAction:'HOLD',desiredStateEffect:'REMAIN_HELD',dialogueDraft:'R4 replanned draft',referenceAssetIds:['reference-1']})}; }
     if(input.instruction.startsWith('SCENE_QC_V1:')) { if(sceneQcThrows) throw new Error('mock QC unavailable'); const sceneId=parsed.sceneId as string, candidateAssetId=parsed.candidateAssetId as string, failed=scene2Fail&&sceneId.endsWith(':scene:2'); return {data:input.parse({sceneId,candidateAssetId,frame:failed?[{gate:'PRODUCT_FIDELITY',status:'FAIL'},...pass(frame.slice(1))]:pass(frame),temporal:pass(temporal),speechDetected:true,spokenTranscript:parsed.expectedDialogue,dialogueComplete:true,unexpectedSpeechDetected:false,presentationDynamics:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     if(input.instruction.startsWith('SEQUENCE_QC_V1:')) { const reports=parsed.reports as {sceneId:string}[]; return {data:input.parse({pairs:[0,1,2].map(index=>({fromSceneId:reports[index]!.sceneId,toSceneId:reports[index+1]!.sceneId,gates:sequenceFail?[{gate:'PRODUCT_IDENTITY_CONTINUITY',status:'FAIL'},...pass(pair.slice(1))]:pass(pair)})),global:pass(global),visualVariation:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     const data=[
@@ -34,7 +34,7 @@ function createMock() {
       {scenes:Array.from({length:4},()=>({coversKeyPoint1:true,coversKeyPoint2:true,introducesUnsupportedProductFact:false,naturalSouthernConversationalVietnamese:true,containsStageDirectionOrNonSpeechText:false})),sameReviewerPersonaAcrossScenes:true}
     ][runtimeCall++ % 9]; return {data:input.parse(data)};
   }};
-  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;},setSceneQcThrows:(value:boolean)=>{sceneQcThrows=value;}};
+  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;},setSceneQcThrows:(value:boolean)=>{sceneQcThrows=value;},setTargetedReplanThrows:(value:boolean)=>{targetedReplanThrows=value;}};
 }
 
 const validVideoInspector={async inspect(){return {container:'MP4' as const,width:1080,height:1920,durationMs:8000,rotationDegrees:0 as const};}};
@@ -48,6 +48,11 @@ test('Task 7B clean mocked browser E2E delivers byte-exact files and determinist
   for(const [index,filename] of ['scene-01.mp4','scene-02.mp4','scene-03.mp4','scene-04.mp4'].entries()) assert.deepEqual(service.deliveryOutput(build.snapshotId,filename as DeliveryOutputName).bytes,Buffer.from(`video-${index+1}`));
   const text=Buffer.from(service.deliveryOutput(build.snapshotId,'key-points.txt').bytes).toString('utf8'); const lines=text.trimEnd().split('\n'); assert.equal(lines.length,8); assert.equal(lines[0],project.product.name); assert.ok(lines.every(line=>line.length>0));
   assert.equal(mock.requests.filter(request=>request.instruction.startsWith('SCENE_QC_V1:')).length,4); assert.equal(mock.requests.filter(request=>request.instruction.startsWith('SEQUENCE_QC_V1:')).length,1); assert.equal(service.recordDelivery(build.snapshotId).status,'DELIVERED');
+}));
+
+test('a ProductionRuntimeError retains its canonical failing stage at the workspace boundary', async()=>withWorkspace(async({service,mock})=>{
+  mock.setTargetedReplanThrows(true);
+  await assert.rejects(service.build(project,references),(error:unknown)=>error instanceof ProductionWorkspaceError&&error.code==='PRODUCTION_BUILD_FAILED'&&error.stage==='R6_BOUNDED_REPLAN');
 }));
 
 test('failed Scene 2 repair creates attempt two, preserves other reports, and requires a rerun before delivery', async()=>withWorkspace(async({service,mock})=>{

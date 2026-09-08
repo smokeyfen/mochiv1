@@ -1,14 +1,15 @@
-import type { MochiProjectInput } from '@mochi/contracts';
+import { isPreF1RuntimeStage, type MochiProjectInput, type PreF1RuntimeStage } from '@mochi/contracts';
 
 export type RuntimeStatus='GEMINI_READY'|'GEMINI_NOT_CONFIGURED';
+export type { PreF1RuntimeStage };
 export type SceneLifecycle='WAITING'|'READY_FOR_FLOW'|'VIDEO_UPLOADED'|'QC_RUNNING'|'QC_PASS'|'QC_FAIL';
 export interface SceneView { sceneId:string; index:number; role:'HOOK'|'FEATURE'|'PROOF'|'CTA'; primaryAction:string; startSummary:string; endSummary:string; keyPoints:[string,string]; dialogue:string; voiceLabel:string; visualRhythm:string; prompt:string; promptCharacterCount:number; promptBudgetStatus:string; lifecycleStatus:SceneLifecycle; referenceAssetIds:string[]; candidateAssetId:string; attempt:number; qcReport?:{result:string;frameGates:{gate:string;status:string}[];temporalGates:{gate:string;status:string}[];speechGates:{gate:string;status:string}[];expectedDialogue:string;detectedTranscript:string;exactDialogueMatch:string;presentationDynamics:{status:'PASS'|'WARN';notes:string}}; }
 export interface SequenceView { status:string;pairs:{fromSceneId:string;toSceneId:string;gates:{gate:string;status:string}[]}[];globalGates:{gate:string;status:string}[];visualVariation:'PASS'|'WARN'; }
 export interface FinalAcceptanceView { version:'FINAL_ACCEPTANCE_V1'; status:'FINAL_ACCEPTANCE_PASS'|'FINAL_ACCEPTANCE_BLOCKED'; blockerCodes:string[]; }
 export type DeliveryOutputName='scene-01.mp4'|'scene-02.mp4'|'scene-03.mp4'|'scene-04.mp4'|'key-points.txt';
 export interface DeliveryManifest { version:'DELIVERY_PACKAGE_V1'; status:'NOT_READY'|'READY_FOR_DELIVERY'|'DELIVERED'; outputs:{filename:DeliveryOutputName;mimeType:'video/mp4'|'text/plain; charset=utf-8'}[]; }
-export class ProductionClientError extends Error { constructor(readonly code:string){super(code);} }
-async function body(response:Response):Promise<any>{ let value:any; try{value=await response.json();}catch{throw new ProductionClientError('INVALID_RESPONSE');} if(!response.ok||value?.ok!==true)throw new ProductionClientError(value?.error?.code??'INVALID_RESPONSE'); return value; }
+export class ProductionClientError extends Error { constructor(readonly code:string,readonly stage?:PreF1RuntimeStage){super(code);} }
+async function body(response:Response):Promise<any>{ let value:any; try{value=await response.json();}catch{throw new ProductionClientError('INVALID_RESPONSE');} if(!response.ok||value?.ok!==true){const code=value?.error?.code??'INVALID_RESPONSE';throw new ProductionClientError(code,code==='PRODUCTION_BUILD_FAILED'&&isPreF1RuntimeStage(value?.error?.stage)?value.error.stage:undefined);} return value; }
 export async function runtimeStatus():Promise<RuntimeStatus>{return (await body(await fetch('/api/runtime/status'))).status;}
 export async function connectGemini(apiKey:string):Promise<RuntimeStatus>{return (await body(await fetch('/api/runtime/connect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({apiKey})}))).status;}
 export async function disconnectGemini():Promise<RuntimeStatus>{return (await body(await fetch('/api/runtime/disconnect',{method:'POST'}))).status;}

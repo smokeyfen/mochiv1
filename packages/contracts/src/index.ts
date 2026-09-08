@@ -1,6 +1,36 @@
 export const SCHEMA_VERSION = '1.0.0' as const;
 export type SchemaVersion = typeof SCHEMA_VERSION;
 
+/** Safe, provider-neutral labels for the ordered PRE-F1 runtime boundary. */
+export const PRE_F1_RUNTIME_STAGES = [
+  'VALIDATE_INPUT',
+  'R1_PRODUCT_EVIDENCE',
+  'R2_A_PRODUCT_TRUTH',
+  'R2_B_REFERENCE_ASSESSMENT',
+  'R2_COMMIT',
+  'R3_CONTINUITY',
+  'R4_GLOBAL_PLAN',
+  'R5_INITIAL_STATE',
+  'R6_INITIAL_RISK',
+  'R6_BOUNDED_REPLAN',
+  'R5_FINAL_STATE',
+  'R6_FINAL_RISK',
+  'R6_READY_GATE',
+  'R7_A_HUMAN_REALISM',
+  'R4_1_KEY_POINTS',
+  'R7_B_DIALOGUE',
+  'R8_PRODUCTION_CONTRACT',
+  'P0_CREATE_PERSIST',
+  'P0_LOAD',
+  'P0_EQUALITY',
+  'RETURN_VALIDATE'
+] as const;
+export type PreF1RuntimeStage = typeof PRE_F1_RUNTIME_STAGES[number];
+const PRE_F1_RUNTIME_STAGE_SET: ReadonlySet<string> = new Set(PRE_F1_RUNTIME_STAGES);
+export function isPreF1RuntimeStage(value: unknown): value is PreF1RuntimeStage {
+  return typeof value === 'string' && PRE_F1_RUNTIME_STAGE_SET.has(value);
+}
+
 export type AssetRole =
   | 'PRODUCT_REFERENCE' | 'PRODUCT_FRONT' | 'PRODUCT_SIDE' | 'PRODUCT_BACK' | 'PRODUCT_IN_HAND'
   | 'HAND_REFERENCE' | 'ENVIRONMENT_REFERENCE' | 'FIRST_FRAME' | 'LAST_FRAME';

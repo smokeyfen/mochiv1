@@ -302,6 +302,9 @@ describe('App', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/runtime/status'));
     const analyze=screen.getByRole('button',{name:'Analyze Product'});
     expect(analyze).toBeDisabled();
+    expect(screen.getByLabelText('Gemini API Key')).toHaveValue('');
+    expect(screen.getByRole('button',{name:'Connect'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Disconnect'})).not.toBeInTheDocument();
     expect(screen.getByText('Connect Gemini to analyze the product.')).toBeInTheDocument();
     enterValidProjectInput();
     const selectedBefore=screen.getByAltText(/Preview for asset-/).getAttribute('src');
@@ -309,12 +312,38 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button',{name:'Connect'}));
     await waitFor(() => expect(screen.getByText('GEMINI_READY')).toBeInTheDocument());
     expect(analyze).toBeEnabled();
+    expect(screen.getByText('LOCKED')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Gemini API Key')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Connect'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Disconnect'})).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(apiKey);
     expect(window.localStorage.getItem('GEMINI_API_KEY')).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'Disconnect'}));
     await waitFor(() => expect(screen.getByText('GEMINI_NOT_CONFIGURED')).toBeInTheDocument());
+    expect(screen.getByLabelText('Gemini API Key')).toHaveValue('');
+    expect(screen.queryByText('LOCKED')).not.toBeInTheDocument();
     expect(analyze).toBeDisabled();
     expect(screen.getByAltText(/Preview for asset-/).getAttribute('src')).toBe(selectedBefore);
+  });
+
+  it('renders the safe production runtime stage without exposing a raw failure', async () => {
+    const fetchMock=vi.fn().mockImplementation((url:unknown) => {
+      if(String(url)==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_READY'));
+      if(String(url)==='/api/product-evidence') return Promise.resolve(evidenceResponse());
+      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',trace:'provider exception raw-secret'}}),{status:400,headers:{'content-type':'application/json'}}));
+      return Promise.resolve(new Response('{}'));
+    });
+    vi.stubGlobal('fetch',fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());
+    fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));
+    await waitFor(()=>expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
+    submitProject();
+    fireEvent.click(screen.getByRole('button',{name:'Build Production Plan'}));
+    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Production build failed at R6_BOUNDED_REPLAN.'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('provider exception');
   });
 
   it('shows Delivery Center only after READY_FOR_DELIVERY and displays exactly five filenames', () => {
