@@ -15,6 +15,7 @@ import {
 import {
   analyzeProductTruth,
   buildProductTruthDecisionSchema,
+  buildProductTruthInputText,
   ProductTruthError,
   type ProductTruthDecision
 } from './index.ts';
@@ -121,6 +122,27 @@ test('an uncertain or contradicted candidate may be excluded while retained text
   assert.equal(truth.facts.some(fact => fact.factId === 'packaging:0'), false);
   assert.deepEqual(truth.exclusions, decision.exclusions);
   assert.equal(truth.facts[0]?.text, evidence.geometryNotes[0]);
+});
+
+test('Product Truth preserves composition uncertainty without turning it into a material fact', async () => {
+  const input = product();
+  const evidence = { ...evidenceFor(input), geometryNotes: ['A ribbed or folded body structure is visible.'], uncertainties: [{ subject: 'Material composition', assetIds: ['reference-1'], reason: 'Appearance does not establish material.' }] };
+  const { provider } = stubProvider(completeDecision(input, evidence));
+  const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
+  assert.deepEqual(truth.facts.map(fact => fact.text), ['A ribbed or folded body structure is visible.', 'The package is predominantly yellow.', 'The bottle is presented as a capped retail package.', 'A Cocoon label is visible.']);
+  assert.deepEqual(truth.unresolvedUncertainties, evidence.uncertainties);
+  assert.doesNotMatch(JSON.stringify(truth), /paper|cardboard|bamboo|wood/i);
+});
+
+test('Product Truth has no Creative Direction input and is unchanged by browser-only creative controls', async () => {
+  const input = product();
+  const evidence = evidenceFor(input);
+  const { provider, requests } = stubProvider(completeDecision(input, evidence));
+  const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
+  assert.equal('creativeDirection' in ({ product: input, evidence, sourceEvidenceVersion }), false);
+  assert.doesNotMatch(buildProductTruthInputText({ product: input, evidence, sourceEvidenceVersion }), /audience|shootingContext|voiceGender|reviewerPersona|tone/i);
+  assert.doesNotMatch(requests[0]?.inputText ?? '', /audience|shootingContext|voiceGender|reviewerPersona|tone/i);
+  assert.equal(truth.identityDescription, evidence.identityDescription);
 });
 
 test('decision schema binds identity, version, assets, and candidate IDs to the exact source', () => {

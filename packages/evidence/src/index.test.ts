@@ -299,6 +299,82 @@ test('unsupported claims are preserved rather than promoted', async () => {
   assert.equal(result.claims[0]?.allowed, false);
 });
 
+test('fluffy trim does not establish faux-fur material from visual appearance', async () => {
+  const input = product();
+  const output = { ...evidenceFor(input), geometryNotes: ['A faux-fur trim is visible.'] };
+  const { provider } = stubProvider(output);
+  await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
+});
+
+test('a visible thin stick does not establish bamboo or wood from appearance', async () => {
+  const input = product();
+  for (const note of ['A bamboo control stick is visible.', 'A wooden control stick is visible.']) {
+    const { provider } = stubProvider({ ...evidenceFor(input), geometryNotes: [note] });
+    await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
+  }
+});
+
+test('a folded or ribbed body appearance does not establish paper or cardboard', async () => {
+  const input = product();
+  for (const note of ['A paper body is visible.', 'A ribbed cardboard body is visible.']) {
+    const { provider } = stubProvider({ ...evidenceFor(input), geometryNotes: [note] });
+    await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
+  }
+});
+
+test('uncertain composition is retained as uncertainty instead of a false visual fact', async () => {
+  const input = product();
+  const output = {
+    ...evidenceFor(input),
+    geometryNotes: ['A ribbed or folded body structure is visible.'],
+    uncertainties: [{ subject: 'Material composition', assetIds: ['asset-1'], reason: 'The reference appearance does not establish the material.' }]
+  };
+  const { provider } = stubProvider(output);
+  const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
+  assert.deepEqual(result.geometryNotes, ['A ribbed or folded body structure is visible.']);
+  assert.deepEqual(result.uncertainties, output.uncertainties);
+});
+
+test('Product Details claims retain USER_INPUT provenance and nonvisual claims cannot be image-proven', async () => {
+  const input = { ...product(), details: 'Có thể dùng làm quà tặng trong nhiều dịp.' };
+  const sourceClaim = { claimId: 'gift', text: input.details, allowed: true };
+  const mislabeled = { ...evidenceFor(input), claims: [{ ...sourceClaim, source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'] }] };
+  const { provider: mislabeledProvider } = stubProvider(mislabeled);
+  await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: mislabeledProvider }), 'INVALID_MODEL_OUTPUT');
+  const preserved = { ...evidenceFor(input), claims: [{ ...sourceClaim, source: 'USER_INPUT' as const, evidenceAssetIds: [] }] };
+  const { provider } = stubProvider(preserved);
+  const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
+  assert.deepEqual(result.claims, preserved.claims);
+
+  const materialInput = { ...product(), details: 'The body is made of wood.' };
+  const { provider: materialProvider } = stubProvider({ ...evidenceFor(materialInput), claims: [{ claimId: 'wood', text: 'A wooden body is visible.', source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }] });
+  await expectError(analyzeProductEvidence({ product: materialInput, media: mediaFor(materialInput), intelligence: materialProvider }), 'INVALID_MODEL_OUTPUT');
+
+  for (const text of ['Phù hợp nhiều dịp.', 'Có thể dùng làm quà tặng.', 'Tăng tính tương tác.']) {
+    const { provider: nonvisualProvider } = stubProvider({ ...evidenceFor(input), claims: [{ claimId: text, text, source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }] });
+    await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: nonvisualProvider }), 'INVALID_MODEL_OUTPUT');
+  }
+});
+
+test('directly visible LED illumination may remain REFERENCE_EVIDENCE', async () => {
+  const input = product();
+  const output = { ...evidenceFor(input), claims: [{ claimId: 'led', text: 'Visible LED illumination is shown.', source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }] };
+  const { provider } = stubProvider(output);
+  const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
+  assert.deepEqual(result.claims, output.claims);
+});
+
+test('logical asset IDs remain bindings and never enter user-facing evidence prose', async () => {
+  const input = product();
+  const safe = evidenceFor(input);
+  const { provider } = stubProvider(safe);
+  const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
+  assert.deepEqual(result.canonicalAssetIds, ['asset-1']);
+  assert.doesNotMatch(JSON.stringify({ ...result, canonicalAssetIds: [], claims: result.claims.map(claim => ({ ...claim, evidenceAssetIds: [] })), uncertainties: result.uncertainties.map(item => ({ ...item, assetIds: [] })), contradictions: result.contradictions.map(item => ({ ...item, assetIds: [] })) }), /asset-1/);
+  const { provider: leakingProvider } = stubProvider({ ...safe, identityDescription: 'The product in asset-1 has a rounded body.' });
+  await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: leakingProvider }), 'INVALID_MODEL_OUTPUT');
+});
+
 test('provider failures normalize without leaking raw details', async () => {
   const input = product();
   const { provider } = stubProvider(evidenceFor(input), true);

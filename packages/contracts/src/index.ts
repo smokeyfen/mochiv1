@@ -1170,6 +1170,54 @@ export function validateProductInput(input: ProductInput): readonly string[] {
   return issues;
 }
 
+const VISUAL_MATERIAL_GROUPS = [
+  { id: 'faux_fur', terms: ['faux fur', 'faux-fur', 'long thu gia'] },
+  { id: 'paper_cardboard', terms: ['paper', 'cardboard', 'giay', 'bia cung'] },
+  { id: 'bamboo', terms: ['bamboo', 'tre'] },
+  { id: 'wood', terms: ['wood', 'wooden'] },
+  { id: 'plastic', terms: ['plastic', 'nhua'] },
+  { id: 'metal', terms: ['metal', 'kim loai'] },
+  { id: 'fabric', terms: ['fabric', 'cotton', 'polyester', 'silk'] },
+  { id: 'leather', terms: ['leather', 'da thuoc'] },
+  { id: 'glass', terms: ['glass', 'thuy tinh'] },
+  { id: 'ceramic', terms: ['ceramic'] },
+  { id: 'rubber', terms: ['rubber', 'cao su'] },
+  { id: 'battery', terms: ['battery', 'pin'] },
+  { id: 'internal_electrical', terms: ['internal electrical', 'electrical construction', 'cau tao dien'] }
+] as const;
+const NON_VISUAL_REFERENCE_CLAIM_TERMS = [
+  'durable', 'durability', 'safe', 'safety', 'age suitable', 'suitable', 'suitability',
+  'gift', 'occasion', 'can be used', 'use as', 'engagement', 'interaction',
+  'phu hop', 'qua tang', 'nhieu dip', 'dung lam', 'tang tinh tuong tac', 'do ben', 'an toan', 'do tuoi'
+] as const;
+
+function normalizedGroundingText(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function hasGroundingTerm(value: string, term: string): boolean {
+  return ` ${normalizedGroundingText(value)} `.includes(` ${normalizedGroundingText(term)} `);
+}
+
+function matchingVisualMaterialGroups(value: string): readonly typeof VISUAL_MATERIAL_GROUPS[number]['id'][] {
+  return VISUAL_MATERIAL_GROUPS.filter(group => group.terms.some(term => hasGroundingTerm(value, term))).map(group => group.id);
+}
+
+function containsNonVisualReferenceClaim(value: string): boolean {
+  const normalized = normalizedGroundingText(value);
+  return NON_VISUAL_REFERENCE_CLAIM_TERMS.some(term => normalized.includes(normalizedGroundingText(term)));
+}
+
+function containsLogicalAssetId(value: string, assetIds: ReadonlySet<string>): boolean {
+  return [...assetIds].some(assetId => assetId.length > 0 && value.includes(assetId));
+}
+
+function hasReadableLabelMaterialSupport(labelNotes: readonly string[], group: string): boolean {
+  const readableMarkers = ['readable', 'legible', 'label states', 'label reads', 'text reads', 'doc duoc', 'nhan ghi'];
+  const terms = VISUAL_MATERIAL_GROUPS.find(candidate => candidate.id === group)!.terms;
+  return labelNotes.some(note => terms.some(term => hasGroundingTerm(note, term)) && readableMarkers.some(marker => hasGroundingTerm(note, marker)));
+}
+
 /** Validates evidence only against factual ProductInput and logical asset IDs. */
 export function validateProductEvidence(
   evidence: ProductEvidence,
@@ -1200,6 +1248,19 @@ export function validateProductEvidence(
     for (const note of notes) if (!nonBlank(note)) issues.push(`blank_${name}_note`);
   }
 
+  const visualProse = [evidence.identityDescription, ...evidence.geometryNotes, ...evidence.colorNotes, ...evidence.packagingNotes];
+  const productDetails = normalizedGroundingText(product.details);
+  const assertedMaterialGroups = new Set<string>();
+  for (const prose of visualProse) {
+    for (const group of matchingVisualMaterialGroups(prose)) {
+      assertedMaterialGroups.add(group);
+      const groupTerms = VISUAL_MATERIAL_GROUPS.find(candidate => candidate.id === group)!.terms;
+      if (!groupTerms.some(term => hasGroundingTerm(productDetails, term)) && !hasReadableLabelMaterialSupport(evidence.labelNotes, group)) {
+        issues.push(`unsupported_visual_material:${group}`);
+      }
+    }
+  }
+
   const claimIds = new Set<string>();
   for (const claim of evidence.claims) {
     if (!nonBlank(claim.claimId)) issues.push('claim_id');
@@ -1208,6 +1269,20 @@ export function validateProductEvidence(
     claimIds.add(claim.claimId);
     if (claim.source === 'REFERENCE_EVIDENCE' && claim.evidenceAssetIds.length === 0) {
       issues.push(`reference_claim_requires_evidence:${claim.claimId}`);
+    }
+    if (claim.source === 'USER_INPUT' && claim.evidenceAssetIds.length !== 0) {
+      issues.push(`user_input_claim_must_not_bind_reference:${claim.claimId}`);
+    }
+    if (claim.source === 'REFERENCE_EVIDENCE') {
+      if (containsNonVisualReferenceClaim(claim.text)) issues.push(`nonvisual_reference_claim:${claim.claimId}`);
+      if (normalizedGroundingText(claim.text).length > 0 && productDetails.includes(normalizedGroundingText(claim.text))) {
+        issues.push(`product_details_claim_mislabeled:${claim.claimId}`);
+      }
+      for (const group of matchingVisualMaterialGroups(claim.text)) {
+        if (!hasReadableLabelMaterialSupport(evidence.labelNotes, group)) {
+          issues.push(`unsupported_visual_material_claim:${claim.claimId}:${group}`);
+        }
+      }
     }
     for (const assetId of claim.evidenceAssetIds) {
       if (!productAssetIds.has(assetId)) issues.push(`unknown_claim_asset:${claim.claimId}:${assetId}`);
@@ -1220,6 +1295,9 @@ export function validateProductEvidence(
     for (const assetId of uncertainty.assetIds) {
       if (!productAssetIds.has(assetId)) issues.push(`unknown_uncertainty_asset:${assetId}`);
     }
+    for (const group of matchingVisualMaterialGroups(`${uncertainty.subject} ${uncertainty.reason}`)) {
+      if (assertedMaterialGroups.has(group)) issues.push(`material_certainty_uncertainty_overlap:${group}`);
+    }
   }
   for (const contradiction of evidence.contradictions) {
     if (contradiction.statements.length < 2 || contradiction.statements.some(statement => !nonBlank(statement))) {
@@ -1229,6 +1307,15 @@ export function validateProductEvidence(
     for (const assetId of contradiction.assetIds) {
       if (!productAssetIds.has(assetId)) issues.push(`unknown_contradiction_asset:${assetId}`);
     }
+  }
+  const userFacingProse = [
+    evidence.identityDescription, ...evidence.geometryNotes, ...evidence.colorNotes, ...evidence.packagingNotes,
+    ...evidence.labelNotes, ...evidence.prohibitedInferences, ...evidence.claims.map(claim => claim.text),
+    ...evidence.uncertainties.flatMap(uncertainty => [uncertainty.subject, uncertainty.reason]),
+    ...evidence.contradictions.flatMap(contradiction => [...contradiction.statements, contradiction.reason])
+  ];
+  for (const prose of userFacingProse) {
+    if (containsLogicalAssetId(prose, productAssetIds)) issues.push('logical_asset_id_in_prose');
   }
   return issues;
 }

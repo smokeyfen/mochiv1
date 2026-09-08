@@ -63,6 +63,12 @@ describe('analyzeProductEvidence', () => {
     }
   });
 
+  it('rejects a response that leaks a logical asset ID into user-facing evidence prose', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, evidence: { ...evidence(), identityDescription: 'The product in asset-1 is visible.' } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
+
   it('maps recognized safe server errors and network failures to browser-safe codes', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'ANALYSIS_UNAVAILABLE' } }), { status: 503 }))
