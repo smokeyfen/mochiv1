@@ -84,6 +84,7 @@ export {
 } from './flow-production.ts';
 export {
   SCENE_QC_V1,
+  SCENE_QC_OUTPUT_SCHEMA,
   SceneQcError,
   evaluateSceneQcV1,
   normalizeVietnameseSpeechForQc,
@@ -97,3 +98,4 @@ export {
   type SceneQcTemporalGate,
   type SceneQcVideoMediaV1
 } from './scene-qc.ts';
+export { FOUR_SCENE_PRODUCTION_V1, SequenceQcError, runFourSceneProductionV1, type FourSceneProductionInputV1, type GeneratedVideoMediaResolverV1, type GlobalGate, type PairwiseAssessmentV1, type PairwiseGate, type SequenceResultV1 } from './four-scene-production.ts';
