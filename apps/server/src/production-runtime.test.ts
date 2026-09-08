@@ -74,15 +74,10 @@ function createMockIntelligence(options: MockOptions = {}) {
         { skinTone: 'ấm', nailStyle: 'ngắn', jewelry: 'không', dominantHand: 'RIGHT', surface: 'gỗ', background: 'trơn', lighting: 'mềm' },
         {
           productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
-          scenes: [
-            ['HOOK', 'identity', 'PICK_UP', 'BECOME_HELD'], ['FEATURE', 'geometry:0', 'HOLD', 'REMAIN_HELD'],
-            ['PROOF', 'color:0', 'ROTATE_SLOW', 'CHANGE_ORIENTATION'], ['CTA', 'identity', 'PLACE_DOWN', 'BECOME_PLACED']
-          ].map(([role, primaryTruthRefId, primaryAction, desiredStateEffect], offset) => ({
-            index: offset + 1, role, primaryTruthRefId, physicalObjective: `mục tiêu ${offset + 1}`,
-            primaryAction, desiredStateEffect, dialogueDraft: 'R4 draft',
-            referenceAssetIds: options.staleReplanReference && offset === 2 ? ['reference-1', 'reference-1'] : ['reference-1'],
-            ...(offset < 3 ? { transitionToNext: 'MATCH_CUT' } : {})
-          }))
+          hook:{primaryTruthRefId:'identity',physicalObjective:'mục tiêu 1',primaryAction:'PICK_UP',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
+          feature:{primaryTruthRefId:'geometry:0',physicalObjective:'mục tiêu 2',primaryAction:'HOLD',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
+          proof:{primaryTruthRefId:'color:0',physicalObjective:'mục tiêu 3',primaryAction:'ROTATE_SLOW',dialogueDraft:'R4 draft',referenceAssetIds:options.staleReplanReference?['reference-1','reference-1']:['reference-1'],transitionToNext:'MATCH_CUT'},
+          cta:{reuseTruthFromScene:1,physicalObjective:'mục tiêu 4',primaryAction:'PLACE_DOWN',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}
         },
         { scenes: Array.from({ length: 4 }, () => ({ approachBehavior: 'Đưa tay tự nhiên.', gripAndContactBehavior: 'Giữ chắc.', actionExecutionBehavior: 'Thực hiện chậm.', postActionSettleBehavior: 'Dừng nhẹ.', cameraBehavior: 'Rung tay nhẹ.' })) },
         { secondaryTruthRefIds: ['identity', 'geometry:0', 'geometry:0'] },
