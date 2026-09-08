@@ -137,7 +137,8 @@ function validateRequest<T>(request: StructuredIntelligenceRequest<T>): void {
     || Object.keys(request.outputSchema).length === 0) {
     throw new IntelligenceProviderError('INVALID_REQUEST', false);
   }
-  if (request.media.length === 0 || request.media.some(hasInvalidMediaInput)) {
+  if ((request.inputText === undefined && request.media.length === 0)
+    || request.media.some(hasInvalidMediaInput)) {
     throw new IntelligenceProviderError('INVALID_REQUEST', false);
   }
 }

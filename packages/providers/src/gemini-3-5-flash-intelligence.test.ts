@@ -88,6 +88,18 @@ test('blank optional input text fails before the transport is called', async () 
   assert.equal(called, false);
 });
 
+test('text-only structured reasoning is accepted while no-input and invalid media requests fail closed', async () => {
+  let calls = 0;
+  const provider = new Gemini35FlashIntelligenceProvider({
+    async generateStructured() { calls += 1; return JSON.stringify({ label: 'text-only' }); }
+  });
+  assert.deepEqual(await provider.analyzeStructured({ ...request, inputText: 'pure text reasoning', media: [] }), { data: { label: 'text-only' } });
+  assert.equal(calls, 1);
+  await assert.rejects(provider.analyzeStructured({ ...request, media: [] }), (error: unknown) => error instanceof IntelligenceProviderError && error.code === 'INVALID_REQUEST');
+  await assert.rejects(provider.analyzeStructured({ ...request, media: [{ assetId: '', mimeType: 'image/png', dataBase64: 'aGVsbG8=' }] }), (error: unknown) => error instanceof IntelligenceProviderError && error.code === 'INVALID_REQUEST');
+  assert.equal(calls, 1);
+});
+
 test('provider remains an intelligence boundary rather than a VideoProvider', () => {
   const provider = new Gemini35FlashIntelligenceProvider({
     async generateStructured() {

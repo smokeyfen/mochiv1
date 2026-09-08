@@ -1066,6 +1066,28 @@ export interface GeneratedCandidate {
   generationMetadata: Readonly<Record<string, unknown>>;
 }
 
+/** Provider-neutral candidate handoff for scene QC. Provider runtime metadata stays at its edge. */
+export const GENERATED_SCENE_CANDIDATE_V1 = 'GENERATED_SCENE_CANDIDATE_V1' as const;
+export interface GeneratedSceneCandidateV1 {
+  readonly candidateVersion: typeof GENERATED_SCENE_CANDIDATE_V1;
+  readonly sceneId: string;
+  readonly candidateAssetId: string;
+  readonly dialogue: string;
+  readonly voiceIdentityId: VoiceIdentityId;
+  readonly lifecycleStatus: 'QC_PENDING';
+}
+export function validateGeneratedSceneCandidateV1(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ['shape'];
+  const candidate = value as GeneratedSceneCandidateV1;
+  const keys = ['candidateVersion', 'sceneId', 'candidateAssetId', 'dialogue', 'voiceIdentityId', 'lifecycleStatus'];
+  if (Object.keys(candidate).length !== keys.length || !keys.every(key => key in candidate)) return ['shape'];
+  const nonBlank = (item: unknown): item is string => typeof item === 'string' && item.trim().length > 0;
+  if (candidate.candidateVersion !== GENERATED_SCENE_CANDIDATE_V1 || !nonBlank(candidate.sceneId)
+    || !nonBlank(candidate.candidateAssetId) || !nonBlank(candidate.dialogue) || !nonBlank(candidate.voiceIdentityId)
+    || candidate.lifecycleStatus !== 'QC_PENDING') return ['fields'];
+  return [];
+}
+
 export type QCGate =
   | 'PRODUCT_IDENTITY' | 'PRODUCT_GEOMETRY' | 'HAND_ANATOMY' | 'ACTION_COMPLETION'
   | 'PHYSICS' | 'ENVIRONMENT' | 'CAMERA' | 'FACTS' | 'AUDIO' | 'CONTINUITY' | 'ARTIFACTS';

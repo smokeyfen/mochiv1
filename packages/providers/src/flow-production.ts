@@ -4,6 +4,8 @@ import {
   validateSceneAnchorAgainstSnapshot,
   validateSceneAnchorV1,
   type EffectsV1,
+  GENERATED_SCENE_CANDIDATE_V1,
+  type GeneratedSceneCandidateV1,
   type ProductionSnapshotV1,
   type SceneAnchorV1
 } from '@mochi/contracts';
@@ -160,6 +162,18 @@ export async function executeFlowProductionRequestV1(driver: FlowProductionDrive
     || result.dialogue !== request.dialogue || JSON.stringify(result.nativeVoiceBinding) !== JSON.stringify(request.nativeVoiceBinding)
     || !['GENERATED', 'QC_PENDING'].includes(result.generationStatus)) throw new FlowProductionError('INVALID_GENERATED_CANDIDATE');
   return { ...result, generationStatus: 'QC_PENDING' };
+}
+
+/** Drops Flow-only execution metadata before the candidate enters provider-neutral QC. */
+export function mapFlowGeneratedCandidateV1(result: FlowGeneratedCandidateResultV1, request: FlowProductionRequestV1): GeneratedSceneCandidateV1 {
+  if (!result || result.sceneId !== request.sceneId || result.dialogue !== request.dialogue
+    || JSON.stringify(result.nativeVoiceBinding) !== JSON.stringify(request.nativeVoiceBinding)
+    || result.nativeVoiceBinding.logicalVoiceIdentityId !== request.nativeVoiceBinding.logicalVoiceIdentityId
+    || !nonBlank(result.candidateAssetId) || !['GENERATED', 'QC_PENDING'].includes(result.generationStatus)) {
+    throw new FlowProductionError('INVALID_GENERATED_CANDIDATE');
+  }
+  return { candidateVersion: GENERATED_SCENE_CANDIDATE_V1, sceneId: result.sceneId, candidateAssetId: result.candidateAssetId,
+    dialogue: result.dialogue, voiceIdentityId: result.nativeVoiceBinding.logicalVoiceIdentityId, lifecycleStatus: 'QC_PENDING' };
 }
 
 export type SingleSceneCanaryPreparationV1 =

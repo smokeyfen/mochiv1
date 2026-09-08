@@ -69,6 +69,7 @@ export {
   FlowProductionError,
   compileFlowProductionRequestV1,
   executeFlowProductionRequestV1,
+  mapFlowGeneratedCandidateV1,
   prepareSingleSceneCanaryV1,
   resolveFlowNativeVoiceBindingV1,
   resolveFlowReferenceBindingsV1,
@@ -81,3 +82,18 @@ export {
   type FlowReferenceBindingV1,
   type SingleSceneCanaryPreparationV1
 } from './flow-production.ts';
+export {
+  SCENE_QC_V1,
+  SceneQcError,
+  evaluateSceneQcV1,
+  normalizeVietnameseSpeechForQc,
+  type PresentationDynamicsV1,
+  type SceneQcFrameGate,
+  type SceneQcGateResultV1,
+  type SceneQcInputV1,
+  type SceneQcReferenceMediaV1,
+  type SceneQcReportV1,
+  type SceneQcSpeechGate,
+  type SceneQcTemporalGate,
+  type SceneQcVideoMediaV1
+} from './scene-qc.ts';
