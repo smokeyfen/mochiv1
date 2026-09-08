@@ -54,3 +54,12 @@ export { VoiceProviderError, validateVoiceSynthesisRequest, type VoiceProvider, 
 export { SaydiBrowserVoiceProvider, createSaydiVoiceBindingRegistry, type SaydiBrowserDriver, type SaydiBrowserDriverResult, type SaydiVoiceBinding } from './saydi-browser-voice.ts';
 
 export { SaydiPlaywrightDriver, SaydiSingleFlight, measureWavDurationMs, validateDownloadedWav, type SaydiPlaywrightDriverOptions, type ValidatedWavFile } from './saydi-playwright-driver.ts';
+export {
+  FLOW_SCENE_PROMPT_V1,
+  FlowScenePromptError,
+  compileFlowScenePromptV1,
+  countUnicodeCodePoints,
+  type FlowScenePromptBudgetStatus,
+  type FlowScenePromptV1,
+  type FlowScenePromptVersion
+} from './flow-scene-prompt.ts';

@@ -675,6 +675,209 @@ export function validateProductionSnapshotV1(value: unknown): string[] {
   return issues;
 }
 
+/** Provider-neutral post-P0 presentation choreography. It cannot add physical work. */
+export const VISUAL_RHYTHM_V1 = 'VISUAL_RHYTHM_V1' as const;
+export type VisualRhythmVersion = typeof VISUAL_RHYTHM_V1;
+export type VisualEnergy = 'HIGH' | 'MODERATE' | 'LOW';
+export type VisualPresentationIntent =
+  | 'HOOK_IMMEDIATE_REVEAL'
+  | 'FEATURE_CONTROLLED_DETAIL'
+  | 'PROOF_STABLE_INSPECTION'
+  | 'CTA_CLEAN_HERO';
+export type PresentationBeat =
+  | 'ACTION_SETTLE'
+  | 'HERO_PRESENT'
+  | 'DETAIL_EMPHASIS'
+  | 'FRAMING_REVEAL'
+  | 'STABLE_PRESENTATION';
+export type SubtleCameraBehavior =
+  | 'NONE'
+  | 'SUBTLE_PUSH_IN'
+  | 'SUBTLE_PARALLAX'
+  | 'SUBTLE_HANDHELD_DRIFT';
+export interface VisualRhythmV1 {
+  rhythmVersion: VisualRhythmVersion;
+  presentationIntent: VisualPresentationIntent;
+  energy: VisualEnergy;
+  primaryActionTiming: 'EARLY' | 'CONTROLLED' | 'STEADY';
+  presentationBeats: readonly PresentationBeat[];
+  cameraBehavior: SubtleCameraBehavior;
+  exactlyOneCanonicalPrimaryAction: true;
+  atMostOneStateChangingPhysicalAction: true;
+  presentationOnly: true;
+  noAdditionalProductStateTransition: true;
+  noSecondHandProductContactEvent: true;
+  noNewGripOrContactEvent: true;
+  noNewPropInteraction: true;
+  noCapOpening: true;
+  noDispensing: true;
+  noUncontractedCutOrReset: true;
+}
+
+const visualRhythmKeys = [
+  'rhythmVersion', 'presentationIntent', 'energy', 'primaryActionTiming', 'presentationBeats', 'cameraBehavior',
+  'exactlyOneCanonicalPrimaryAction', 'atMostOneStateChangingPhysicalAction', 'presentationOnly', 'noAdditionalProductStateTransition', 'noSecondHandProductContactEvent', 'noNewGripOrContactEvent', 'noNewPropInteraction',
+  'noCapOpening', 'noDispensing', 'noUncontractedCutOrReset'
+] as const;
+const presentationBeatValues: readonly PresentationBeat[] = ['ACTION_SETTLE', 'HERO_PRESENT', 'DETAIL_EMPHASIS', 'FRAMING_REVEAL', 'STABLE_PRESENTATION'];
+const cameraBehaviorValues: readonly SubtleCameraBehavior[] = ['NONE', 'SUBTLE_PUSH_IN', 'SUBTLE_PARALLAX', 'SUBTLE_HANDHELD_DRIFT'];
+
+/** The only V1 visual-rhythm authority. It is role-aware and has no model dependency. */
+export function buildVisualRhythmV1(role: Global4SceneRole, primaryAction: ActionId): VisualRhythmV1 {
+  const byRole: Record<Global4SceneRole, Omit<VisualRhythmV1, 'rhythmVersion'>> = {
+    HOOK: { presentationIntent: 'HOOK_IMMEDIATE_REVEAL', energy: 'HIGH', primaryActionTiming: 'EARLY', presentationBeats: ['FRAMING_REVEAL', 'HERO_PRESENT'], cameraBehavior: 'SUBTLE_PUSH_IN', exactlyOneCanonicalPrimaryAction: true, atMostOneStateChangingPhysicalAction: true, presentationOnly: true, noAdditionalProductStateTransition: true, noSecondHandProductContactEvent: true, noNewGripOrContactEvent: true, noNewPropInteraction: true, noCapOpening: true, noDispensing: true, noUncontractedCutOrReset: true },
+    FEATURE: { presentationIntent: 'FEATURE_CONTROLLED_DETAIL', energy: 'MODERATE', primaryActionTiming: 'CONTROLLED', presentationBeats: ['FRAMING_REVEAL', 'DETAIL_EMPHASIS'], cameraBehavior: 'SUBTLE_PARALLAX', exactlyOneCanonicalPrimaryAction: true, atMostOneStateChangingPhysicalAction: true, presentationOnly: true, noAdditionalProductStateTransition: true, noSecondHandProductContactEvent: true, noNewGripOrContactEvent: true, noNewPropInteraction: true, noCapOpening: true, noDispensing: true, noUncontractedCutOrReset: true },
+    PROOF: { presentationIntent: 'PROOF_STABLE_INSPECTION', energy: 'LOW', primaryActionTiming: 'STEADY', presentationBeats: ['DETAIL_EMPHASIS', 'STABLE_PRESENTATION'], cameraBehavior: 'NONE', exactlyOneCanonicalPrimaryAction: true, atMostOneStateChangingPhysicalAction: true, presentationOnly: true, noAdditionalProductStateTransition: true, noSecondHandProductContactEvent: true, noNewGripOrContactEvent: true, noNewPropInteraction: true, noCapOpening: true, noDispensing: true, noUncontractedCutOrReset: true },
+    CTA: { presentationIntent: 'CTA_CLEAN_HERO', energy: 'MODERATE', primaryActionTiming: 'CONTROLLED', presentationBeats: ['HERO_PRESENT', 'ACTION_SETTLE'], cameraBehavior: 'SUBTLE_HANDHELD_DRIFT', exactlyOneCanonicalPrimaryAction: true, atMostOneStateChangingPhysicalAction: true, presentationOnly: true, noAdditionalProductStateTransition: true, noSecondHandProductContactEvent: true, noNewGripOrContactEvent: true, noNewPropInteraction: true, noCapOpening: true, noDispensing: true, noUncontractedCutOrReset: true }
+  };
+  // No presentation beat represents rotation; primaryAction is deliberately not rewritten.
+  void primaryAction;
+  return { rhythmVersion: VISUAL_RHYTHM_V1, ...byRole[role] };
+}
+
+export function validateVisualRhythmV1(value: unknown): string[] {
+  if (!hasExactKeys(value, visualRhythmKeys)) return ['shape'];
+  const rhythm = value as unknown as VisualRhythmV1;
+  const issues: string[] = [];
+  if (rhythm.rhythmVersion !== VISUAL_RHYTHM_V1) issues.push('version');
+  if (!['HOOK_IMMEDIATE_REVEAL', 'FEATURE_CONTROLLED_DETAIL', 'PROOF_STABLE_INSPECTION', 'CTA_CLEAN_HERO'].includes(rhythm.presentationIntent)) issues.push('intent');
+  if (!['HIGH', 'MODERATE', 'LOW'].includes(rhythm.energy) || !['EARLY', 'CONTROLLED', 'STEADY'].includes(rhythm.primaryActionTiming)) issues.push('energy');
+  if (!Array.isArray(rhythm.presentationBeats) || rhythm.presentationBeats.length > 2 || rhythm.presentationBeats.some(beat => !presentationBeatValues.includes(beat)) || new Set(rhythm.presentationBeats).size !== rhythm.presentationBeats.length) issues.push('beats');
+  if (!cameraBehaviorValues.includes(rhythm.cameraBehavior)) issues.push('camera');
+  if (rhythm.exactlyOneCanonicalPrimaryAction !== true || rhythm.atMostOneStateChangingPhysicalAction !== true || rhythm.presentationOnly !== true || rhythm.noAdditionalProductStateTransition !== true || rhythm.noSecondHandProductContactEvent !== true || rhythm.noNewGripOrContactEvent !== true || rhythm.noNewPropInteraction !== true || rhythm.noCapOpening !== true || rhythm.noDispensing !== true || rhythm.noUncontractedCutOrReset !== true) issues.push('physical_guardrails');
+  return issues;
+}
+
+export const SCENE_ANCHOR_V1 = 'SCENE_ANCHOR_V1' as const;
+export type SceneAnchorVersion = typeof SCENE_ANCHOR_V1;
+export type SoftCameraDistance = 'CLOSE' | 'MEDIUM';
+export type SoftCameraAngle = 'FRONT' | 'THREE_QUARTER';
+export type SoftCrop = 'TIGHT_PRODUCT_HAND' | 'PRODUCT_HAND_CONTEXT';
+export type SoftComposition = 'IMMEDIATE_CENTER_REVEAL' | 'DETAIL_LED' | 'STABLE_INSPECTION' | 'CLEAN_HERO';
+export type ProductScreenPosition = 'CENTER' | 'CENTER_RIGHT';
+export interface HardContinuityV1 {
+  productIdentity: { productId: string; canonicalAssetIds: readonly string[] };
+  productGeometryMaterialIdentity: { canonicalReferenceAssetIds: readonly string[] };
+  handIdentity: GlobalContinuityState['immutable']['handIdentity'];
+  environment: GlobalContinuityState['immutable']['environment'];
+  cameraFamily: 'SMARTPHONE_POV';
+  logicalVoiceIdentityId: VoiceIdentityId;
+  logicalVoiceIdentity: GlobalContinuityState['immutable']['voiceIdentity'];
+}
+export interface SoftContinuityV1 {
+  cameraDistance: SoftCameraDistance;
+  cameraAngle: SoftCameraAngle;
+  crop: SoftCrop;
+  composition: SoftComposition;
+  productScreenPosition: ProductScreenPosition;
+  subtleHandheldBehavior: SubtleCameraBehavior;
+}
+export interface EffectsV1 { sfx: 'NONE'; vfx: 'NONE'; }
+export interface SceneAnchorV1 {
+  schemaVersion: SchemaVersion;
+  sceneAnchorVersion: SceneAnchorVersion;
+  snapshotId: string;
+  projectId: string;
+  productId: string;
+  sourceEvidenceVersion: string;
+  canonicalAssetIds: readonly string[];
+  sceneId: string;
+  index: 1 | 2 | 3 | 4;
+  role: Global4SceneRole;
+  durationSeconds: 8;
+  aspectRatio: '9:16';
+  physicalObjective: string;
+  primaryAction: ActionId;
+  startState: CanonicalPhysicalState;
+  endState: CanonicalPhysicalState;
+  referenceAssetIds: readonly string[];
+  dialogue: string;
+  voiceIdentityId: VoiceIdentityId;
+  hardContinuity: HardContinuityV1;
+  softContinuity: SoftContinuityV1;
+  visualRhythm: VisualRhythmV1;
+  effects: EffectsV1;
+}
+const sceneAnchorKeys = ['schemaVersion', 'sceneAnchorVersion', 'snapshotId', 'projectId', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'sceneId', 'index', 'role', 'durationSeconds', 'aspectRatio', 'physicalObjective', 'primaryAction', 'startState', 'endState', 'referenceAssetIds', 'dialogue', 'voiceIdentityId', 'hardContinuity', 'softContinuity', 'visualRhythm', 'effects'] as const;
+const hardContinuityKeys = ['productIdentity', 'productGeometryMaterialIdentity', 'handIdentity', 'environment', 'cameraFamily', 'logicalVoiceIdentityId', 'logicalVoiceIdentity'] as const;
+const softContinuityKeys = ['cameraDistance', 'cameraAngle', 'crop', 'composition', 'productScreenPosition', 'subtleHandheldBehavior'] as const;
+
+function softContinuityFor(role: Global4SceneRole, cameraBehavior: SubtleCameraBehavior): SoftContinuityV1 {
+  const byRole: Record<Global4SceneRole, Omit<SoftContinuityV1, 'subtleHandheldBehavior'>> = {
+    HOOK: { cameraDistance: 'CLOSE', cameraAngle: 'FRONT', crop: 'TIGHT_PRODUCT_HAND', composition: 'IMMEDIATE_CENTER_REVEAL', productScreenPosition: 'CENTER' },
+    FEATURE: { cameraDistance: 'CLOSE', cameraAngle: 'THREE_QUARTER', crop: 'TIGHT_PRODUCT_HAND', composition: 'DETAIL_LED', productScreenPosition: 'CENTER_RIGHT' },
+    PROOF: { cameraDistance: 'MEDIUM', cameraAngle: 'THREE_QUARTER', crop: 'PRODUCT_HAND_CONTEXT', composition: 'STABLE_INSPECTION', productScreenPosition: 'CENTER' },
+    CTA: { cameraDistance: 'MEDIUM', cameraAngle: 'FRONT', crop: 'PRODUCT_HAND_CONTEXT', composition: 'CLEAN_HERO', productScreenPosition: 'CENTER' }
+  };
+  return { ...byRole[role], subtleHandheldBehavior: cameraBehavior };
+}
+
+function hardContinuityFor(snapshot: ProductionSnapshotV1): HardContinuityV1 {
+  const immutable = snapshot.productionContract.continuity.immutable;
+  return {
+    productIdentity: { productId: snapshot.productId, canonicalAssetIds: snapshot.canonicalAssetIds },
+    productGeometryMaterialIdentity: { canonicalReferenceAssetIds: snapshot.canonicalAssetIds },
+    handIdentity: immutable.handIdentity,
+    environment: immutable.environment,
+    cameraFamily: immutable.cameraFamily,
+    logicalVoiceIdentityId: snapshot.productionContract.voiceIdentityId,
+    logicalVoiceIdentity: immutable.voiceIdentity
+  };
+}
+
+function buildSceneAnchorV1(snapshot: ProductionSnapshotV1, offset: number): SceneAnchorV1 {
+  const scene = snapshot.productionContract.scenes[offset]!;
+  const visualRhythm = buildVisualRhythmV1(scene.role, scene.primaryAction);
+  return {
+    schemaVersion: SCHEMA_VERSION, sceneAnchorVersion: SCENE_ANCHOR_V1,
+    snapshotId: snapshot.snapshotId, projectId: snapshot.projectId, productId: snapshot.productId, sourceEvidenceVersion: snapshot.sourceEvidenceVersion, canonicalAssetIds: snapshot.canonicalAssetIds,
+    sceneId: scene.sceneId, index: scene.index, role: scene.role, durationSeconds: scene.durationSeconds, aspectRatio: scene.aspectRatio,
+    physicalObjective: scene.physicalObjective, primaryAction: scene.primaryAction, startState: scene.startState, endState: scene.endState,
+    referenceAssetIds: scene.referenceAssetIds, dialogue: scene.dialogue, voiceIdentityId: scene.voiceIdentityId,
+    hardContinuity: hardContinuityFor(snapshot), softContinuity: softContinuityFor(scene.role, visualRhythm.cameraBehavior), visualRhythm, effects: { sfx: 'NONE', vfx: 'NONE' }
+  };
+}
+
+/** Deterministically derives the four immutable production presentation inputs from validated P0. */
+export function compileSceneAnchorsV1(snapshot: ProductionSnapshotV1): readonly [SceneAnchorV1, SceneAnchorV1, SceneAnchorV1, SceneAnchorV1] {
+  if (validateProductionSnapshotV1(snapshot).length > 0) throw new Error('SCENE_ANCHOR_ERROR:INVALID_SNAPSHOT');
+  return [buildSceneAnchorV1(snapshot, 0), buildSceneAnchorV1(snapshot, 1), buildSceneAnchorV1(snapshot, 2), buildSceneAnchorV1(snapshot, 3)];
+}
+
+export function validateSceneAnchorV1(value: unknown): string[] {
+  if (!hasExactKeys(value, sceneAnchorKeys)) return ['shape'];
+  const anchor = value as unknown as SceneAnchorV1;
+  const issues: string[] = [];
+  if (anchor.schemaVersion !== SCHEMA_VERSION || anchor.sceneAnchorVersion !== SCENE_ANCHOR_V1) issues.push('version');
+  if (!productionSnapshotIdPattern.test(anchor.snapshotId) || !nonBlankContract(anchor.projectId) || !nonBlankContract(anchor.productId) || !nonBlankContract(anchor.sourceEvidenceVersion) || !Array.isArray(anchor.canonicalAssetIds) || anchor.canonicalAssetIds.some(asset => !nonBlankContract(asset))) issues.push('snapshot_binding');
+  const validState = (state: unknown): state is CanonicalPhysicalState => !!state && typeof state === 'object'
+    && ['NONE', 'LEFT_HAND', 'RIGHT_HAND', 'BOTH_HANDS'].includes((state as CanonicalPhysicalState).heldBy)
+    && ['ON_SURFACE', 'IN_HAND', 'NEAR_CAMERA'].includes((state as CanonicalPhysicalState).placement)
+    && ['FRONT_FACING', 'ROTATED'].includes((state as CanonicalPhysicalState).orientation)
+    && ['BASELINE', 'OPENED', 'ACTUATED', 'CONTENT_TRANSFERRED', 'APPLIED'].includes((state as CanonicalPhysicalState).interactionState);
+  if (!nonBlankContract(anchor.sceneId) || ![1, 2, 3, 4].includes(anchor.index) || !['HOOK', 'FEATURE', 'PROOF', 'CTA'].includes(anchor.role) || anchor.durationSeconds !== 8 || anchor.aspectRatio !== '9:16' || !nonBlankContract(anchor.physicalObjective) || !nonBlankContract(anchor.primaryAction) || !validState(anchor.startState) || !validState(anchor.endState) || !Array.isArray(anchor.referenceAssetIds) || anchor.referenceAssetIds.some(asset => !nonBlankContract(asset)) || !nonBlankContract(anchor.dialogue) || !nonBlankContract(anchor.voiceIdentityId)) issues.push('scene');
+  if (!hasExactKeys(anchor.hardContinuity, hardContinuityKeys) || !hasExactKeys(anchor.softContinuity, softContinuityKeys)) issues.push('continuity_shape');
+  else {
+    const hard = anchor.hardContinuity;
+    const soft = anchor.softContinuity;
+    if (!hard.productIdentity || hard.productIdentity.productId !== anchor.productId || !sameOrderedStrings(hard.productIdentity.canonicalAssetIds, anchor.canonicalAssetIds) || !hard.productGeometryMaterialIdentity || !sameOrderedStrings(hard.productGeometryMaterialIdentity.canonicalReferenceAssetIds, anchor.canonicalAssetIds) || !hard.handIdentity || !hard.environment || hard.cameraFamily !== 'SMARTPHONE_POV' || hard.logicalVoiceIdentityId !== anchor.voiceIdentityId || !hard.logicalVoiceIdentity) issues.push('hard_continuity');
+    if (!['CLOSE', 'MEDIUM'].includes(soft.cameraDistance) || !['FRONT', 'THREE_QUARTER'].includes(soft.cameraAngle) || !['TIGHT_PRODUCT_HAND', 'PRODUCT_HAND_CONTEXT'].includes(soft.crop) || !['IMMEDIATE_CENTER_REVEAL', 'DETAIL_LED', 'STABLE_INSPECTION', 'CLEAN_HERO'].includes(soft.composition) || !['CENTER', 'CENTER_RIGHT'].includes(soft.productScreenPosition) || !cameraBehaviorValues.includes(soft.subtleHandheldBehavior)) issues.push('soft_continuity');
+  }
+  if (!anchor.effects || anchor.effects.sfx !== 'NONE' || anchor.effects.vfx !== 'NONE') issues.push('effects');
+  if (validateVisualRhythmV1(anchor.visualRhythm).length > 0 || anchor.softContinuity?.subtleHandheldBehavior !== anchor.visualRhythm?.cameraBehavior) issues.push('rhythm');
+  return issues;
+}
+
+/** Proves one anchor still binds byte-for-byte to the exact current P0 snapshot and source scene. */
+export function validateSceneAnchorAgainstSnapshot(anchor: SceneAnchorV1, snapshot: ProductionSnapshotV1): string[] {
+  const issues = validateSceneAnchorV1(anchor);
+  if (validateProductionSnapshotV1(snapshot).length > 0) return [...issues, 'snapshot'];
+  if (!Number.isInteger(anchor.index) || anchor.index < 1 || anchor.index > 4) return [...issues, 'scene'];
+  const expected = buildSceneAnchorV1(snapshot, anchor.index - 1);
+  if (JSON.stringify(anchor) !== JSON.stringify(expected)) issues.push('stale_or_mutated_binding');
+  return issues;
+}
+
 export type ActionId =
   | 'REACH' | 'PICK_UP' | 'HOLD' | 'MOVE_CLOSER' | 'ROTATE_SLOW' | 'PLACE_DOWN'
   | 'OPEN_SIMPLE' | 'PRESS_BUTTON' | 'POUR_SIMPLE' | 'APPLY_SIMPLE' | 'POINT';
