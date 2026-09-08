@@ -17,10 +17,10 @@ const global=['PRODUCT_CONSISTENCY','HAND_CONSISTENCY','ENVIRONMENT_LIGHTING_CON
 const pass=(gates:readonly string[])=>gates.map(gate=>({gate,status:'PASS'}));
 
 function createMock() {
-  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false;
+  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false; let sceneQcThrows=false;
   const provider: IntelligenceProvider={id:'mock-delivery',async analyzeStructured<T>(input:StructuredIntelligenceRequest<T>){requests.push(input as StructuredIntelligenceRequest<unknown>); const parsed=(input.instruction.startsWith('SCENE_QC_V1:')||input.instruction.startsWith('SEQUENCE_QC_V1:'))?JSON.parse(input.inputText??'{}') as Record<string,unknown>:{};
     if(input.instruction.startsWith('TARGETED REPLAN:')) return {data:input.parse({physicalObjective:'mục tiêu replanned',primaryAction:'HOLD',desiredStateEffect:'REMAIN_HELD',dialogueDraft:'R4 replanned draft',referenceAssetIds:['reference-1']})};
-    if(input.instruction.startsWith('SCENE_QC_V1:')) { const sceneId=parsed.sceneId as string, candidateAssetId=parsed.candidateAssetId as string, failed=scene2Fail&&sceneId.endsWith(':scene:2'); return {data:input.parse({sceneId,candidateAssetId,frame:failed?[{gate:'PRODUCT_FIDELITY',status:'FAIL'},...pass(frame.slice(1))]:pass(frame),temporal:pass(temporal),speechDetected:true,spokenTranscript:parsed.expectedDialogue,dialogueComplete:true,unexpectedSpeechDetected:false,presentationDynamics:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
+    if(input.instruction.startsWith('SCENE_QC_V1:')) { if(sceneQcThrows) throw new Error('mock QC unavailable'); const sceneId=parsed.sceneId as string, candidateAssetId=parsed.candidateAssetId as string, failed=scene2Fail&&sceneId.endsWith(':scene:2'); return {data:input.parse({sceneId,candidateAssetId,frame:failed?[{gate:'PRODUCT_FIDELITY',status:'FAIL'},...pass(frame.slice(1))]:pass(frame),temporal:pass(temporal),speechDetected:true,spokenTranscript:parsed.expectedDialogue,dialogueComplete:true,unexpectedSpeechDetected:false,presentationDynamics:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     if(input.instruction.startsWith('SEQUENCE_QC_V1:')) { const reports=parsed.reports as {sceneId:string}[]; return {data:input.parse({pairs:[0,1,2].map(index=>({fromSceneId:reports[index]!.sceneId,toSceneId:reports[index+1]!.sceneId,gates:sequenceFail?[{gate:'PRODUCT_IDENTITY_CONTINUITY',status:'FAIL'},...pass(pair.slice(1))]:pass(pair)})),global:pass(global),visualVariation:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     const data=[
       {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,canonicalAssetIds:['reference-1'],identityDescription:'Mochi snack',geometryNotes:['Round shape'],colorNotes:['White coating'],packagingNotes:['Simple package'],labelNotes:['Mochi label'],claims:[],prohibitedInferences:[],uncertainties:[],contradictions:[]},
@@ -34,10 +34,11 @@ function createMock() {
       {scenes:Array.from({length:4},()=>({coversKeyPoint1:true,coversKeyPoint2:true,introducesUnsupportedProductFact:false,naturalSouthernConversationalVietnamese:true,containsStageDirectionOrNonSpeechText:false})),sameReviewerPersonaAcrossScenes:true}
     ][runtimeCall++ % 9]; return {data:input.parse(data)};
   }};
-  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;}};
+  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;},setSceneQcThrows:(value:boolean)=>{sceneQcThrows=value;}};
 }
 
-async function withWorkspace(run:(value:{service:ProductionWorkspaceService;mock:ReturnType<typeof createMock>})=>Promise<void>) { const root=await mkdtemp(join(tmpdir(),'mochi-delivery-')); const mock=createMock(); const service=new ProductionWorkspaceService(new RuntimeConfiguration(mock.provider),root); try { await run({service,mock}); } finally { await rm(root,{recursive:true,force:true}); } }
+const validVideoInspector={async inspect(){return {container:'MP4' as const,width:1080,height:1920,durationMs:8000,rotationDegrees:0 as const};}};
+async function withWorkspace(run:(value:{service:ProductionWorkspaceService;mock:ReturnType<typeof createMock>})=>Promise<void>, inspector=validVideoInspector) { const root=await mkdtemp(join(tmpdir(),'mochi-delivery-')); const mock=createMock(); const service=new ProductionWorkspaceService(new RuntimeConfiguration(mock.provider),root,inspector); try { await run({service,mock}); } finally { await rm(root,{recursive:true,force:true}); } }
 async function ready(service:ProductionWorkspaceService) { const build=await service.build(project,references); for(const scene of build.scenes) await service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from(`video-${scene.index}`)}); await service.runSequence(build.snapshotId); assert.equal(service.finalAcceptance(build.snapshotId).status,'FINAL_ACCEPTANCE_PASS'); return build; }
 const active=(service:ProductionWorkspaceService):any=>(service as unknown as {active:any}).active;
 
@@ -59,6 +60,16 @@ test('a candidate accepts exactly one video payload and every accepted mutation 
   const build=await ready(service); const scene=service.safeScenes()[0]!; await assert.rejects(service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from('second')}),(error:unknown)=>error instanceof ProductionWorkspaceError&&error.code==='INVALID_OR_STALE_VIDEO');
   const state=active(service); assert.equal(state.sequence.view.status,'FOUR_SCENE_SEQUENCE_PASS'); assert.equal(state.finalAcceptance.status,'FINAL_ACCEPTANCE_PASS'); service.replaceFailedCandidate(build.snapshotId,scene.sceneId,scene.candidateAssetId); // unavailable because passed
 }).catch(error=>{ if(error instanceof ProductionWorkspaceError&&error.code==='REPAIR_NOT_AVAILABLE') return; throw error; }));
+
+test('technical validation fails closed before Scene QC for non-portrait, wrong-duration, or unverifiable media', async()=>{
+  for(const inspector of [{async inspect(){return {container:'MP4' as const,width:1920,height:1080,durationMs:8000,rotationDegrees:0 as const};}},{async inspect(){return {container:'MP4' as const,width:1080,height:1920,durationMs:8101,rotationDegrees:0 as const};}},{async inspect(){throw new Error('ffprobe unavailable');}}] as const) await withWorkspace(async({service,mock})=>{
+    const build=await service.build(project,references); const scene=build.scenes[0]!; await assert.rejects(service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from('not accepted')}),(error:unknown)=>error instanceof ProductionWorkspaceError&&error.code==='VIDEO_TECHNICAL_INVALID'); assert.equal(mock.requests.filter(request=>request.instruction.startsWith('SCENE_QC_V1:')).length,0); assert.equal(service.safeScenes()[0]!.lifecycleStatus,'READY_FOR_FLOW');
+  },inspector);
+});
+
+test('a thrown Scene QC leaves the candidate retryable with no partial video or report', async()=>withWorkspace(async({service,mock})=>{
+  const build=await service.build(project,references); const scene=build.scenes[0]!; mock.setSceneQcThrows(true); await assert.rejects(service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from('retry-me')}),(error:unknown)=>error instanceof ProductionWorkspaceError&&error.code==='SCENE_QC_FAILED'); assert.equal(service.safeScenes()[0]!.lifecycleStatus,'READY_FOR_FLOW'); const state=active(service); assert.equal(state.candidates.get(scene.sceneId).video,undefined); assert.equal(state.candidates.get(scene.sceneId).report,undefined); assert.equal(state.sequence,undefined); assert.equal(state.finalAcceptance,undefined); mock.setSceneQcThrows(false); assert.equal((await service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from('retry-me')})).lifecycleStatus,'QC_PASS');
+}));
 
 test('Final Acceptance records every fail-closed blocker and WARN-only QC remains accepted', async()=>withWorkspace(async({service})=>{
   const build=await ready(service); const base=structuredClone(active(service)); const cases:readonly [string,(state:any)=>void][]=[

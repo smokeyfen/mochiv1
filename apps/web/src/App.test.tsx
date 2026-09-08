@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { App } from './App';
+import { App, DeliveryCenter } from './App';
+import type { DeliveryManifest } from './production-client';
 
 const createObjectUrl = vi.fn((file: File) => `blob:preview-${file.name}`);
 const revokeObjectUrl = vi.fn();
@@ -38,6 +39,10 @@ function enterValidProjectInput() {
 function submitProject() {
   fireEvent.click(screen.getByRole('button', { name: 'Validate project input' }));
 }
+
+const delivery:DeliveryManifest={version:'DELIVERY_PACKAGE_V1',status:'READY_FOR_DELIVERY',outputs:[
+  {filename:'scene-01.mp4',mimeType:'video/mp4'},{filename:'scene-02.mp4',mimeType:'video/mp4'},{filename:'scene-03.mp4',mimeType:'video/mp4'},{filename:'scene-04.mp4',mimeType:'video/mp4'},{filename:'key-points.txt',mimeType:'text/plain; charset=utf-8'}
+]};
 
 function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetIds: readonly string[]) => readonly Record<string, unknown>[])): Response {
   const request = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
@@ -310,5 +315,35 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('GEMINI_NOT_CONFIGURED')).toBeInTheDocument());
     expect(analyze).toBeDisabled();
     expect(screen.getByAltText(/Preview for asset-/).getAttribute('src')).toBe(selectedBefore);
+  });
+
+  it('shows Delivery Center only after READY_FOR_DELIVERY and displays exactly five filenames', () => {
+    render(<DeliveryCenter snapshotId="snapshot-1" delivery={{...delivery,status:'NOT_READY'}} onDelivery={vi.fn()} />);
+    expect(screen.queryByRole('heading',{name:'Delivery'})).not.toBeInTheDocument();
+    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />);
+    expect(screen.getByRole('heading',{name:'Delivery'})).toBeInTheDocument();
+    expect(delivery.outputs.map(output=>screen.getByText(output.filename))).toHaveLength(5);
+  });
+
+  it('downloads the exact requested individual delivery filename', async () => {
+    const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{}); const bytes=new Uint8Array([7,8,9]);
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(bytes,{status:200})));
+    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button',{name:'Download Scene 2'}));
+    await waitFor(()=>expect(globalThis.fetch).toHaveBeenCalledWith('/api/production/delivery/scene-02.mp4?snapshotId=snapshot-1'));
+    expect(click).toHaveBeenCalledTimes(1); const blob=createObjectUrl.mock.calls.at(-1)?.[0] as Blob; expect(blob.size).toBe(bytes.length);
+  });
+
+  it('writes all five exact outputs through the folder picker', async () => {
+    const writes:{name:string;blob:Blob}[]=[]; const picker=vi.fn().mockResolvedValue({getFileHandle:async(name:string)=>({createWritable:async()=>({write:async(blob:Blob)=>{writes.push({name,blob});},close:async()=>{}})})}); Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:picker});
+    const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/production/delivery/receipt'?Promise.resolve(new Response(JSON.stringify({ok:true,delivery:{...delivery,status:'DELIVERED'}}))):Promise.resolve(new Response(`bytes:${String(url)}`))); vi.stubGlobal('fetch',fetchMock); const onDelivery=vi.fn();
+    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={onDelivery} />); fireEvent.click(screen.getByRole('button',{name:'Save 5 files to folder'}));
+    await waitFor(()=>expect(onDelivery).toHaveBeenCalledWith(expect.objectContaining({status:'DELIVERED'}))); expect(writes.map(item=>item.name)).toEqual(delivery.outputs.map(output=>output.filename)); expect(writes.every(item=>item.blob.size>0)).toBe(true);
+  });
+
+  it('keeps individual-download fallback when the directory picker is unavailable', async () => {
+    Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:undefined}); const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{}); const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/production/delivery/receipt'?Promise.resolve(new Response(JSON.stringify({ok:true,delivery:{...delivery,status:'DELIVERED'}}))):Promise.resolve(new Response('fallback'))); vi.stubGlobal('fetch',fetchMock);
+    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />); fireEvent.click(screen.getByRole('button',{name:'Save 5 files to folder'}));
+    await waitFor(()=>expect(fetchMock.mock.calls.filter(call=>String(call[0]).startsWith('/api/production/delivery/scene-'))).toHaveLength(4)); expect(fetchMock.mock.calls.some(call=>String(call[0]).includes('key-points.txt'))).toBe(true); expect(click).toHaveBeenCalledTimes(5);
   });
 });
