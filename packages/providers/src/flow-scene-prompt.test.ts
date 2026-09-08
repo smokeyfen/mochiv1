@@ -60,7 +60,7 @@ test('Flow scene prompt compiler is pure, concise, exact about dialogue, and cou
 
 test('ordinary four-scene fixture reports exact Unicode counts within the target budget', () => {
   const compiled = fourSceneFixtureAnchors().map(compileFlowScenePromptV1);
-  assert.deepEqual(compiled.map(item => item.unicodeCharacterCount), [1100, 1088, 1105, 1091]);
+  assert.deepEqual(compiled.map(item => item.unicodeCharacterCount), [1089, 1077, 1094, 1080]);
   assert.deepEqual(compiled.map(item => item.budgetStatus), ['TARGET', 'TARGET', 'TARGET', 'TARGET']);
   assert.ok(compiled.every(item => item.unicodeCharacterCount === countUnicodeCodePoints(item.prompt)));
 });

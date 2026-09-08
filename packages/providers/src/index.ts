@@ -63,3 +63,21 @@ export {
   type FlowScenePromptV1,
   type FlowScenePromptVersion
 } from './flow-scene-prompt.ts';
+export {
+  FLOW_OMNI_FLASH_1_1_V1,
+  FLOW_PRODUCTION_REQUEST_V1,
+  FlowProductionError,
+  compileFlowProductionRequestV1,
+  executeFlowProductionRequestV1,
+  prepareSingleSceneCanaryV1,
+  resolveFlowNativeVoiceBindingV1,
+  resolveFlowReferenceBindingsV1,
+  type FlowGeneratedCandidateResultV1,
+  type FlowNativeVoiceBindingV1,
+  type FlowProductionDriverV1,
+  type FlowProductionModelTarget,
+  type FlowProductionRequestV1,
+  type FlowProductionRequestVersion,
+  type FlowReferenceBindingV1,
+  type SingleSceneCanaryPreparationV1
+} from './flow-production.ts';

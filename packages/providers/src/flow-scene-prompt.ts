@@ -49,11 +49,11 @@ function fullPrompt(anchor: SceneAnchorV1): string {
   const hard = anchor.hardContinuity;
   return [
     `Create one 8-second 9:16 vertical SMARTPHONE_POV scene. No reviewer face.`,
-    `Authoritative product identity: ${anchor.productId}; match only logical reference assets ${anchor.referenceAssetIds.join(', ')}.`,
+    'The supplied product reference image(s) are authoritative for product identity, geometry, material, packaging and visible details.',
     `Scene ${anchor.index} ${anchor.role}. Physical objective: ${anchor.physicalObjective}.`,
     `Execute exactly one canonical primary physical action: ${anchor.primaryAction}.`,
     `State progression: START [${stateText(anchor.startState)}] -> END [${stateText(anchor.endState)}].`,
-    `Hard continuity: same product and geometry/material references ${hard.productGeometryMaterialIdentity.canonicalReferenceAssetIds.join(', ')}; same ${hard.handIdentity.dominantHand} hand, skin ${hard.handIdentity.skinTone}, nails ${hard.handIdentity.nailStyle}, jewelry ${hard.handIdentity.jewelry}; environment ${hard.environment.location}, ${hard.environment.surface}, ${hard.environment.background}, ${hard.environment.lighting} lighting; logical voice ${hard.logicalVoiceIdentityId}.`,
+    `Hard continuity: preserve the supplied product references; same ${hard.handIdentity.dominantHand} hand, skin ${hard.handIdentity.skinTone}, nails ${hard.handIdentity.nailStyle}, jewelry ${hard.handIdentity.jewelry}; environment ${hard.environment.location}, ${hard.environment.surface}, ${hard.environment.background}, ${hard.environment.lighting} lighting.`,
     `Presentation: ${anchor.visualRhythm.presentationIntent}, ${anchor.visualRhythm.energy.toLowerCase()} energy, action ${anchor.visualRhythm.primaryActionTiming.toLowerCase()}; beats ${anchor.visualRhythm.presentationBeats.map(beat => beatText[beat]).join(', ')}; camera ${cameraText[anchor.visualRhythm.cameraBehavior]}.`,
     `Say this exact dialogue without alteration: ${anchor.dialogue}`,
     'One visible hand only; preserve established hand identity and continuous product contact. No second contact event, new prop interaction, cap opening, dispensing, additional product-state transition, uncontracted cut/reset, teleportation, impossible grip, or hand/product penetration.'
@@ -68,9 +68,9 @@ function fullPrompt(anchor: SceneAnchorV1): string {
 function compactPrompt(anchor: SceneAnchorV1): string {
   const hard = anchor.hardContinuity;
   return [
-    `8s, 9:16, SMARTPHONE_POV; no face. Product ${anchor.productId}; only refs ${anchor.referenceAssetIds.join(', ')}.`,
+    '8s, 9:16, SMARTPHONE_POV; no face. Supplied product reference image(s) are authoritative for identity, geometry, material, packaging and visible details.',
     `Action: exactly ${anchor.primaryAction}. State: ${stateText(anchor.startState)} -> ${stateText(anchor.endState)}.`,
-    `Continuity: ${hard.handIdentity.dominantHand} hand, ${hard.handIdentity.skinTone} skin, ${hard.handIdentity.nailStyle} nails, ${hard.handIdentity.jewelry} jewelry; ${hard.environment.location}/${hard.environment.surface}/${hard.environment.background}/${hard.environment.lighting}; voice ${hard.logicalVoiceIdentityId}; product refs ${hard.productGeometryMaterialIdentity.canonicalReferenceAssetIds.join(', ')}.`,
+    `Continuity: preserve supplied product references; ${hard.handIdentity.dominantHand} hand, ${hard.handIdentity.skinTone} skin, ${hard.handIdentity.nailStyle} nails, ${hard.handIdentity.jewelry} jewelry; ${hard.environment.location}/${hard.environment.surface}/${hard.environment.background}/${hard.environment.lighting}.`,
     `Presentation: ${anchor.visualRhythm.presentationIntent}; ${anchor.visualRhythm.presentationBeats.map(beat => beatText[beat]).join(', ')}; ${cameraText[anchor.visualRhythm.cameraBehavior]}.`,
     `Exact dialogue: ${anchor.dialogue}`,
     'One hand; continuous contact. No second contact, prop, cap opening, dispensing, added state change, cut/reset, teleportation, impossible grip, or penetration.'
