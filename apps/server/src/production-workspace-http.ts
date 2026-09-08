@@ -1,5 +1,5 @@
 import { validateMochiProjectInput, type MochiProjectInput } from '@mochi/contracts';
-import { ProductionWorkspaceError, ProductionWorkspaceService, type BrowserReferenceMedia } from './production-workspace.ts';
+import { ProductionWorkspaceError, ProductionWorkspaceService, type BrowserReferenceMedia, type DeliveryOutputName } from './production-workspace.ts';
 import { RuntimeConfiguration } from './runtime-configuration.ts';
 
 export function createProductionWorkspaceHttpHandler(dependencies:{readonly runtime:RuntimeConfiguration;readonly workspace:ProductionWorkspaceService}):(request:Request)=>Promise<Response> {
@@ -13,6 +13,9 @@ export function createProductionWorkspaceHttpHandler(dependencies:{readonly runt
     if(path==='/api/production/repair'&&request.method==='POST') return repair(request,dependencies.workspace);
     if(path==='/api/production/sequence'&&request.method==='POST') return sequence(request,dependencies.workspace);
     if(path==='/api/production/final-acceptance'&&request.method==='POST') return finalAcceptance(request,dependencies.workspace);
+    if(path==='/api/production/delivery'&&request.method==='GET') return deliveryManifest(request,dependencies.workspace);
+    if(path==='/api/production/delivery/receipt'&&request.method==='POST') return deliveryReceipt(request,dependencies.workspace);
+    if(path.startsWith('/api/production/delivery/')&&request.method==='GET') return deliveryOutput(request,dependencies.workspace,path.slice('/api/production/delivery/'.length));
     return Response.json({ok:false,error:{code:'NOT_FOUND'}},{status:404});
   };
 }
@@ -22,8 +25,12 @@ async function upload(request:Request,workspace:ProductionWorkspaceService):Prom
 async function repair(request:Request,workspace:ProductionWorkspaceService):Promise<Response>{ try { const body=await request.json() as {snapshotId?:unknown;sceneId?:unknown;candidateAssetId?:unknown}; if(typeof body?.snapshotId!=='string'||typeof body.sceneId!=='string'||typeof body.candidateAssetId!=='string') return failure('REPAIR_NOT_AVAILABLE'); return Response.json({ok:true,scene:workspace.replaceFailedCandidate(body.snapshotId,body.sceneId,body.candidateAssetId)}); } catch(error) { return map(error); } }
 async function sequence(request:Request,workspace:ProductionWorkspaceService):Promise<Response>{ try { const body=await request.json() as {snapshotId?:unknown}; if(typeof body?.snapshotId!=='string') return failure('INVALID_OR_STALE_VIDEO'); return Response.json({ok:true,sequence:await workspace.runSequence(body.snapshotId)}); } catch(error) { return map(error); } }
 async function finalAcceptance(request:Request,workspace:ProductionWorkspaceService):Promise<Response>{ try { const body=await request.json() as {snapshotId?:unknown}; if(typeof body?.snapshotId!=='string') return failure('INVALID_OR_STALE_VIDEO'); return Response.json({ok:true,finalAcceptance:workspace.finalAcceptance(body.snapshotId)}); } catch(error) { return map(error); } }
+function deliveryManifest(request:Request,workspace:ProductionWorkspaceService):Response { try { const snapshotId=new URL(request.url).searchParams.get('snapshotId'); if(!snapshotId) return failure('DELIVERY_NOT_READY'); return Response.json({ok:true,delivery:workspace.deliveryManifest(snapshotId)}); } catch(error) { return map(error); } }
+async function deliveryReceipt(request:Request,workspace:ProductionWorkspaceService):Promise<Response>{ try { const body=await request.json() as {snapshotId?:unknown}; if(typeof body?.snapshotId!=='string') return failure('DELIVERY_NOT_READY'); return Response.json({ok:true,delivery:workspace.recordDelivery(body.snapshotId)}); } catch(error) { return map(error); } }
+function deliveryOutput(request:Request,workspace:ProductionWorkspaceService,filename:string):Response { try { const snapshotId=new URL(request.url).searchParams.get('snapshotId'); if(!snapshotId||!isDeliveryOutputName(filename)) return failure('DELIVERY_OUTPUT_NOT_FOUND'); const output=workspace.deliveryOutput(snapshotId,filename); return new Response(output.bytes.buffer as ArrayBuffer,{headers:{'content-type':output.mimeType,'content-disposition':`attachment; filename="${filename}"`}}); } catch(error) { return map(error); } }
 function decodeProject(value:FormDataEntryValue|null):MochiProjectInput|undefined { if(typeof value!=='string') return; try { const project=JSON.parse(value) as MochiProjectInput; return validateMochiProjectInput(project).length===0?project:undefined; } catch { return; } }
 async function decodeReferences(form:FormData,project:MochiProjectInput):Promise<readonly BrowserReferenceMedia[]|undefined>{ const result:BrowserReferenceMedia[]=[]; for(const asset of project.product.assets){const value=form.get(`asset:${asset.assetId}`); if(typeof value==='string'||!(value instanceof Blob)||value.type!==asset.mimeType||!value.type.startsWith('image/')||value.size===0)return; result.push({assetId:asset.assetId,mimeType:value.type,dataBase64:Buffer.from(await value.arrayBuffer()).toString('base64')});} return result; }
 function field(form:FormData,key:string):string|undefined { const value=form.get(key); return typeof value==='string'&&value.trim().length>0?value:undefined; }
 function map(error:unknown):Response { if(error instanceof ProductionWorkspaceError) return failure(error.code); return failure('PRODUCTION_BUILD_FAILED'); }
-function failure(code:string):Response { return Response.json({ok:false,error:{code}},{status:code==='GEMINI_NOT_CONFIGURED'?503:400}); }
+function isDeliveryOutputName(value:string):value is DeliveryOutputName { return ['scene-01.mp4','scene-02.mp4','scene-03.mp4','scene-04.mp4','key-points.txt'].includes(value); }
+function failure(code:string):Response { return Response.json({ok:false,error:{code}},{status:code==='GEMINI_NOT_CONFIGURED'?503:code==='DELIVERY_NOT_READY'||code==='DELIVERY_OUTPUT_NOT_FOUND'?409:400}); }

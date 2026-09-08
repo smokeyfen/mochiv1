@@ -12,6 +12,9 @@ export type RuntimeStatus = 'GEMINI_READY' | 'GEMINI_NOT_CONFIGURED';
 export class RuntimeConfiguration {
   #provider: IntelligenceProvider | undefined;
 
+  /** Injected only by deterministic server tests; browser setup still owns normal configuration. */
+  constructor(provider?: IntelligenceProvider) { this.#provider = provider; }
+
   status(): RuntimeStatus { return this.#provider === undefined ? 'GEMINI_NOT_CONFIGURED' : 'GEMINI_READY'; }
   provider(): IntelligenceProvider | undefined { return this.#provider; }
   connect(apiKey: unknown): RuntimeStatus {
