@@ -55,6 +55,11 @@ function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetI
     }
   }), { status: 200, headers: { 'content-type': 'application/json' } });
 }
+const statusResponse=(status:'GEMINI_READY'|'GEMINI_NOT_CONFIGURED') => new Response(JSON.stringify({ok:true,status}),{status:200,headers:{'content-type':'application/json'}});
+function mockReadyRuntime(analysis:(()=>Response)|undefined=undefined) {
+  const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):Promise.resolve(analysis?.() ?? new Response('{}')));
+  vi.stubGlobal('fetch',fetchMock); return fetchMock;
+}
 
 describe('App', () => {
   it('renders canonical product and creative form fields', () => {
@@ -181,14 +186,14 @@ describe('App', () => {
     expect(preview).not.toMatch(/[A-Z]:\\|\/Users\/|\/home\//);
     expect(preview).not.toMatch(/File|Blob|Gemini|Flow|generate/i);
     expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeInTheDocument();
-    expect(screen.queryByText(/Gemini|Flow|generate/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Runtime Setup')).toBeInTheDocument();
   });
 
   it('posts factual product input only and renders validated Product Evidence', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse()));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = mockReadyRuntime(() => evidenceResponse());
     render(<App />);
     enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     expect(screen.getByRole('status')).toHaveTextContent('ANALYZING PRODUCT');
     await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
@@ -198,17 +203,18 @@ describe('App', () => {
     expect(screen.getByText('ALLOWED')).toBeInTheDocument();
     expect(screen.getByText('1 reference')).toBeInTheDocument();
     expect(screen.getByText('No recorded uncertainties.')).toBeInTheDocument();
-    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    const body = fetchMock.mock.calls.find(call => String(call[0]) === '/api/product-evidence')?.[1]?.body as FormData;
     expect(JSON.parse(body.get('product') as string)).not.toHaveProperty('creativeDirection');
     expect([...body.keys()]).toEqual(['product', expect.stringMatching(/^asset:asset-/)]);
   });
 
   it('clears product evidence immediately after a factual edit and ignores a late result', async () => {
     let resolveFetch: ((value: Response) => void) | undefined;
-    const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>(resolve => { resolveFetch = resolve; }));
+    const fetchMock = vi.fn().mockImplementation((url:unknown) => String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):new Promise<Response>(resolve => { resolveFetch = resolve; }));
     vi.stubGlobal('fetch', fetchMock);
     render(<App />);
     enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     expect(screen.getByRole('status')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Changed bottle' } });
@@ -217,19 +223,19 @@ describe('App', () => {
     resolveFetch!(evidenceResponse());
     await Promise.resolve();
     expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
   });
 
   it('keeps evidence through creative edits but clears it on adding or removing a reference', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse()));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = mockReadyRuntime(() => evidenceResponse());
     render(<App />);
     enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'A new audience' } });
     expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
     selectProductImage('side.jpg');
     expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
@@ -237,10 +243,10 @@ describe('App', () => {
   });
 
   it('keeps provider and malformed response details out of the user-facing error', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, error: { code: 'ANALYSIS_UNAVAILABLE', detail: 'Bearer raw-secret' } }), { status: 503 }));
-    vi.stubGlobal('fetch', fetchMock);
+    mockReadyRuntime(() => new Response(JSON.stringify({ ok: false, error: { code: 'ANALYSIS_UNAVAILABLE', detail: 'Bearer raw-secret' } }), { status: 503 }));
     render(<App />);
     enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ANALYSIS UNAVAILABLE'));
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
@@ -248,13 +254,13 @@ describe('App', () => {
   });
 
   it('renders each claim allowed state directly without exposing supporting asset IDs', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(evidenceResponse(assetIds => [
+    const fetchMock = mockReadyRuntime(() => evidenceResponse(assetIds => [
       { claimId: 'claim-allowed', text: 'Reference-supported bottle', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: [...assetIds, ...assetIds], allowed: true },
       { claimId: 'claim-blocked', text: 'Unverified marketing claim', source: 'USER_INPUT', evidenceAssetIds: [], allowed: false }
-    ])));
-    vi.stubGlobal('fetch', fetchMock);
+    ]));
     render(<App />);
     enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     await waitFor(() => expect(screen.getByText('Reference-supported bottle')).toBeInTheDocument());
     expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
@@ -262,9 +268,40 @@ describe('App', () => {
     expect(screen.getByText('ALLOWED')).toBeInTheDocument();
     expect(screen.getByText('NOT ALLOWED')).toBeInTheDocument();
     expect(screen.getByText('2 references')).toBeInTheDocument();
-    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    const body = fetchMock.mock.calls.find(call => String(call[0]) === '/api/product-evidence')?.[1]?.body as FormData;
     const assetId = (JSON.parse(body.get('product') as string) as { assets: readonly { assetId: string }[] }).assets[0]!.assetId;
     expect(screen.queryByText(assetId)).not.toBeInTheDocument();
     expect(screen.getByText('Unverified marketing claim').parentElement).toHaveTextContent('NOT ALLOWED');
+  });
+
+  it('owns Runtime Setup before analysis and gates analysis through safe server status', async () => {
+    const apiKey='browser-only-test-secret';
+    const fetchMock=vi.fn().mockImplementation((url:unknown, init?:RequestInit) => {
+      const path=String(url);
+      if(path==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_NOT_CONFIGURED'));
+      if(path==='/api/runtime/connect') { expect(JSON.parse(String(init?.body))).toEqual({apiKey}); return Promise.resolve(statusResponse('GEMINI_READY')); }
+      if(path==='/api/runtime/disconnect') return Promise.resolve(statusResponse('GEMINI_NOT_CONFIGURED'));
+      return Promise.resolve(evidenceResponse());
+    });
+    vi.stubGlobal('fetch',fetchMock);
+    render(<App />);
+    expect(screen.getByText('Runtime Setup')).toBeInTheDocument();
+    expect(screen.queryByText('Production Workspace')).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/runtime/status'));
+    const analyze=screen.getByRole('button',{name:'Analyze Product'});
+    expect(analyze).toBeDisabled();
+    expect(screen.getByText('Connect Gemini to analyze the product.')).toBeInTheDocument();
+    enterValidProjectInput();
+    const selectedBefore=screen.getByAltText(/Preview for asset-/).getAttribute('src');
+    fireEvent.change(screen.getByLabelText('Gemini API Key'),{target:{value:apiKey}});
+    fireEvent.click(screen.getByRole('button',{name:'Connect'}));
+    await waitFor(() => expect(screen.getByText('GEMINI_READY')).toBeInTheDocument());
+    expect(analyze).toBeEnabled();
+    expect(document.body.textContent).not.toContain(apiKey);
+    expect(window.localStorage.getItem('GEMINI_API_KEY')).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'Disconnect'}));
+    await waitFor(() => expect(screen.getByText('GEMINI_NOT_CONFIGURED')).toBeInTheDocument());
+    expect(analyze).toBeDisabled();
+    expect(screen.getByAltText(/Preview for asset-/).getAttribute('src')).toBe(selectedBefore);
   });
 });

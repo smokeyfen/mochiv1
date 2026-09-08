@@ -48,7 +48,7 @@ textarea { resize: vertical; }
 .empty-evidence { font-style: italic; font-size: .9rem; }
 .primary-button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 640px) { .evidence-grid { grid-template-columns: 1fr; } }
-.production-workspace { border-color: #94bda3; margin-top: 22px; }
+.runtime-setup, .production-workspace { border-color: #94bda3; margin-top: 22px; }
 .runtime-row { align-items: end; display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
 .runtime-row label { min-width: 250px; }
 .scene-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
