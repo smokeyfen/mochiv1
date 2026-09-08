@@ -98,4 +98,4 @@ export {
   type SceneQcTemporalGate,
   type SceneQcVideoMediaV1
 } from './scene-qc.ts';
-export { FOUR_SCENE_PRODUCTION_V1, SequenceQcError, runFourSceneProductionV1, type FourSceneProductionInputV1, type GeneratedVideoMediaResolverV1, type GlobalGate, type PairwiseAssessmentV1, type PairwiseGate, type SequenceResultV1 } from './four-scene-production.ts';
+export { FOUR_SCENE_PRODUCTION_V1, SEQUENCE_QC_OUTPUT_SCHEMA, SequenceQcError, runFourSceneProductionV1, runManualCandidateSequenceQcV1, type FourSceneProductionInputV1, type GeneratedVideoMediaResolverV1, type GlobalGate, type ManualCandidateSequenceQcInputV1, type PairwiseAssessmentV1, type PairwiseGate, type SequenceResultV1 } from './four-scene-production.ts';

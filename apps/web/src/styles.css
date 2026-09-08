@@ -48,3 +48,20 @@ textarea { resize: vertical; }
 .empty-evidence { font-style: italic; font-size: .9rem; }
 .primary-button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 640px) { .evidence-grid { grid-template-columns: 1fr; } }
+.production-workspace { border-color: #94bda3; margin-top: 22px; }
+.runtime-row { align-items: end; display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.runtime-row label { min-width: 250px; }
+.scene-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+.scene-card { background: #fbfcfa; border: 1px solid #dce2da; border-radius: 10px; padding: 16px; }
+.scene-heading { align-items: start; display: flex; justify-content: space-between; gap: 12px; }
+.scene-card p { font-size: .88rem; margin: 8px 0; }
+.key-points { color: #354239; font-size: .88rem; padding-left: 20px; }
+.scene-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.lifecycle { border-radius: 999px; font-size: .7rem; font-weight: 800; padding: 4px 7px; white-space: nowrap; }
+.lifecycle-ready_for_flow,.lifecycle-qc_pass { background: #e0f1e4; color: #24533a; }.lifecycle-qc_fail { background: #f7e2e0; color: #8c2f28; }.lifecycle-video_uploaded,.lifecycle-qc_running { background: #f9efd2; color: #795b12; }
+.prompt-view { background: #17221b; border-radius: 7px; color: #dcefe2; font-size: .75rem; max-height: 280px; overflow: auto; padding: 12px; white-space: pre-wrap; word-break: break-word; }
+.flow-panel,.qc-panel,.sequence-panel { background: #f4f8f3; border: 1px solid #dce2da; border-radius: 8px; margin-top: 14px; padding: 12px; }
+.flow-panel h4,.qc-panel h4 { margin: 0 0 8px; }.flow-thumbnails { display:flex; gap:8px; margin:10px 0; }.flow-thumbnails img { border-radius:5px; height:52px; object-fit:cover; width:52px; }
+.qc-gates { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }.qc-gates strong { width:100%; }
+.gate-pass,.gate-fail,.presentation-warn { border-radius: 5px; display:inline-block; font-size:.73rem; font-weight:700; margin:4px 5px 4px 0; padding:3px 5px; }.gate-pass { background:#e0f1e4;color:#24533a; }.gate-fail { background:#f7e2e0;color:#8c2f28; }.presentation-warn { background:#f9efd2;color:#795b12; }
+@media (max-width: 760px) { .scene-grid { grid-template-columns: 1fr; } .runtime-row { align-items: stretch; flex-direction: column; } .runtime-row label { min-width: 0; } }

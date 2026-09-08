@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Mochi V1 - Start UI",
+      "type": "shell",
+      "command": "npm run dev:workspace",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}
