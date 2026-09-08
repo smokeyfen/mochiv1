@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     const service = createProductEvidenceServiceFromEnv(process.env);
     const evidence = await runSmokeEvidence(service, request);
     console.log('R1_B2_LIVE_SMOKE=PASS');
-    console.log(`provider=gemini-3-5-flash-intelligence`);
+    console.log(`provider=gemini-3-5-flash-lite-intelligence`);
     console.log(`productId=${evidence.productId}`);
     console.log(`inputAssets=${request.media.length}`);
     console.log(`canonicalAssets=${evidence.canonicalAssetIds.length}`);

@@ -10,13 +10,13 @@ export {
   type StructuredOutputSchema
 } from './intelligence.ts';
 export {
-  GEMINI_3_5_FLASH_MODEL,
-  Gemini35FlashIntelligenceProvider,
-  createGemini35FlashIntelligenceProviderFromEnv,
+  GEMINI_3_5_FLASH_LITE_MODEL,
+  Gemini35FlashLiteIntelligenceProvider,
+  createGemini35FlashLiteIntelligenceProviderFromEnv,
   type GeminiIntelligenceTransport,
   type GeminiIntelligenceTransportFactory,
   type GeminiStructuredTransportRequest
-} from './gemini-3-5-flash-intelligence.ts';
+} from './gemini-3-5-flash-lite-intelligence.ts';
 
 export interface VideoProviderCapabilities {
   referenceToVideo: boolean;

@@ -50,7 +50,7 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 
 The completed live path is:
 
-`apps/web` → relative `POST /api/product-evidence` → `apps/server` → Gemini 3.5 Flash → validated `ProductEvidence` → Product Analysis UI.
+`apps/web` → relative `POST /api/product-evidence` → `apps/server` → Gemini 3.5 Flash-Lite → validated `ProductEvidence` → Product Analysis UI.
 
 This path is locked. It keeps browser runtime files separate from logical AssetRefs, sends only factual ProductInput to Product Evidence, validates output deterministically, and keeps credentials server-side.
 
@@ -66,7 +66,7 @@ R2-B Reference Assessment is locked. It analyzes exactly one runtime image per c
 - `packages/core`: feasibility, continuity carryover, lifecycle, and ActionCapability policy.
 - `packages/evidence`: provider-neutral factual product evidence boundary.
 - `packages/reasoning`: provider-neutral reasoning modules; R2-A deterministically compiles ProductTruth from ProductEvidence.
-- `packages/providers`: Gemini 3.5 Flash intelligence adapter only. It is not a video provider.
+- `packages/providers`: Gemini 3.5 Flash-Lite intelligence adapter only. It is not a video provider.
 - `apps/harness`: dry feasibility runner; its expected output remains fail-closed `action_untested:PICK_UP`.
 - `apps/harness/src/f0-capability-campaign.ts`: approved deterministic 30-case Cocoon bottle capability campaign and trusted status entry point.
 - `docs/quality/RUBRIC_0.md`: human-review instructions for one real generated benchmark scene.
@@ -110,7 +110,7 @@ F0 is **PAUSED AFTER BATCH 1 FOR V1 FAST-TRACK**, not statistically complete. It
 
 Task 2 is implemented. `VISUAL_RHYTHM_V1` deterministically assigns role-aware presentation only: exactly one canonical primary physical action (HOLD remains valid despite no canonical state change), at most one state-changing physical action, 0–2 state-neutral beats, and 0–1 subtle camera behavior. It forbids an added product-state transition, second/new grip or hand/product contact event, prop interaction, cap opening, dispensing, and uncontracted cut/reset. `SCENE_ANCHOR_V1` is a strict, provider-neutral exact binding to `PRODUCTION_SNAPSHOT_V1`, preserving P0 scene/action/states/dialogue/references/logical voice while separating immutable hard identity/state continuity from intentionally variable soft framing. Effects are fixed to `sfx=NONE`, `vfx=NONE`. The pure provider-edge `FLOW_SCENE_PROMPT_V1` compiler uses Unicode code-point counts, returns <=2800 as target, accepts 2801..3200 only after deterministic semantic compaction with explicit headroom, and throws `PROMPT_BUDGET_EXCEEDED` above 3200. It makes no HTTP, browser, Gemini, Flow, Saydi, credential, or generation call; it does not implement the Flow adapter or voice binding.
 
-Task 3 is FINAL LOCKED / DIRECTLY AUDITED at `5422a2d765c1d02fc72d031fbf8f352cd4470f27`: Flow production requests, reference resolution, native voice bindings, and an injected-only driver remain provider-edge only; no supported live Flow runtime exists. Task 4 is IMPLEMENTATION PASS at `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756`: one-call `SCENE_QC_V1` combines Frame, Temporal, Speech, and non-critical Presentation Dynamics observation using candidate video plus exact authoritative reference images. Candidate and source binding, media identity/order/type, voice correlation, and lexical Vietnamese dialogue comparison are deterministic fail-closed gates. `GENERATED_SCENE_CANDIDATE_V1` is provider-neutral and excludes Flow metadata; QC reports never persist Base64 or approve candidates. Gemini 3.5 Flash accepts valid text-only structured reasoning (`inputText` plus `media=[]`) while retaining no-input and invalid-media rejection. Remaining roadmap: (1) Four-scene orchestrator + Pairwise + Global Continuity QC; (2) Selective Repair + Final Acceptance; (3) Delivery + Production UI + V1 E2E. The real PRE-F1-LIVE gate remains `BLOCKED_BY_ENVIRONMENT`; a supported Flow runtime and live canary remain required before final V1 acceptance.
+Task 3 is FINAL LOCKED / DIRECTLY AUDITED at `5422a2d765c1d02fc72d031fbf8f352cd4470f27`: Flow production requests, reference resolution, native voice bindings, and an injected-only driver remain provider-edge only; no supported live Flow runtime exists. Task 4 is IMPLEMENTATION PASS at `f3e75446cda6a9a2d7317bb1c1117c4a85dfe756`: one-call `SCENE_QC_V1` combines Frame, Temporal, Speech, and non-critical Presentation Dynamics observation using candidate video plus exact authoritative reference images. Candidate and source binding, media identity/order/type, voice correlation, and lexical Vietnamese dialogue comparison are deterministic fail-closed gates. `GENERATED_SCENE_CANDIDATE_V1` is provider-neutral and excludes Flow metadata; QC reports never persist Base64 or approve candidates. Gemini 3.5 Flash-Lite accepts valid text-only structured reasoning (`inputText` plus `media=[]`) while retaining no-input and invalid-media rejection. Remaining roadmap: (1) Four-scene orchestrator + Pairwise + Global Continuity QC; (2) Selective Repair + Final Acceptance; (3) Delivery + Production UI + V1 E2E. The real PRE-F1-LIVE gate remains `BLOCKED_BY_ENVIRONMENT`; a supported Flow runtime and live canary remain required before final V1 acceptance.
 
 Baseline transfer confidence is accepted for roadmap continuation because the completed real PICK_UP and HOLD canaries each have a valid, single reviewed RUBRIC-0 PASS observation. Those observations do not promote either action: the locked 10-attempt, 0.90 SAFE, and 0.60 RISKY policy remains in force.
 
@@ -141,7 +141,7 @@ RUBRIC-0 still evaluates one generated benchmark scene against actual generated 
 ### Providers and credentials
 
 - **Google Flow is the only video generator and the V1 primary authoritative native-speech path.** Flow / Omni Flash 1.1 usage stays behind a provider/infrastructure boundary.
-- **Gemini 3.5 Flash is reasoning and QC only.** It must not implement `VideoProvider` or generate video.
+- **Gemini 3.5 Flash-Lite is reasoning and QC only.** It must not implement `VideoProvider` or generate video.
 - Core never receives Flow media IDs, Flow project IDs, Gemini file URIs, bearer/session values, provider operation IDs, endpoints, request IDs, upload bytes, or local paths.
 - Credentials are environment-only and server-only. Do not expose, log, or commit secrets.
 

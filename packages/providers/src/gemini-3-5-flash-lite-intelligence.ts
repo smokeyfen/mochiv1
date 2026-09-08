@@ -9,10 +9,10 @@ import {
 } from './intelligence.ts';
 
 /** The only Gemini model accepted by this M2-A intelligence provider. */
-export const GEMINI_3_5_FLASH_MODEL = 'gemini-3.5-flash' as const;
+export const GEMINI_3_5_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite' as const;
 
 export interface GeminiStructuredTransportRequest {
-  readonly model: typeof GEMINI_3_5_FLASH_MODEL;
+  readonly model: typeof GEMINI_3_5_FLASH_LITE_MODEL;
   readonly instruction: string;
   readonly inputText?: string;
   readonly media: readonly IntelligenceMediaInput[];
@@ -70,8 +70,8 @@ export function createGeminiGenerateContentRequest(request: GeminiStructuredTran
 const createGeminiSdkTransport: GeminiIntelligenceTransportFactory = apiKey =>
   new GeminiSdkStructuredTransport(apiKey);
 
-export class Gemini35FlashIntelligenceProvider implements IntelligenceProvider {
-  readonly id = 'gemini-3-5-flash-intelligence';
+export class Gemini35FlashLiteIntelligenceProvider implements IntelligenceProvider {
+  readonly id = 'gemini-3-5-flash-lite-intelligence';
   private readonly transport: GeminiIntelligenceTransport;
 
   constructor(transport: GeminiIntelligenceTransport) {
@@ -85,7 +85,7 @@ export class Gemini35FlashIntelligenceProvider implements IntelligenceProvider {
 
     try {
       const text = await this.transport.generateStructured({
-        model: GEMINI_3_5_FLASH_MODEL,
+        model: GEMINI_3_5_FLASH_LITE_MODEL,
         instruction: request.instruction,
         ...(request.inputText === undefined ? {} : { inputText: request.inputText }),
         media: request.media,
@@ -120,15 +120,15 @@ export class Gemini35FlashIntelligenceProvider implements IntelligenceProvider {
  * Reads the key at the infrastructure edge only.  The key is never returned,
  * logged, or included in an error message.
  */
-export function createGemini35FlashIntelligenceProviderFromEnv(
+export function createGemini35FlashLiteIntelligenceProviderFromEnv(
   environment: Readonly<Record<string, string | undefined>> = process.env,
   transportFactory: GeminiIntelligenceTransportFactory = createGeminiSdkTransport
-): Gemini35FlashIntelligenceProvider {
+): Gemini35FlashLiteIntelligenceProvider {
   const apiKey = environment.GEMINI_API_KEY?.trim();
   if (apiKey === undefined || apiKey.length === 0) {
     throw new IntelligenceProviderError('CONFIGURATION', false);
   }
-  return new Gemini35FlashIntelligenceProvider(transportFactory(apiKey));
+  return new Gemini35FlashLiteIntelligenceProvider(transportFactory(apiKey));
 }
 
 function validateRequest<T>(request: StructuredIntelligenceRequest<T>): void {

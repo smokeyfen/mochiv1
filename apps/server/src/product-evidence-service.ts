@@ -1,7 +1,7 @@
 import type { ProductEvidence, ProductInput } from '@mochi/contracts';
 import { analyzeProductEvidence } from '@mochi/evidence';
 import {
-  createGemini35FlashIntelligenceProviderFromEnv,
+  createGemini35FlashLiteIntelligenceProviderFromEnv,
   type IntelligenceMediaInput,
   type IntelligenceProvider
 } from '@mochi/providers';
@@ -40,7 +40,7 @@ export function createProductEvidenceService(
  */
 export function createProductEvidenceServiceFromEnv(
   environment: ServerEnvironment = process.env,
-  createIntelligence: IntelligenceProviderFromEnvironment = createGemini35FlashIntelligenceProviderFromEnv
+  createIntelligence: IntelligenceProviderFromEnvironment = createGemini35FlashLiteIntelligenceProviderFromEnv
 ): ProductEvidenceService {
   return createProductEvidenceService({ intelligence: createIntelligence(environment) });
 }

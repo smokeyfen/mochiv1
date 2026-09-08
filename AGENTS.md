@@ -85,7 +85,7 @@ Do not mark an action `SAFE` or `RISKY` from intuition, a single output, or non-
 
 ## Locked architecture rules
 
-- Google Flow is the only video generator and the V1 primary authoritative native-speech path. Gemini 3.5 Flash is reasoning and QC only.
+- Google Flow is the only video generator and the V1 primary authoritative native-speech path. Gemini 3.5 Flash-Lite is reasoning and QC only.
 - Core contracts remain provider-neutral. Keep provider identifiers, credentials, endpoints, operation IDs, media IDs, file URIs, and session data outside Core.
 - `apps/web` is the only user-facing surface.
 - Product Truth is separate from `CreativeDirectionInput`; creative controls must not invent product facts.

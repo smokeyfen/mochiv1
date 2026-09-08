@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  GEMINI_3_5_FLASH_MODEL,
-  Gemini35FlashIntelligenceProvider,
+  GEMINI_3_5_FLASH_LITE_MODEL,
+  Gemini35FlashLiteIntelligenceProvider,
   createGeminiGenerateContentRequest,
-  createGemini35FlashIntelligenceProviderFromEnv,
+  createGemini35FlashLiteIntelligenceProviderFromEnv,
   type GeminiIntelligenceTransport,
   type GeminiStructuredTransportRequest
-} from './gemini-3-5-flash-intelligence.ts';
+} from './gemini-3-5-flash-lite-intelligence.ts';
 import { IntelligenceProviderError } from './intelligence.ts';
 
 const request = {
@@ -27,7 +27,7 @@ test('missing GEMINI_API_KEY fails before a transport is created', () => {
   let factoryCalled = false;
 
   assert.throws(
-    () => createGemini35FlashIntelligenceProviderFromEnv({}, () => {
+    () => createGemini35FlashLiteIntelligenceProviderFromEnv({}, () => {
       factoryCalled = true;
       throw new Error('must not be called');
     }),
@@ -38,7 +38,7 @@ test('missing GEMINI_API_KEY fails before a transport is created', () => {
   assert.equal(factoryCalled, false);
 });
 
-test('Gemini intelligence requests use the fixed free-tier model and return typed data', async () => {
+test('Gemini intelligence requests use the fixed Flash-Lite model and return typed data', async () => {
   let captured: GeminiStructuredTransportRequest | undefined;
   const transport: GeminiIntelligenceTransport = {
     async generateStructured(nextRequest) {
@@ -46,12 +46,13 @@ test('Gemini intelligence requests use the fixed free-tier model and return type
       return JSON.stringify({ label: 'bottle' });
     }
   };
-  const provider = new Gemini35FlashIntelligenceProvider(transport);
+  const provider = new Gemini35FlashLiteIntelligenceProvider(transport);
 
   const result = await provider.analyzeStructured(request);
 
   assert.deepEqual(result, { data: { label: 'bottle' } });
-  assert.equal(captured?.model, GEMINI_3_5_FLASH_MODEL);
+  assert.equal(GEMINI_3_5_FLASH_LITE_MODEL, 'gemini-3.5-flash-lite');
+  assert.equal(captured?.model, 'gemini-3.5-flash-lite');
   assert.equal(captured?.inputText, undefined);
   assert.equal(captured?.media[0]?.assetId, 'logical-product-image');
   assert.equal(captured?.outputSchema, request.outputSchema);
@@ -59,7 +60,7 @@ test('Gemini intelligence requests use the fixed free-tier model and return type
 
 test('Gemini transport maps authoritative instruction and untrusted input to separate SDK fields', () => {
   const mapped = createGeminiGenerateContentRequest({
-    model: GEMINI_3_5_FLASH_MODEL,
+    model: GEMINI_3_5_FLASH_LITE_MODEL,
     instruction: 'Authoritative policy',
     inputText: 'Untrusted task data',
     media: [{ assetId: 'logical-image', mimeType: 'image/png', dataBase64: 'aGVsbG8=' }],
@@ -75,7 +76,7 @@ test('Gemini transport maps authoritative instruction and untrusted input to sep
 
 test('blank optional input text fails before the transport is called', async () => {
   let called = false;
-  const provider = new Gemini35FlashIntelligenceProvider({
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
     async generateStructured() {
       called = true;
       return '{}';
@@ -90,7 +91,7 @@ test('blank optional input text fails before the transport is called', async () 
 
 test('text-only structured reasoning is accepted while no-input and invalid media requests fail closed', async () => {
   let calls = 0;
-  const provider = new Gemini35FlashIntelligenceProvider({
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
     async generateStructured() { calls += 1; return JSON.stringify({ label: 'text-only' }); }
   });
   assert.deepEqual(await provider.analyzeStructured({ ...request, inputText: 'pure text reasoning', media: [] }), { data: { label: 'text-only' } });
@@ -100,20 +101,38 @@ test('text-only structured reasoning is accepted while no-input and invalid medi
   assert.equal(calls, 1);
 });
 
+test('video structured reasoning remains valid with the fixed Flash-Lite model', async () => {
+  let captured: GeminiStructuredTransportRequest | undefined;
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
+    async generateStructured(nextRequest) {
+      captured = nextRequest;
+      return JSON.stringify({ label: 'video' });
+    }
+  });
+
+  assert.deepEqual(await provider.analyzeStructured({
+    ...request,
+    media: [{ assetId: 'logical-scene-video', mimeType: 'video/mp4', dataBase64: 'dmlkZW8=' }]
+  }), { data: { label: 'video' } });
+  assert.equal(captured?.model, 'gemini-3.5-flash-lite');
+  assert.equal(captured?.media[0]?.mimeType, 'video/mp4');
+});
+
 test('provider remains an intelligence boundary rather than a VideoProvider', () => {
-  const provider = new Gemini35FlashIntelligenceProvider({
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
     async generateStructured() {
       return '{}';
     }
   });
 
+  assert.equal(provider.id, 'gemini-3-5-flash-lite-intelligence');
   assert.equal(typeof provider.analyzeStructured, 'function');
   assert.equal('generate' in provider, false);
   assert.equal('edit' in provider, false);
 });
 
 test('Gemini transport errors normalize without exposing provider details', async () => {
-  const provider = new Gemini35FlashIntelligenceProvider({
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
     async generateStructured() {
       throw { status: 429, message: 'request-123 and an internal provider response' };
     }
@@ -129,7 +148,7 @@ test('Gemini transport errors normalize without exposing provider details', asyn
 });
 
 test('invalid structured responses fail closed', async () => {
-  const provider = new Gemini35FlashIntelligenceProvider({
+  const provider = new Gemini35FlashLiteIntelligenceProvider({
     async generateStructured() {
       return 'not-json';
     }

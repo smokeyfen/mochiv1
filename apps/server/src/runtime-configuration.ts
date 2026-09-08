@@ -1,5 +1,5 @@
 import {
-  createGemini35FlashIntelligenceProviderFromEnv,
+  createGemini35FlashLiteIntelligenceProviderFromEnv,
   type IntelligenceProvider
 } from '@mochi/providers';
 
@@ -20,7 +20,7 @@ export class RuntimeConfiguration {
   connect(apiKey: unknown): RuntimeStatus {
     if (typeof apiKey !== 'string' || apiKey.trim().length === 0) throw new Error('INVALID_CONFIGURATION');
     // The provider factory is reused with a one-off object; process.env is never changed.
-    this.#provider = createGemini35FlashIntelligenceProviderFromEnv({ GEMINI_API_KEY: apiKey });
+    this.#provider = createGemini35FlashLiteIntelligenceProviderFromEnv({ GEMINI_API_KEY: apiKey });
     return this.status();
   }
   disconnect(): RuntimeStatus { this.#provider = undefined; return this.status(); }

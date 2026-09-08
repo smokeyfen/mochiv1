@@ -6,7 +6,7 @@ import {
 } from '@mochi/contracts';
 import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import {
-  createGemini35FlashIntelligenceProviderFromEnv,
+  createGemini35FlashLiteIntelligenceProviderFromEnv,
   type IntelligenceProvider,
   type StructuredIntelligenceRequest
 } from '@mochi/providers';
@@ -110,7 +110,7 @@ export async function runPreF1Live(dependencies: PreF1LiveRunnerDependencies): P
   try {
     const manifest = await (dependencies.loadManifest ?? defaultLoadManifest)(environment.PRE_F1_LIVE_MANIFEST);
     const evidenceRequest = await (dependencies.prepareMedia ?? buildSmokeEvidenceRequest)({ product: manifest.product, images: manifest.images });
-    const concrete = (dependencies.createIntelligence ?? createGemini35FlashIntelligenceProviderFromEnv)(environment);
+    const concrete = (dependencies.createIntelligence ?? createGemini35FlashLiteIntelligenceProviderFromEnv)(environment);
     const calls: string[] = [];
     const intelligence: IntelligenceProvider = {
       id: concrete.id,

@@ -312,6 +312,8 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button',{name:'Connect'}));
     await waitFor(() => expect(screen.getByText('GEMINI_READY')).toBeInTheDocument());
     expect(analyze).toBeEnabled();
+    expect(screen.getByText('Model')).toBeInTheDocument();
+    expect(screen.getByText('Gemini 3.5 Flash-Lite')).toBeInTheDocument();
     expect(screen.getByText('LOCKED')).toBeInTheDocument();
     expect(screen.queryByLabelText('Gemini API Key')).not.toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'Connect'})).not.toBeInTheDocument();

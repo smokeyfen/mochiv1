@@ -28,7 +28,7 @@ All ActionIds start UNTESTED. Only empirical evidence from the Flow video feasib
 
 ## Provider separation
 
-Gemini 3.5 Flash Free Tier is an intelligence and multimodal-analysis provider only. It must not implement `VideoProvider`. Actual video generation is a separate responsibility reserved for a future Google Flow adapter using Flow credits.
+Gemini 3.5 Flash-Lite is an intelligence and multimodal-analysis provider only. It must not implement `VideoProvider`. Actual video generation is a separate responsibility reserved for a future Google Flow adapter using Flow credits.
 
 ## UI
 
