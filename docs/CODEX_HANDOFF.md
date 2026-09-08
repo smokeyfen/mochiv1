@@ -40,7 +40,8 @@ MochiV1 has completed and locked the R1 Product Evidence application path.
 - F0-B Trusted Capability Evidence Foundation: **FINAL LOCKED / DIRECTLY AUDITED** at `da3b289c76795e2a33360525c11e1ca4451fcffa`
 - F0-C Controlled Flow Benchmark Execution Planner: **FINAL LOCKED / DIRECTLY AUDITED** at implementation `812af23a5737c58b60d76ef533e0574e927d6ed3` (F0-C1 remains `533960348da9ba03e29ed259bcdc689522116116`)
 - F0-D1 Controlled Flow Benchmark Batch 1: **EMPIRICAL PASS / human Rubric-0 reviewed**
-- PRE-F1-LIVE: **BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN**
+- V1 Simple-Action Fast-Track: **IMPLEMENTATION PASS** at `8e11464`
+- PRE-F1-LIVE: **BLOCKED_BY_ENVIRONMENT** — missing `PRE_F1_LIVE=1`, `GEMINI_API_KEY`, `PRE_F1_LIVE_MANIFEST`, and `PRE_F1_SNAPSHOT_STORAGE_ROOT`; 0 Gemini/Flow/Saydi calls
 - F1: **NOT STARTED**
 
 The completed live path is:
@@ -98,6 +99,12 @@ The frozen V1 target pipeline is:
 This is a sequencing and boundary lock. It is not authorization to begin the next stage. Each stage requires an explicit task and acceptance gate.
 
 ## Empirical and PRE-F1 runtime policy
+
+The user has explicitly chosen `SIMPLE_ACTION_FAST_TRACK_V1` for V1 production feasibility. It authorizes exactly `PICK_UP`, `HOLD`, and `ROTATE_SLOW` only after the bounded simple-action contract and existing R5/R6 validation pass. It is provider-neutral and separate from ActionCapabilityMap, BenchmarkObservation, empirical classification, and promotion policy. R6 reports `FAST_TRACK_AUTHORIZED` independently from the retained empirical `UNTESTED` classification; no fake SAFE map, environment override, or R6 bypass exists. Unsupported secondary actions, cap removal, dispensing, product-state transformations outside the canonical action, unrelated UNTESTED actions, and AVOID remain fail-closed.
+
+F0 is **PAUSED AFTER BATCH 1 FOR V1 FAST-TRACK**, not statistically complete. Its truthful state remains PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, ROTATE_SLOW 1/10 UNTESTED, `campaignReady=false`, promotions=0. No further F0 batch is required on the V1 critical path unless production evidence later shows a reliability problem. The live PRE-F1 runner no longer blocks on these three classifications; its environment-gated attempt made 0 Gemini/Flow/Saydi calls and reported exactly missing `PRE_F1_LIVE=1`, `GEMINI_API_KEY`, `PRE_F1_LIVE_MANIFEST`, and `PRE_F1_SNAPSHOT_STORAGE_ROOT`.
+
+Remaining roadmap: (1) Fast-track + PRE-F1-LIVE; (2) Visual Rhythm + SceneAnchor + Compact Flow Prompt Compiler; (3) Flow adapter + voice binding + single-scene live; (4) Frame QC + Temporal QC + Speech QC; (5) Four-scene orchestrator + Pairwise + Global Continuity QC; (6) Selective Repair + Final Acceptance; (7) Delivery + Production UI + V1 end-to-end acceptance. Future Visual Rhythm permits one state-changing primary action, 0–2 non-state-changing presentation beats, and 0–1 subtle camera motion; it forbids a secondary product-state change and second contact event, with identity/state continuity hard and composition/camera continuity soft. Future Flow prompt compilation targets <=2800 Unicode characters, hard-fails and never sends >3200, has no silent truncation or raw internal-contract dump, and compacts deterministically only. Optional SFX/VFX remains an additive production-layer concern with default `NONE`.
 
 Baseline transfer confidence is accepted for roadmap continuation because the completed real PICK_UP and HOLD canaries each have a valid, single reviewed RUBRIC-0 PASS observation. Those observations do not promote either action: the locked 10-attempt, 0.90 SAFE, and 0.60 RISKY policy remains in force.
 

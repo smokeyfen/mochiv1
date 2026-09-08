@@ -8,6 +8,12 @@ The campaign plans exactly ten independent cases per action (30 total). Attempt 
 
 The locked `DEFAULT_CAPABILITY_PROMOTION_POLICY` remains the sole classification policy: a minimum of 10 human-reviewed real-model-video observations, SAFE at pass rate at least 0.90, and RISKY at pass rate at least 0.60. The existing `classifyCapabilityEvidence` authority performs this math; the campaign layer does not reproduce it.
 
+## V1 fast-track decision
+
+The user has selected the provider-neutral `SIMPLE_ACTION_FAST_TRACK_V1` policy for bounded V1 production feasibility. It authorizes exactly `PICK_UP`, `HOLD`, and `ROTATE_SLOW`; it is not empirical evidence and creates no BenchmarkObservation, ActionCapability promotion, or SAFE classification. The production path records `FAST_TRACK_AUTHORIZED` separately from the empirical `UNTESTED` state and still requires canonical single-primary-action R5 START → ACTION → END validation plus existing R6 risk validation. It does not authorize secondary actions, cap removal, dispensing, product-state transformation outside the canonical action, unrelated UNTESTED actions, or AVOID.
+
+F0 is **PAUSED AFTER BATCH 1 FOR V1 FAST-TRACK**. It is not statistically complete: PICK_UP remains 2/10 UNTESTED, HOLD 2/10 UNTESTED, ROTATE_SLOW 1/10 UNTESTED, `campaignReady=false`, and promotions=0. No further F0 batch is required for the V1 critical path unless production evidence later shows a reliability problem.
+
 ## Current reviewed state
 
 | Action | Accepted reviewed observations | Minimum remaining | Classification |
@@ -24,7 +30,7 @@ Only explicit, human-reviewed `BenchmarkObservation` records can count. Every re
 
 Rubric-0 remains the only review rubric. Its dimensions are PRODUCT_FIDELITY, HAND_ANATOMY, ACTION_COMPLETION, PHYSICS, CAMERA_REALISM, UNEXPECTED_CUTS, and VISIBLE_ARTIFACTS. There is no weighted or averaged scoring, automatic Gemini review, automatic observation creation, or automatic promotion writeback.
 
-`npm run benchmark:capability:dry` reads only repository campaign and reviewed-evidence data, validates the campaign, and prints the deterministic status. It makes no provider or network calls. It does not connect the map to `getCurrentTrustedCapabilityMap()`; PRE-F1-LIVE remains BLOCKED BY EMPIRICAL ACTION CAPABILITY / NOT RUN until sufficient reviewed Flow evidence exists.
+`npm run benchmark:capability:dry` reads only repository campaign and reviewed-evidence data, validates the campaign, and prints the deterministic status. It makes no provider or network calls. Its dry output remains the empirical authority and does not change when the production fast-track policy is used.
 
 ## F0-C controlled execution planning
 

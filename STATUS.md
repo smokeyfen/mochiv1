@@ -5,19 +5,23 @@
 - Current verified implementation commit: `812af23a5737c58b60d76ef533e0574e927d6ed3` (F0-C Controlled Flow Benchmark Execution Planner finalization)
 - Superseded M2 video-path audit commit: `d8553db`
 - Provider asset boundary correction: VERIFIED at `6ad9d0e`
-- Current milestone: F0-D1 Controlled Flow Benchmark Batch 1
-- Milestone status: EMPIRICAL PASS / human Rubric-0 reviewed
+- Current milestone: V1 Simple-Action Fast-Track + PRE-F1-LIVE
+- Milestone status: IMPLEMENTATION PASS; PRE-F1-LIVE BLOCKED_BY_ENVIRONMENT
 - Application path: FINAL LOCKED
 - Product Evidence: RUNTIME VALIDATED / FINAL LOCKED
 - Flow milestone: M2-B Flow Video Canary — deferred until the reasoning pipeline is stable
-- FEN V1 FEASIBILITY LOCK: BLOCKED pending Flow canary and controlled empirical video evidence
+- FEN V1 FEASIBILITY LOCK: deterministic PRE-F1 path unlocked by the explicit bounded V1 simple-action authorization; live Gemini validation remains environment-blocked
 - Historical Flow benchmark generations: 5 (the two prior generations cost 24 credits; Batch 1 added three generations and its exact credit count is unspecified); new Flow calls in this Codex task: 0
 - Real generation count: 5
 - Architecture deviations: none
-- Next planned batch is planning only: PICK_UP attempt 3, HOLD attempt 3, and ROTATE_SLOW attempt 2 (maximum 3). Batch 2 requires explicit user authorization. PRE-F1-LIVE is BLOCKED BY EMPIRICAL ACTION CAPABILITY and is NOT RUN; F1 is NOT STARTED.
+- F0 empirical campaign: PAUSED AFTER BATCH 1 FOR V1 FAST-TRACK. No further F0 batches are required for the V1 critical path unless production evidence later identifies a reliability problem. F1 is NOT STARTED.
 - Documentation correction: the full suite at the previous verification was 244 PASS, not 225. This corrects only that stale documentation count and does not rewrite older milestone verification counts.
 
 No action has been promoted from `UNTESTED`.
+
+V1 Simple-Action Fast-Track at implementation `8e11464`: the explicit provider-neutral `SIMPLE_ACTION_FAST_TRACK_V1` policy authorizes exactly `PICK_UP`, `HOLD`, and `ROTATE_SLOW` for bounded V1 production feasibility. It is not ActionCapabilityMap evidence, a BenchmarkObservation, a capability classifier result, or a promotion override. The empirical map remains PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, ROTATE_SLOW 1/10 UNTESTED; `campaignReady=false`; promotions=0; the locked 10 / 0.90 / 0.60 policy is unchanged. R6 records production eligibility separately as `FAST_TRACK_AUTHORIZED` while retaining empirical `UNTESTED`, and still applies R5 state validation, R6 risk, bounded replan, and all downstream R6 consistency gates. Unsupported, AVOID, state-transforming, secondary, cap-removal, and dispensing actions remain fail-closed. Mocked PRE-F1 reaches P0 with the policy and no fake SAFE capability, no Flow, and no Saydi call. Live runner preflight has no empirical blocker: its controlled attempt returned `PRE-F1-LIVE BLOCKED_BY_ENVIRONMENT` with exactly missing `PRE_F1_LIVE=1`, `GEMINI_API_KEY`, `PRE_F1_LIVE_MANIFEST`, and `PRE_F1_SNAPSHOT_STORAGE_ROOT`; Gemini/Flow/Saydi calls and generations were 0. Verification: `npm run typecheck` PASS; `npm test` PASS (251 tests); `npm run benchmark:capability:dry` PASS; `npm run benchmark:execution:dry` PASS; `npm run build -w @mochi/web` PASS; `git diff --check` PASS.
+
+Compressed remaining roadmap: (1) Fast-track + PRE-F1-LIVE; (2) Visual Rhythm + SceneAnchor + Compact Flow Prompt Compiler; (3) Flow adapter + voice binding + single-scene live; (4) Frame QC + Temporal QC + Speech QC; (5) Four-scene orchestrator + Pairwise + Global Continuity QC; (6) Selective Repair + Final Acceptance; (7) Delivery + Production UI + V1 end-to-end acceptance. Visual Rhythm is a future lock: one state-changing primary action, zero to two non-state-changing presentation beats, zero to one subtle camera motion, no secondary product-state change, no second contact event, identity/state continuity hard, and composition/camera continuity soft. The future Flow prompt compiler targets <=2800 Unicode characters, hard-fails >3200, never sends >3200, does not silently truncate or dump raw internal contracts, and uses deterministic compaction only. Optional SFX/VFX remains an additive production-layer concern with default `NONE`; it is not implemented here.
 
 F0-B Trusted Capability Evidence Foundation V1: FINAL LOCKED / DIRECTLY AUDITED at `da3b289c76795e2a33360525c11e1ca4451fcffa`. `F0_BOTTLE_BASELINE_CAPABILITY_V1` binds only the canonical Cocoon bottle fixture and PICK_UP, HOLD, and ROTATE_SLOW. It plans exactly 30 deterministic cases (10 per action), preserves each historical attempt-one case, and derives capability only from explicit human-reviewed REAL_MODEL_VIDEO observations that pass Rubric-0 validation and campaign binding checks. Current accepted evidence is PICK_UP 2/10 UNTESTED, HOLD 2/10 UNTESTED, and ROTATE_SLOW 1/10 UNTESTED; `campaignReady=false`, promotions=0, and 25 reviewed attempts remain to reach the minimum sample counts (8 / 8 / 9). This count does not guarantee SAFE.
 
