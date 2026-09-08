@@ -16,7 +16,7 @@ import {
   validateKeyPointPlan,
   validateProductionContractV1
 } from '@mochi/contracts';
-import { type ActionCapabilityMap } from '@mochi/core';
+import { type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import { validateGlobalContinuityState } from './continuity.ts';
 import { validateDialogueUpstreamBinding } from './dialogue.ts';
 import { HUMAN_REALISM_GLOBAL_CONSTRAINTS } from './human-realism.ts';
@@ -40,6 +40,7 @@ export interface CompileProductionContractRequest {
   readonly statePlan: StateResolved4ScenePlan;
   readonly riskAssessment: GlobalSceneRiskAssessment;
   readonly capabilityMap: ActionCapabilityMap;
+  readonly productionEligibilityPolicy?: SimpleActionFastTrackPolicyV1;
   readonly humanRealismPlan: HumanRealism4ScenePlan;
   readonly dialoguePlan: DialoguePlan;
 }
@@ -184,7 +185,7 @@ function validateProductionUpstream(request: CompileProductionContractRequest): 
   let resolved: StateResolved4ScenePlan;
   try { resolved = resolveSceneStates(request.globalPlan); } catch { return [...issues, 'r5']; }
   if (!same(resolved, request.statePlan)) issues.push('r5');
-  const risk = evaluateSceneRisk(resolved, request.capabilityMap);
+  const risk = evaluateSceneRisk(resolved, request.capabilityMap, request.productionEligibilityPolicy);
   if (!same(risk, request.riskAssessment)) issues.push('r6');
   if (risk.scenes.some(scene => scene.status !== 'READY')) issues.push('r6_not_ready');
   if (validateHumanRealism4ScenePlan(request.humanRealismPlan, resolved, HUMAN_REALISM_GLOBAL_CONSTRAINTS).length > 0) issues.push('r7_a');

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ActionId, BenchmarkObservation } from '@mochi/contracts';
 import { BENCHMARK_DIMENSIONS } from '@mochi/contracts';
-import { createUntestedActionCapabilityMap } from '@mochi/core';
+import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1 } from '@mochi/core';
 import {
   F0_BASELINE_ACTION_IDS,
   f0BottleBaselineCapabilityCampaign,
@@ -81,6 +81,17 @@ test('controlled Batch 1 reviewed evidence has no trusted promotions', () => {
   assert.equal(status.totalPromotionsFromUntested, 0);
   assert.deepEqual(F0_BASELINE_ACTION_IDS.map(actionId => status.actions[actionId].attemptsRemainingToMinimum), [8, 8, 9]);
   assert.equal(F0_BASELINE_ACTION_IDS.reduce((total, actionId) => total + status.actions[actionId].attemptsRemainingToMinimum, 0), 25);
+});
+
+test('V1 fast-track authorization neither creates observations nor changes the empirical dry authority', () => {
+  const status = deriveF0CapabilityStatus(f0EmpiricalBenchmarkObservations);
+  assert.deepEqual(simpleActionFastTrackPolicyV1.authorizedActionIds, ['PICK_UP', 'HOLD', 'ROTATE_SLOW']);
+  assert.equal(f0EmpiricalBenchmarkObservations.length, 5);
+  assert.deepEqual(F0_BASELINE_ACTION_IDS.map(actionId => status.actions[actionId].reviewedAttemptCount), [2, 2, 1]);
+  assert.deepEqual(F0_BASELINE_ACTION_IDS.map(actionId => status.actions[actionId].classification), ['UNTESTED', 'UNTESTED', 'UNTESTED']);
+  assert.deepEqual(status.actionCapabilityMap, createUntestedActionCapabilityMap());
+  assert.equal(status.campaignReady, false);
+  assert.equal(status.totalPromotionsFromUntested, 0);
 });
 
 test('trusted derivation rejects out-of-campaign, malformed, synthetic, and duplicate evidence', () => {

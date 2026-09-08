@@ -6,7 +6,9 @@ import type {
   PhysicalState,
   ProductArchetype,
   QCReport,
-  ScenePlan
+  ScenePlan,
+  CanonicalPhysicalState,
+  StateResolvedScene
 } from '@mochi/contracts';
 import { validateBenchmarkCase, validateBenchmarkObservation, validateGoldenProductFixture } from '@mochi/contracts';
 
@@ -18,6 +20,21 @@ export const createUntestedActionCapabilityMap = (): ActionCapabilityMap => ({
   ROTATE_SLOW: 'UNTESTED', PLACE_DOWN: 'UNTESTED', OPEN_SIMPLE: 'UNTESTED',
   PRESS_BUTTON: 'UNTESTED', POUR_SIMPLE: 'UNTESTED', APPLY_SIMPLE: 'UNTESTED', POINT: 'UNTESTED'
 });
+
+/** Production authorization is separate from reviewed empirical evidence. */
+export const SIMPLE_ACTION_FAST_TRACK_V1 = 'SIMPLE_ACTION_FAST_TRACK_V1' as const;
+export interface SimpleActionFastTrackPolicyV1 { readonly policyVersion: typeof SIMPLE_ACTION_FAST_TRACK_V1; readonly authorizedActionIds: readonly ['PICK_UP', 'HOLD', 'ROTATE_SLOW']; }
+export const simpleActionFastTrackPolicyV1: SimpleActionFastTrackPolicyV1 = { policyVersion: SIMPLE_ACTION_FAST_TRACK_V1, authorizedActionIds: ['PICK_UP', 'HOLD', 'ROTATE_SLOW'] };
+export type ProductionEligibilityStatus = 'EMPIRICAL_SAFE' | 'FAST_TRACK_AUTHORIZED' | 'BLOCKED';
+export interface ProductionActionEligibility { readonly actionId: ActionId; readonly empiricalClassification: CapabilityLevel; readonly status: ProductionEligibilityStatus; readonly policyVersion?: typeof SIMPLE_ACTION_FAST_TRACK_V1; readonly reasons: readonly string[]; }
+export function isSimpleActionFastTrackPolicyV1(value: unknown): value is SimpleActionFastTrackPolicyV1 { if (!value || typeof value !== 'object') return false; const policy = value as Partial<SimpleActionFastTrackPolicyV1>; return policy.policyVersion === SIMPLE_ACTION_FAST_TRACK_V1 && Array.isArray(policy.authorizedActionIds) && policy.authorizedActionIds.length === 3 && policy.authorizedActionIds[0] === 'PICK_UP' && policy.authorizedActionIds[1] === 'HOLD' && policy.authorizedActionIds[2] === 'ROTATE_SLOW'; }
+function sameCanonicalState(left: CanonicalPhysicalState, right: CanonicalPhysicalState): boolean { return left.heldBy === right.heldBy && left.placement === right.placement && left.orientation === right.orientation && left.interactionState === right.interactionState; }
+function hasUnsupportedSecondaryAction(scene: StateResolvedScene): boolean { const value = scene as unknown as Record<string, unknown>; return ['secondaryAction', 'secondaryActionId', 'secondaryActions', 'actions'].some(key => key in value); }
+/** Validates R5's conservative state boundary for the three authorized V1 primitives. */
+export function validateBoundedSimpleAction(scene: StateResolvedScene): readonly string[] { const reasons: string[] = []; if (hasUnsupportedSecondaryAction(scene)) reasons.push('unsupported_secondary_action'); if (scene.startState.interactionState !== 'BASELINE' || scene.endState.interactionState !== 'BASELINE') reasons.push('product_state_transformation'); const start = scene.startState; const end = scene.endState; if (scene.primaryAction === 'PICK_UP') { if (start.heldBy !== 'NONE' || start.placement !== 'ON_SURFACE' || end.heldBy === 'NONE' || end.placement !== 'IN_HAND' || start.orientation !== end.orientation || start.interactionState !== end.interactionState) reasons.push('invalid_pick_up_transition'); } else if (scene.primaryAction === 'HOLD') { if (start.heldBy === 'NONE' || start.placement !== 'IN_HAND' || !sameCanonicalState(start, end)) reasons.push('invalid_hold_transition'); } else if (scene.primaryAction === 'ROTATE_SLOW') { if (start.heldBy === 'NONE' || start.placement !== 'IN_HAND' || end.heldBy !== start.heldBy || end.placement !== start.placement || start.orientation !== 'FRONT_FACING' || end.orientation !== 'ROTATED' || start.interactionState !== end.interactionState) reasons.push('invalid_rotate_slow_transition'); } else reasons.push('action_not_simple_fast_track'); return reasons; }
+export function evaluateProductionActionEligibility(scene: StateResolvedScene, capabilityMap: ActionCapabilityMap, policy?: SimpleActionFastTrackPolicyV1): ProductionActionEligibility { const empiricalClassification = capabilityMap[scene.primaryAction]; if (empiricalClassification === 'SAFE') return { actionId: scene.primaryAction, empiricalClassification, status: 'EMPIRICAL_SAFE', reasons: [] }; if (empiricalClassification === 'AVOID') return { actionId: scene.primaryAction, empiricalClassification, status: 'BLOCKED', reasons: ['action_avoid'] }; if (!isSimpleActionFastTrackPolicyV1(policy) || !policy.authorizedActionIds.includes(scene.primaryAction as never)) return { actionId: scene.primaryAction, empiricalClassification, status: 'BLOCKED', reasons: [`action_${empiricalClassification.toLowerCase()}`] }; const reasons = validateBoundedSimpleAction(scene); return reasons.length > 0 ? { actionId: scene.primaryAction, empiricalClassification, status: 'BLOCKED', policyVersion: policy.policyVersion, reasons } : { actionId: scene.primaryAction, empiricalClassification, status: 'FAST_TRACK_AUTHORIZED', policyVersion: policy.policyVersion, reasons: [] }; }
+/** Candidate action IDs for bounded R6 replan; R5 state validation still decides final eligibility. */
+export function productionEligibleActionIds(capabilityMap: ActionCapabilityMap, policy?: SimpleActionFastTrackPolicyV1): readonly ActionId[] { const empiricalSafe = (Object.keys(capabilityMap) as ActionId[]).filter(actionId => capabilityMap[actionId] === 'SAFE'); return !isSimpleActionFastTrackPolicyV1(policy) ? empiricalSafe : [...new Set([...empiricalSafe, ...policy.authorizedActionIds])]; }
 
 export interface FeasibilityResult {
   passed: boolean;

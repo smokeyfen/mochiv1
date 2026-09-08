@@ -7,7 +7,7 @@ import {
   type ProductionSnapshotV1
 } from '@mochi/contracts';
 import { isDeepStrictEqual } from 'node:util';
-import { type ActionCapabilityMap } from '@mochi/core';
+import { isSimpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import { analyzeProductEvidence } from '@mochi/evidence';
 import { type IntelligenceMediaInput, type IntelligenceProvider } from '@mochi/providers';
 import {
@@ -63,6 +63,7 @@ export interface ProductionRuntimeRequest {
   readonly media: readonly IntelligenceMediaInput[];
   readonly sourceEvidenceVersion: string;
   readonly capabilityMap: ActionCapabilityMap;
+  readonly productionEligibilityPolicy?: SimpleActionFastTrackPolicyV1;
 }
 
 /** Trusted server composition dependencies. One provider instance is shared by every intelligence stage. */
@@ -100,7 +101,8 @@ function validRequest(request: ProductionRuntimeRequest): boolean {
     || typeof request.sourceEvidenceVersion !== 'string' || request.sourceEvidenceVersion.trim().length === 0
     || validateProductInput(request.product).length > 0
     || validateCreativeDirectionInput(request.creativeDirection).length > 0
-    || !request.capabilityMap || typeof request.capabilityMap !== 'object') return false;
+    || !request.capabilityMap || typeof request.capabilityMap !== 'object'
+    || (request.productionEligibilityPolicy !== undefined && !isSimpleActionFastTrackPolicyV1(request.productionEligibilityPolicy))) return false;
   return ACTION_IDS.every(action => CAPABILITY_LEVELS.has(request.capabilityMap[action]));
 }
 
@@ -151,7 +153,7 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
         context, continuity, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
       }));
       const initialStatePlan = await stage('R5_INITIAL_STATE', () => resolveSceneStates(globalPlan));
-      const initialRiskAssessment = await stage('R6_INITIAL_RISK', () => evaluateSceneRisk(initialStatePlan, request.capabilityMap));
+      const initialRiskAssessment = await stage('R6_INITIAL_RISK', () => evaluateSceneRisk(initialStatePlan, request.capabilityMap, request.productionEligibilityPolicy));
       const finalGlobalPlan = await stage('R6_BOUNDED_REPLAN', async () => {
         let candidatePlan = globalPlan;
         let candidateStatePlan = initialStatePlan;
@@ -163,21 +165,21 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
           replannedIndexes.add(target.index);
           candidatePlan = await targetedReplan(
             candidatePlan, context, continuity, request.capabilityMap, target.index,
-            dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS
+            dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS, request.productionEligibilityPolicy
           );
           candidateStatePlan = resolveSceneStates(candidatePlan);
-          candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap);
+          candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap, request.productionEligibilityPolicy);
         }
         return candidatePlan;
       });
       const statePlan = await stage('R5_FINAL_STATE', () => resolveSceneStates(finalGlobalPlan));
-      const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap));
+      const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap, request.productionEligibilityPolicy));
       await stage('R6_READY_GATE', () => {
         if (riskAssessment.scenes.some(scene => scene.status !== 'READY')) throw new Error('risk_not_ready');
       });
       const humanRealismPlan = await stage('R7_A_HUMAN_REALISM', () => planHumanRealism({
         context, plan: finalGlobalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,
-        capabilityMap: request.capabilityMap, intelligence: dependencies.intelligence
+        capabilityMap: request.capabilityMap, ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy }), intelligence: dependencies.intelligence
       }));
       const keyPointPlan = await stage('R4_1_KEY_POINTS', () => planKeyPoints({
         context, globalPlan: finalGlobalPlan, intelligence: dependencies.intelligence
@@ -187,7 +189,7 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
       }));
       const productionRequest = {
         context, creativeDirection: request.creativeDirection, globalPlan: finalGlobalPlan, keyPointPlan, statePlan,
-        riskAssessment, capabilityMap: request.capabilityMap, humanRealismPlan, dialoguePlan
+        riskAssessment, capabilityMap: request.capabilityMap, ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy }), humanRealismPlan, dialoguePlan
       };
       const productionContract = await stage('R8_PRODUCTION_CONTRACT', () => compileProductionContract(productionRequest));
       const snapshot = await stage('P0_CREATE_PERSIST', () => dependencies.snapshotStore.create({

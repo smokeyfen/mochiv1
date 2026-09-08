@@ -9,7 +9,7 @@ import {
   type CreativeDirectionInput,
   type ProductInput
 } from '@mochi/contracts';
-import { createUntestedActionCapabilityMap, type ActionCapabilityMap } from '@mochi/core';
+import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1, type ActionCapabilityMap } from '@mochi/core';
 import { type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import { compileProductionContract, MAX_SCENE_REPLAN_ATTEMPTS } from '@mochi/reasoning';
 import { createProductionSnapshotStore, ProductionSnapshotError, type ProductionSnapshotStore } from './production-snapshot.ts';
@@ -112,6 +112,20 @@ test('PRE-F1 mocked integration completes only with an explicitly supplied test 
   assert.deepEqual(validateProductionSnapshotV1(result.snapshot), []);
   assert.equal(result.snapshot.snapshotVersion, 'PRODUCTION_SNAPSHOT_V1');
   assert.doesNotMatch(JSON.stringify(result.snapshot), /dataBase64|base64|providerMediaId|gemini|saydi|session|credentials|storageRoot/i);
+}));
+
+test('PRE-F1 mocked integration reaches P0 through V1 fast-track while empirical classifications stay UNTESTED', async () => withRuntime(async ({ runtime, requests }) => {
+  const capabilityMap = createUntestedActionCapabilityMap();
+  const result = await runtime.run({ ...request(capabilityMap), productionEligibilityPolicy: simpleActionFastTrackPolicyV1 });
+  assert.equal(capabilityMap.PICK_UP, 'UNTESTED');
+  assert.equal(capabilityMap.HOLD, 'UNTESTED');
+  assert.equal(capabilityMap.ROTATE_SLOW, 'UNTESTED');
+  assert.equal(requests.length, 10);
+  assert.ok(requests.some(item => item.instruction.startsWith('TARGETED REPLAN:')));
+  assert.deepEqual(result.trace.map(entry => entry.stage), PRE_F1_RUNTIME_STAGES);
+  assert.deepEqual(validateProductionSnapshotV1(result.snapshot), []);
+  assert.equal(result.snapshot.productionContract.scenes[3]?.primaryAction, 'HOLD');
+  assert.doesNotMatch(JSON.stringify(result.snapshot), /flow|saydi|providerMediaId/i);
 }));
 
 test('PRE-F1 returns the exact P0 reloaded snapshot and exact R8 production contract', async () => {

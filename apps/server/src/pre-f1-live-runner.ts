@@ -4,7 +4,7 @@ import {
   type CreativeDirectionInput,
   type ProductInput
 } from '@mochi/contracts';
-import { createUntestedActionCapabilityMap, type ActionCapabilityMap } from '@mochi/core';
+import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import {
   createGemini35FlashIntelligenceProviderFromEnv,
   type IntelligenceProvider,
@@ -29,8 +29,7 @@ const INTELLIGENCE_STAGES = [
 ] as const;
 
 export type PreF1LiveReport =
-  | { readonly status: 'NOT_RUN' }
-  | { readonly status: 'BLOCKED' }
+  | { readonly status: 'BLOCKED_BY_ENVIRONMENT'; readonly missingPrerequisites: readonly string[] }
   | { readonly status: 'FAIL'; readonly category: string }
   | {
     readonly status: 'PASS'; readonly intelligenceRequests: number; readonly intelligenceStages: readonly string[];
@@ -41,6 +40,8 @@ export interface PreF1LiveRunnerDependencies {
   readonly environment: NodeJS.ProcessEnv;
   /** Trusted server source only; it is never read from a manifest or environment override. */
   readonly getTrustedCapabilityMap?: () => ActionCapabilityMap;
+  /** Trusted server policy only; it is never read from a manifest or environment override. */
+  readonly getTrustedProductionEligibilityPolicy?: () => SimpleActionFastTrackPolicyV1;
   readonly loadManifest?: (path: string | undefined) => Promise<PreF1LiveManifest>;
   readonly prepareMedia?: typeof buildSmokeEvidenceRequest;
   readonly createIntelligence?: (environment: NodeJS.ProcessEnv) => IntelligenceProvider;
@@ -52,11 +53,13 @@ function nonBlank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function enabled(environment: NodeJS.ProcessEnv): boolean {
-  return environment.PRE_F1_LIVE === '1'
-    && nonBlank(environment.PRE_F1_LIVE_MANIFEST)
-    && nonBlank(environment.PRE_F1_SNAPSHOT_STORAGE_ROOT)
-    && nonBlank(environment.GEMINI_API_KEY);
+function missingEnvironmentPrerequisites(environment: NodeJS.ProcessEnv): readonly string[] {
+  const missing: string[] = [];
+  if (environment.PRE_F1_LIVE !== '1') missing.push('PRE_F1_LIVE=1');
+  if (!nonBlank(environment.GEMINI_API_KEY)) missing.push('GEMINI_API_KEY');
+  if (!nonBlank(environment.PRE_F1_LIVE_MANIFEST)) missing.push('PRE_F1_LIVE_MANIFEST');
+  if (!nonBlank(environment.PRE_F1_SNAPSHOT_STORAGE_ROOT)) missing.push('PRE_F1_SNAPSHOT_STORAGE_ROOT');
+  return missing;
 }
 
 /** Current trusted state until Flow benchmark/capability evidence produces empirical classifications. */
@@ -64,9 +67,9 @@ export function getCurrentTrustedCapabilityMap(): ActionCapabilityMap {
   return createUntestedActionCapabilityMap();
 }
 
-/** A PRE-F1 run cannot be useful before empirical evidence has made any action READY-capable. */
-export function blocksBeforeProvider(capabilityMap: ActionCapabilityMap): boolean {
-  return !Object.values(capabilityMap).some(level => level === 'SAFE');
+/** The user-authorized production policy is never an empirical capability classification. */
+export function getCurrentTrustedProductionEligibilityPolicy(): SimpleActionFastTrackPolicyV1 {
+  return simpleActionFastTrackPolicyV1;
 }
 
 function validManifest(value: unknown): value is PreF1LiveManifest {
@@ -93,15 +96,16 @@ function safeFailureCategory(error: unknown): string {
 }
 
 /**
- * The empirical capability preflight occurs before manifest/media reads,
- * Gemini composition, and P0 store construction.
+ * Trusted inputs are composed before manifest/media reads; R5 and R6 remain
+ * mandatory inside the runtime before any downstream stage can proceed.
  */
 export async function runPreF1Live(dependencies: PreF1LiveRunnerDependencies): Promise<PreF1LiveReport> {
   const environment = dependencies.environment;
-  if (!enabled(environment)) return { status: 'NOT_RUN' };
+  const missingPrerequisites = missingEnvironmentPrerequisites(environment);
+  if (missingPrerequisites.length > 0) return { status: 'BLOCKED_BY_ENVIRONMENT', missingPrerequisites };
 
   const capabilityMap = (dependencies.getTrustedCapabilityMap ?? getCurrentTrustedCapabilityMap)();
-  if (blocksBeforeProvider(capabilityMap)) return { status: 'BLOCKED' };
+  const productionEligibilityPolicy = (dependencies.getTrustedProductionEligibilityPolicy ?? getCurrentTrustedProductionEligibilityPolicy)();
 
   try {
     const manifest = await (dependencies.loadManifest ?? defaultLoadManifest)(environment.PRE_F1_LIVE_MANIFEST);
@@ -127,7 +131,8 @@ export async function runPreF1Live(dependencies: PreF1LiveRunnerDependencies): P
       creativeDirection: manifest.creativeDirection,
       media: evidenceRequest.media,
       sourceEvidenceVersion: manifest.sourceEvidenceVersion,
-      capabilityMap
+      capabilityMap,
+      productionEligibilityPolicy
     } satisfies ProductionRuntimeRequest);
     return {
       status: 'PASS', intelligenceRequests: calls.length, intelligenceStages: calls,

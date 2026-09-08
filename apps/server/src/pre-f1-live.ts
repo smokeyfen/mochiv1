@@ -2,18 +2,9 @@ import { runPreF1Live } from './pre-f1-live-runner.ts';
 
 async function main(): Promise<void> {
   const report = await runPreF1Live({ environment: process.env });
-  if (report.status === 'NOT_RUN') {
-    console.log('PRE_F1_LIVE_NOT_RUN');
-    return;
-  }
-  if (report.status === 'BLOCKED') {
-    console.log('PRE_F1_LIVE_BLOCKED');
-    console.log('reason=EMPIRICAL_ACTION_CAPABILITY');
-    console.log('intelligenceRequests=0');
-    console.log('flowCalls=0');
-    console.log('saydiCalls=0');
-    console.log('generations=0');
-    console.log('actionCapabilityPromotions=0');
+  if (report.status === 'BLOCKED_BY_ENVIRONMENT') {
+    console.log('PRE-F1-LIVE BLOCKED_BY_ENVIRONMENT');
+    console.log(`missingPrerequisites=${report.missingPrerequisites.join(',')}`);
     return;
   }
   if (report.status === 'PASS') {
