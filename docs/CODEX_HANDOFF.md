@@ -171,6 +171,10 @@ RUBRIC-0 still evaluates one generated benchmark scene against actual generated 
 5. Update STATUS and the appropriate progress checkpoint after a successful milestone.
 6. Commit and push scoped checkpoints only to `codex/feasibility-lock-candidate`; do not merge, rebase, or rewrite `main` without explicit human authorization.
 
+## Task 6 browser production workspace
+
+Task 5 is FINAL LOCKED / DIRECTLY AUDITED at `721766f9438bf909fe97e98f9f41aa32d794997a`. Task 6 adds the browser-first normal testing path without changing the locked engine contracts. The Production UI connects a Gemini key only to a single in-process server configuration owner; safe API responses return only `GEMINI_READY` or `GEMINI_NOT_CONFIGURED`, never the key. Build Production runs the existing R1→P0 composition with server-managed temporary snapshot storage and `SIMPLE_ACTION_FAST_TRACK_V1`, derives four anchors and exact safe compiled prompt views, and invalidates the prior manual candidates when a new build becomes active. Flow remains an explicit operator bridge: the application displays the exact prompt and Flow settings but never calls `FlowProductionDriverV1`. Uploaded MP4 candidates are snapshot/scene/candidate-bound and automatically enter existing Scene QC. Once exactly four reports pass, the manual-candidate sequence authority performs its one Task-5 continuity call. Task 7 owns selective repair, final acceptance, delivery, and Browser E2E; automatic Flow runtime activation remains later work.
+
 ## Historical material
 
 Earlier M0 feasibility-first roadmap text, initial exported-tree descriptions, and pre-R1 task sequencing are superseded as current instructions. They remain accessible in Git history and older documentation only as historical context. Preserve the underlying M0 locks—provider-neutral contracts, 8-second and 9:16 scenes, state continuity, Candidate lifecycle, QC fail-closed behavior, and UNTESTED action defaults—but do not present historical sequencing as the current roadmap.
