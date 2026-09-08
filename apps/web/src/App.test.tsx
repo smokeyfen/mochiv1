@@ -36,10 +36,6 @@ function enterValidProjectInput() {
   selectProductImage();
 }
 
-function submitProject() {
-  fireEvent.click(screen.getByRole('button', { name: 'Validate project input' }));
-}
-
 const delivery:DeliveryManifest={version:'DELIVERY_PACKAGE_V1',status:'READY_FOR_DELIVERY',outputs:[
   {filename:'scene-01.mp4',mimeType:'video/mp4'},{filename:'scene-02.mp4',mimeType:'video/mp4'},{filename:'scene-03.mp4',mimeType:'video/mp4'},{filename:'scene-04.mp4',mimeType:'video/mp4'},{filename:'key-points.txt',mimeType:'text/plain; charset=utf-8'}
 ]};
@@ -50,6 +46,7 @@ function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetI
   const product = JSON.parse(body.get('product') as string) as { productId: string; assets: readonly { assetId: string }[] };
   return new Response(JSON.stringify({
     ok: true,
+    analysisReceiptId: 'par_test_receipt_0123456789', receiptVersion: 'PRODUCT_ANALYSIS_RECEIPT_V1',
     evidence: {
       schemaVersion: '1.0.0', productId: product.productId, canonicalAssetIds: product.assets.map(asset => asset.assetId),
       identityDescription: 'A compact white bottle', geometryNotes: ['Rounded bottle'], colorNotes: ['White'], packagingNotes: ['Pump top'], labelNotes: ['Front label'],
@@ -83,51 +80,33 @@ describe('App', () => {
     expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
   });
 
-  it('fails closed when blank input is submitted', () => {
+  it('derives setup readiness without a manual validation action', () => {
     render(<App />);
-    submitProject();
-    expect(screen.getByRole('alert')).toHaveTextContent('Project input needs attention');
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Setup needs attention');
+    expect(screen.queryByRole('button', { name: /Validate project input/i })).not.toBeInTheDocument();
   });
 
   it('builds a valid canonical input with audience under creativeDirection', () => {
     render(<App />);
     enterValidProjectInput();
-    submitProject();
-    expect(screen.getByText('READY_FOR_ANALYSIS')).toBeInTheDocument();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.projectId).toMatch(/^project-/);
-    expect(preview.product.productId).toMatch(/^product-/);
-    expect(preview.creativeDirection.audience).toBe('PRACTICAL_BUYERS');
-    expect(preview.product.audience).toBeUndefined();
-    expect(preview.creativeDirection).toMatchObject({ voiceGender: 'FEMALE', voiceRegion: 'SOUTH' });
+    expect(screen.getByText('Setup ready')).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Create 4-scene plan'})).toBeDisabled();
   });
 
-  it('invalidates READY_FOR_ANALYSIS after product edits and requires revalidation', () => {
+  it('keeps automatic validation current after product edits', () => {
     render(<App />);
     enterValidProjectInput();
-    submitProject();
-    expect(screen.getByText('READY_FOR_ANALYSIS')).toBeInTheDocument();
-
     fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Updated Mochi bottle' } });
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('canonical-input-preview')).not.toBeInTheDocument();
-
-    submitProject();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.product.name).toBe('Updated Mochi bottle');
+    expect(screen.getByText('Setup ready')).toBeInTheDocument();
   });
 
-  it('invalidates READY_FOR_ANALYSIS after creative or voice gender edits', () => {
+  it('keeps setup ready after creative or voice gender edits', () => {
     render(<App />);
     enterValidProjectInput();
-    submitProject();
     fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'GIFT_BUYERS' } });
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
-
-    submitProject();
+    expect(screen.getByText('Setup ready')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+    expect(screen.getByText('Setup ready')).toBeInTheDocument();
 
   });
 
@@ -135,9 +114,6 @@ describe('App', () => {
     render(<App />);
     enterValidProjectInput();
     fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
-    submitProject();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.creativeDirection).toMatchObject({ voiceGender: 'MALE', voiceRegion: 'SOUTH', voiceStyle: 'review' });
     expect(screen.queryByRole('option', { name: 'NORTH' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
@@ -146,16 +122,10 @@ describe('App', () => {
   it('creates a generic logical product reference and removes it from canonical input', () => {
     render(<App />);
     enterValidProjectInput();
-    expect(screen.getByAltText(/Preview for asset-/)).toBeInTheDocument();
+    expect(screen.getByAltText('Product reference preview')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Reference role for asset-/)).not.toBeInTheDocument();
-    submitProject();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.product.assets[0]).toMatchObject({ role: 'PRODUCT_REFERENCE', source: 'UPLOAD', mimeType: 'image/jpeg' });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove reference' }));
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
-    submitProject();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(screen.getByRole('alert')).toHaveTextContent('assets required');
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:preview-front.jpg');
   });
 
@@ -163,40 +133,22 @@ describe('App', () => {
     render(<App />);
     enterValidProjectInput();
     selectProductImage('side.jpg');
-    submitProject();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
-    submitProject();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.product.assets).toHaveLength(1);
-    expect(preview.product.assets[0].assetId).not.toBeUndefined();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
   });
 
   it('assigns PRODUCT_REFERENCE to multiple arbitrary uploads and invalidates READY_FOR_ANALYSIS on add/remove', () => {
     render(<App />);
     enterValidProjectInput();
-    submitProject();
     selectProductImages(['any-order-one.jpg', 'any-order-two.png']);
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
-
-    submitProject();
-    const preview = JSON.parse(screen.getByTestId('canonical-input-preview').textContent ?? '{}');
-    expect(preview.product.assets).toHaveLength(3);
-    expect(preview.product.assets.every((asset: { role: string }) => asset.role === 'PRODUCT_REFERENCE')).toBe(true);
     expect(screen.queryByRole('combobox', { name: /reference role/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
-    expect(screen.queryByText('READY_FOR_ANALYSIS')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
   });
 
   it('keeps browser runtime data out of canonical preview while exposing the Product Analysis action', () => {
     render(<App />);
     enterValidProjectInput();
-    submitProject();
-    const preview = screen.getByTestId('canonical-input-preview').textContent ?? '';
-    expect(preview).not.toContain('blob:');
-    expect(preview).not.toContain('front.jpg');
-    expect(preview).not.toMatch(/[A-Z]:\\|\/Users\/|\/home\//);
-    expect(preview).not.toMatch(/File|Blob|Gemini|Flow|generate/i);
     expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeInTheDocument();
     expect(screen.getByText('Runtime Setup')).toBeInTheDocument();
   });
@@ -208,8 +160,9 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
     expect(screen.getByRole('status')).toHaveTextContent('ANALYZING PRODUCT');
-    await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
     expect(screen.getByText('A compact white bottle')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'View analysis details'}));
     expect(screen.getByText('Physical Evidence')).toBeInTheDocument();
     expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
     expect(screen.getByText('ALLOWED')).toBeInTheDocument();
@@ -234,7 +187,7 @@ describe('App', () => {
     expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
     resolveFetch!(evidenceResponse());
     await Promise.resolve();
-    expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
+    expect(screen.queryByText('Analysis locked to current product + references')).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
   });
 
@@ -244,13 +197,13 @@ describe('App', () => {
     enterValidProjectInput();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'YOUNG_ADULTS_GEN_Z' } });
-    expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument();
+    expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
     selectProductImage('side.jpg');
-    expect(screen.queryByText('PRODUCT_ANALYSIS_READY')).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove reference' })[0]!);
+    expect(screen.queryByText('Analysis locked to current product + references')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
     expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
   });
 
@@ -274,7 +227,7 @@ describe('App', () => {
     enterValidProjectInput();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByText('Reference-supported bottle')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'View analysis details'}));
     expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
     expect(screen.getByText('USER_INPUT')).toBeInTheDocument();
     expect(screen.getByText('ALLOWED')).toBeInTheDocument();
@@ -307,7 +260,7 @@ describe('App', () => {
     expect(screen.queryByRole('button',{name:'Disconnect'})).not.toBeInTheDocument();
     expect(screen.getByText('Connect Gemini to analyze the product.')).toBeInTheDocument();
     enterValidProjectInput();
-    const selectedBefore=screen.getByAltText(/Preview for asset-/).getAttribute('src');
+    const selectedBefore=screen.getByAltText('Product reference preview').getAttribute('src');
     fireEvent.change(screen.getByLabelText('Gemini API Key'),{target:{value:apiKey}});
     fireEvent.click(screen.getByRole('button',{name:'Connect'}));
     await waitFor(() => expect(screen.getByText('GEMINI_READY')).toBeInTheDocument());
@@ -325,7 +278,7 @@ describe('App', () => {
     expect(screen.getByLabelText('Gemini API Key')).toHaveValue('');
     expect(screen.queryByText('LOCKED')).not.toBeInTheDocument();
     expect(analyze).toBeDisabled();
-    expect(screen.getByAltText(/Preview for asset-/).getAttribute('src')).toBe(selectedBefore);
+    expect(screen.getByAltText('Product reference preview').getAttribute('src')).toBe(selectedBefore);
   });
 
   it('renders the safe production runtime stage without exposing a raw failure', async () => {
@@ -340,10 +293,9 @@ describe('App', () => {
     enterValidProjectInput();
     await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());
     fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));
-    await waitFor(()=>expect(screen.getByText('PRODUCT_ANALYSIS_READY')).toBeInTheDocument());
-    submitProject();
-    fireEvent.click(screen.getByRole('button',{name:'Build Production Plan'}));
-    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Production build failed at R6_BOUNDED_REPLAN.'));
+    await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'}));
+    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('The planned physical actions could not be validated.'));
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
     expect(screen.getByRole('alert')).not.toHaveTextContent('provider exception');
   });

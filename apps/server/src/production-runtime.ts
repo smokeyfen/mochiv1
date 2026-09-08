@@ -7,7 +7,7 @@ import {
   type CreativeDirectionInput,
   type PreF1RuntimeStage,
   type ProductInput,
-  type ProductionSnapshotV1
+  type ProductionSnapshotV1, type ProductEvidence, validateProductEvidence
 } from '@mochi/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import { isSimpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
@@ -50,6 +50,7 @@ export interface ProductionRuntimeRequest {
 export interface ProductionRuntimeDependencies {
   readonly intelligence: IntelligenceProvider;
   readonly snapshotStore: ProductionSnapshotStore;
+  readonly trustedProductEvidence?: { readonly evidence: ProductEvidence; readonly sourceEvidenceVersion: string };
 }
 
 export interface ProductionRuntimeResult {
@@ -113,9 +114,13 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
       await stage('VALIDATE_INPUT', () => {
         if (!validRequest(request)) throw new Error('invalid');
       });
-      const evidence = await stage('R1_PRODUCT_EVIDENCE', () => analyzeProductEvidence({
-        product: request.product, media: request.media, intelligence: dependencies.intelligence
-      }));
+      const evidence = await stage('R1_PRODUCT_EVIDENCE', () => {
+        if (dependencies.trustedProductEvidence) {
+          if (validateProductEvidence(dependencies.trustedProductEvidence.evidence, request.product).length > 0) throw new Error('invalid_trusted_evidence');
+          return dependencies.trustedProductEvidence.evidence;
+        }
+        return analyzeProductEvidence({ product: request.product, media: request.media, intelligence: dependencies.intelligence });
+      });
       const productTruth = await stage('R2_A_PRODUCT_TRUTH', () => analyzeProductTruth({
         product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion, intelligence: dependencies.intelligence
       }));

@@ -5,9 +5,11 @@ import type { ProductInput } from '@mochi/contracts';
 import type { ProductEvidenceService } from './product-evidence-service.ts';
 import { decodeProductInput } from './product-input-decoder.ts';
 import { sanitizeProductEvidence } from './product-evidence-response.ts';
+import { createProductAnalysisReceiptStore, PRODUCT_ANALYSIS_RECEIPT_V1, type ProductAnalysisReceiptStore } from './product-analysis-receipt.ts';
 
 export interface ProductEvidenceHttpHandlerDependencies {
   readonly service: ProductEvidenceService;
+  readonly receiptStore?: ProductAnalysisReceiptStore;
 }
 
 type HttpFailureCode =
@@ -29,6 +31,7 @@ type HttpFailureCode =
 export function createProductEvidenceHttpHandler(
   dependencies: ProductEvidenceHttpHandlerDependencies
 ): (request: Request) => Promise<Response> {
+  const receiptStore = dependencies.receiptStore ?? createProductAnalysisReceiptStore();
   return async request => {
     if (new URL(request.url).pathname !== '/api/product-evidence') return failure(404, 'NOT_FOUND');
     if (request.method !== 'POST') return failure(405, 'METHOD_NOT_ALLOWED');
@@ -51,7 +54,8 @@ export function createProductEvidenceHttpHandler(
 
     try {
       const evidence = await dependencies.service.analyze({ product, media: mediaResult.media });
-      return Response.json({ ok: true, evidence: sanitizeProductEvidence(evidence) });
+      const receipt = receiptStore.commit({ product, media: mediaResult.media, evidence });
+      return Response.json({ ok: true, evidence: sanitizeProductEvidence(receipt.evidence), analysisReceiptId: receipt.analysisReceiptId, receiptVersion: PRODUCT_ANALYSIS_RECEIPT_V1 });
     } catch (error: unknown) {
       return mapServiceError(error);
     }

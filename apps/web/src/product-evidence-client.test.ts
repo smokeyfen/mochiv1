@@ -16,7 +16,7 @@ const evidence = (input: ProductInput = product): ProductEvidence => ({
   identityDescription: 'A small bottle', geometryNotes: ['Rounded bottle'], colorNotes: ['White'], packagingNotes: [], labelNotes: [],
   claims: [], prohibitedInferences: ['Do not infer ingredients'], uncertainties: [], contradictions: []
 });
-const success = (input = product) => new Response(JSON.stringify({ ok: true, evidence: evidence(input) }), { status: 200, headers: { 'content-type': 'application/json' } });
+const success = (input = product) => new Response(JSON.stringify({ ok: true, evidence: evidence(input), analysisReceiptId:'par_test_receipt_0123456789', receiptVersion:'PRODUCT_ANALYSIS_RECEIPT_V1' }), { status: 200, headers: { 'content-type': 'application/json' } });
 
 function request(overrides: Partial<Parameters<typeof analyzeProductEvidence>[0]> = {}) {
   return { product, filesByAssetId: new Map([['asset-1', file]]), ...overrides };

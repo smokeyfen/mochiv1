@@ -40,10 +40,11 @@ const request = (capabilityMap = safeMap()): ProductionRuntimeRequest => ({
 });
 const riskyRotateMap = (): ActionCapabilityMap => ({ ...safeMap(), ROTATE_SLOW: 'RISKY' });
 
-type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean };
+type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly trustedR1?: boolean };
 function createMockIntelligence(options: MockOptions = {}) {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
-  let normalCalls = 0;
+  let normalCalls = options.trustedR1 ? 1 : 0;
+  const sourceEvidenceVersion=options.trustedR1?'PRODUCT_ANALYSIS_RECEIPT_V1':'product-evidence-v1';
   const provider: IntelligenceProvider = {
     id: 'mock-intelligence',
     async analyzeStructured<T>(input: StructuredIntelligenceRequest<T>) {
@@ -63,16 +64,16 @@ function createMockIntelligence(options: MockOptions = {}) {
           packagingNotes: ['Simple package'], labelNotes: ['Mochi label'], claims: [], prohibitedInferences: [], uncertainties: [], contradictions: []
         },
         {
-          schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion: 'product-evidence-v1', canonicalAssetIds: ['reference-1'],
+          schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
           retainedFactIds: ['identity', 'geometry:0', 'color:0', 'packaging:0', 'label:0'], exclusions: []
         },
         {
-          schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion: 'product-evidence-v1', canonicalAssetIds: ['reference-1'],
+          schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
           assetAssessments: [{ assetId: 'reference-1', targetVisibility: 'CLEAR', identityConfidence: options.blockedReference ? 'LOW' : 'HIGH', geometryCoverage: 'STRONG', labelReadability: 'CLEAR', occlusion: 'NONE', backgroundInterference: 'LOW', multiProductAmbiguity: 'NONE' }]
         },
         { skinTone: 'ấm', nailStyle: 'ngắn', jewelry: 'không', dominantHand: 'RIGHT', surface: 'gỗ', background: 'trơn', lighting: 'mềm' },
         {
-          productId: product.productId, sourceEvidenceVersion: 'product-evidence-v1', canonicalAssetIds: ['reference-1'],
+          productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
           scenes: [
             ['HOOK', 'identity', 'PICK_UP', 'BECOME_HELD'], ['FEATURE', 'geometry:0', 'HOLD', 'REMAIN_HELD'],
             ['PROOF', 'color:0', 'ROTATE_SLOW', 'CHANGE_ORIENTATION'], ['CTA', 'identity', 'PLACE_DOWN', 'BECOME_PLACED']
@@ -113,6 +114,12 @@ test('PRE-F1 mocked integration completes only with an explicitly supplied test 
   assert.equal(result.snapshot.snapshotVersion, 'PRODUCTION_SNAPSHOT_V1');
   assert.doesNotMatch(JSON.stringify(result.snapshot), /dataBase64|base64|providerMediaId|gemini|saydi|session|credentials|storageRoot/i);
 }));
+
+test('trusted browser R1 evidence retains the R1 trace stage while making zero R1 intelligence calls', async () => {
+  const root=await mkdtemp(join(tmpdir(),'mochi-trusted-r1-')); const mock=createMockIntelligence({trustedR1:true});
+  const evidence={schemaVersion:SCHEMA_VERSION,productId:product.productId,canonicalAssetIds:['reference-1'],identityDescription:'Mochi snack',geometryNotes:['Round shape'],colorNotes:['White coating'],packagingNotes:['Simple package'],labelNotes:['Mochi label'],claims:[],prohibitedInferences:[],uncertainties:[],contradictions:[]} as const;
+  try { const result=await createProductionRuntime({intelligence:mock.provider,snapshotStore:createProductionSnapshotStore({storageRoot:root}),trustedProductEvidence:{evidence,sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}}).run({...request(),sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}); assert.equal(result.trace[1]?.stage,'R1_PRODUCT_EVIDENCE'); assert.equal(mock.requests.some(item=>item.instruction.startsWith('PRODUCT EVIDENCE:')),false); assert.equal(mock.requests.length,8); } finally { await rm(root,{recursive:true,force:true}); }
+});
 
 test('PRE-F1 mocked integration reaches P0 through V1 fast-track while empirical classifications stay UNTESTED', async () => withRuntime(async ({ runtime, requests }) => {
   const capabilityMap = createUntestedActionCapabilityMap();

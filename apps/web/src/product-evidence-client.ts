@@ -36,6 +36,7 @@ export interface AnalyzeProductEvidenceRequest {
   readonly filesByAssetId: ReadonlyMap<string, File>;
   readonly signal?: AbortSignal;
 }
+export interface ProductAnalysisResult { readonly evidence: ProductEvidence; readonly analysisReceiptId: string; readonly receiptVersion: 'PRODUCT_ANALYSIS_RECEIPT_V1'; }
 
 const clientErrorCodes = new Set<ProductEvidenceClientErrorCode>([
   'INVALID_REQUEST', 'INVALID_PRODUCT_INPUT', 'MISSING_MEDIA', 'INVALID_MEDIA',
@@ -124,7 +125,7 @@ function validateRequest({ product, filesByAssetId }: AnalyzeProductEvidenceRequ
   }
 }
 
-async function decodeResponse(response: Response, product: ProductInput): Promise<ProductEvidence> {
+async function decodeResponse(response: Response, product: ProductInput): Promise<ProductAnalysisResult> {
   let body: unknown;
   try {
     body = await response.json();
@@ -138,18 +139,18 @@ async function decodeResponse(response: Response, product: ProductInput): Promis
     }
     throw new ProductEvidenceClientError('INVALID_RESPONSE');
   }
-  if (!isRecord(body) || !hasExactKeys(body, ['ok', 'evidence']) || body.ok !== true) {
+  if (!isRecord(body) || !hasExactKeys(body, ['ok', 'evidence', 'analysisReceiptId', 'receiptVersion']) || body.ok !== true || typeof body.analysisReceiptId !== 'string' || body.analysisReceiptId.trim().length < 20 || body.receiptVersion !== 'PRODUCT_ANALYSIS_RECEIPT_V1') {
     throw new ProductEvidenceClientError('INVALID_RESPONSE');
   }
   const evidence = decodeProductEvidence(body.evidence);
   if (evidence === null || validateProductEvidence(evidence, product).length > 0) {
     throw new ProductEvidenceClientError('INVALID_RESPONSE');
   }
-  return evidence;
+  return { evidence, analysisReceiptId: body.analysisReceiptId, receiptVersion: body.receiptVersion };
 }
 
 /** Browser-only boundary: sends factual ProductInput and runtime Files, never project or creative data. */
-export async function analyzeProductEvidence(request: AnalyzeProductEvidenceRequest): Promise<ProductEvidence> {
+export async function analyzeProductEvidence(request: AnalyzeProductEvidenceRequest): Promise<ProductAnalysisResult> {
   validateRequest(request);
   const formData = new FormData();
   formData.set('product', JSON.stringify(request.product));

@@ -69,7 +69,7 @@ function requestFor(form: FormData, method = 'POST', path = '/api/product-eviden
 }
 
 async function responseBody(response: Response) {
-  return await response.json() as { ok: boolean; error?: { code: string }; evidence?: ProductEvidence };
+  return await response.json() as { ok: boolean; error?: { code: string }; evidence?: ProductEvidence; analysisReceiptId?:string; receiptVersion?:string };
 }
 
 test('valid multipart ProductInput maps one generic reference to one service call', async () => {
@@ -82,6 +82,8 @@ test('valid multipart ProductInput maps one generic reference to one service cal
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.evidence?.productId, input.productId);
+  assert.match(body.analysisReceiptId ?? '',/^par_[A-Za-z0-9_-]{40,}$/);
+  assert.equal(body.receiptVersion,'PRODUCT_ANALYSIS_RECEIPT_V1');
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0]?.media.map(item => item.assetId), ['asset-1']);
   assert.equal(calls[0]?.media[0]?.mimeType, 'image/jpeg');
