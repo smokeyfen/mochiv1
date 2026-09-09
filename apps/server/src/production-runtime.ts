@@ -30,9 +30,15 @@ import {
   synthesizeGlobalContinuity,
   targetedReplan,
   MAX_SCENE_REPLAN_ATTEMPTS,
+  type ProductFoundationV1,
+  type SceneBlueprintV1,
   type ProductTruthErrorCode,
   type ProductTruthIssueCategory
 } from '@mochi/reasoning';
+import {
+  createProductReferenceBindingV1,
+  type LayerArtifactStore
+} from './layer-artifact-store.ts';
 import { type ProductionSnapshotStore } from './production-snapshot.ts';
 
 /** Ordered safe evidence for the one controlled PRE-F1 runtime invocation. */
@@ -55,12 +61,38 @@ export interface ProductionRuntimeRequest {
 export interface ProductionRuntimeDependencies {
   readonly intelligence: IntelligenceProvider;
   readonly snapshotStore: ProductionSnapshotStore;
+  readonly layerArtifactStore: LayerArtifactStore;
   readonly trustedProductEvidence?: { readonly evidence: ProductEvidence; readonly sourceEvidenceVersion: string };
 }
 
 export interface ProductionRuntimeResult {
-  /** The sole persisted production artifact. Trace data is separate and never persisted. */
+  /** Compatibility output remains the exact persisted P0 authority. */
   readonly snapshot: ProductionSnapshotV1;
+  readonly trace: readonly PreF1RuntimeTraceEntry[];
+}
+
+export interface ProductFoundationRuntimeRequest {
+  readonly projectId: string;
+  readonly product: ProductInput;
+  readonly media: readonly IntelligenceMediaInput[];
+  readonly sourceEvidenceVersion: string;
+}
+
+export interface ProductFoundationRuntimeResult {
+  readonly foundation: ProductFoundationV1;
+  readonly trace: readonly PreF1RuntimeTraceEntry[];
+}
+
+export interface SceneBlueprintRuntimeRequest {
+  readonly foundationId: string;
+  readonly creativeDirection: CreativeDirectionInput;
+  readonly capabilityMap: ActionCapabilityMap;
+  readonly productionEligibilityPolicy?: SimpleActionFastTrackPolicyV1;
+}
+
+export interface SceneBlueprintRuntimeResult {
+  readonly foundation: ProductFoundationV1;
+  readonly blueprint: SceneBlueprintV1;
   readonly trace: readonly PreF1RuntimeTraceEntry[];
 }
 
@@ -95,6 +127,7 @@ const ACTION_IDS = [
 ] as const;
 const CAPABILITY_LEVELS = new Set(['UNTESTED', 'SAFE', 'RISKY', 'AVOID']);
 const ACTION_ID_SET = new Set<ActionId>(ACTION_IDS);
+const FOUNDATION_ID_PATTERN = /^pf_[0-9a-f]{64}$/;
 const STATE_PLANNING_CODES = new Set(['ACTION_EFFECT_MISMATCH', 'UNSATISFIABLE_INITIAL_STATE', 'PICK_UP_PRECONDITION', 'HOLD_PRECONDITION', 'MOVE_PRECONDITION', 'ROTATE_PRECONDITION', 'PLACE_PRECONDITION', 'INTERACTION_PRECONDITION']);
 const RISK_REASONS = new Set(['action_avoid', 'action_untested', 'action_risky', 'unsupported_secondary_action', 'product_state_transformation', 'invalid_pick_up_transition', 'invalid_hold_transition', 'invalid_rotate_slow_transition', 'action_not_simple_fast_track', 'complexity_3']);
 const REPLAN_FAILURE_REASONS = new Set(['scene_missing', 'no_eligible_safer_action', 'provider_failure', 'risk_unresolved']);
@@ -147,18 +180,178 @@ function riskDiagnostic(scene: { readonly index:number; readonly actionId:string
   return replan === undefined ? base : { ...base, replanFailureReason: replan.reasons[0] ?? 'risk_unresolved', attempt: replan.attempts };
 }
 
-function validRequest(request: ProductionRuntimeRequest): boolean {
-  if (!request || typeof request.projectId !== 'string' || request.projectId.trim().length === 0
-    || typeof request.sourceEvidenceVersion !== 'string' || request.sourceEvidenceVersion.trim().length === 0
-    || validateProductInput(request.product).length > 0
-    || validateCreativeDirectionInput(request.creativeDirection).length > 0
+function validFoundationRequest(request: ProductFoundationRuntimeRequest): boolean {
+  return !!request && typeof request.projectId === 'string' && request.projectId.trim().length > 0
+    && typeof request.sourceEvidenceVersion === 'string' && request.sourceEvidenceVersion.trim().length > 0
+    && validateProductInput(request.product).length === 0
+    && Array.isArray(request.media);
+}
+
+function validBlueprintInputs(request: Pick<SceneBlueprintRuntimeRequest, 'creativeDirection' | 'capabilityMap' | 'productionEligibilityPolicy'>): boolean {
+  if (!request || validateCreativeDirectionInput(request.creativeDirection).length > 0
     || !request.capabilityMap || typeof request.capabilityMap !== 'object'
     || (request.productionEligibilityPolicy !== undefined && !isSimpleActionFastTrackPolicyV1(request.productionEligibilityPolicy))) return false;
   return ACTION_IDS.every(action => CAPABILITY_LEVELS.has(request.capabilityMap[action]));
 }
 
+function validBlueprintRequest(request: SceneBlueprintRuntimeRequest): boolean {
+  return !!request && FOUNDATION_ID_PATTERN.test(request.foundationId) && validBlueprintInputs(request);
+}
+
+function validRequest(request: ProductionRuntimeRequest): boolean {
+  return validFoundationRequest(request) && validBlueprintInputs({
+    creativeDirection: request.creativeDirection,
+    capabilityMap: request.capabilityMap,
+    ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy })
+  });
+}
+
 function sameValue(left: unknown, right: unknown): boolean {
   return isDeepStrictEqual(left, right);
+}
+
+type StageRunner = <T>(name: PreF1RuntimeStage, operation: () => T | Promise<T>) => Promise<T>;
+
+function createStageRunner(trace: PreF1RuntimeTraceEntry[]): StageRunner {
+  return async <T>(name: PreF1RuntimeStage, operation: () => T | Promise<T>): Promise<T> => {
+    try {
+      const value = await operation();
+      trace.push({ stage: name, status: 'COMPLETED' });
+      return value;
+    } catch (error) {
+      throw new ProductionRuntimeError(name, trace, diagnosticFromError(error));
+    }
+  };
+}
+
+export type ProductFoundationRuntimeDependencies = Pick<ProductionRuntimeDependencies, 'intelligence' | 'layerArtifactStore' | 'trustedProductEvidence'>;
+export type SceneBlueprintRuntimeDependencies = Pick<ProductionRuntimeDependencies, 'intelligence' | 'layerArtifactStore'>;
+
+async function executeProductFoundation(
+  dependencies: ProductFoundationRuntimeDependencies,
+  request: ProductFoundationRuntimeRequest,
+  stage: StageRunner
+): Promise<ProductFoundationV1> {
+  const evidence = await stage('R1_PRODUCT_EVIDENCE', () => {
+    if (dependencies.trustedProductEvidence) {
+      if (validateProductEvidence(dependencies.trustedProductEvidence.evidence, request.product).length > 0) throw new Error('invalid_trusted_evidence');
+      return dependencies.trustedProductEvidence.evidence;
+    }
+    return analyzeProductEvidence({ product: request.product, media: request.media, intelligence: dependencies.intelligence });
+  });
+  const productTruth = await stage('R2_A_PRODUCT_TRUTH', () => analyzeProductTruth({
+    product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion, intelligence: dependencies.intelligence
+  }));
+  const referenceAssessment = await stage('R2_B_REFERENCE_ASSESSMENT', () => analyzeReferenceAssessment({
+    product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion,
+    media: request.media, intelligence: dependencies.intelligence
+  }));
+  return stage('R2_COMMIT', async () => {
+    const committedContext = commitR2ProductContext({
+      product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion, productTruth, referenceAssessment
+    });
+    return dependencies.layerArtifactStore.createProductFoundation({
+      projectId: request.projectId,
+      productReferenceBinding: createProductReferenceBindingV1(request.product, request.media),
+      productEvidence: evidence,
+      committedContext
+    });
+  });
+}
+
+async function executeSceneBlueprint(
+  dependencies: SceneBlueprintRuntimeDependencies,
+  request: SceneBlueprintRuntimeRequest,
+  stage: StageRunner
+): Promise<{ foundation: ProductFoundationV1; blueprint: SceneBlueprintV1 }> {
+  let foundation: ProductFoundationV1;
+  const continuity = await stage('R3_CONTINUITY', async () => {
+    if (!validBlueprintRequest(request)) throw new Error('invalid');
+    foundation = await dependencies.layerArtifactStore.loadProductFoundation(request.foundationId);
+    return synthesizeGlobalContinuity({
+      context: foundation.committedContext, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
+    });
+  });
+  const context = foundation!;
+  const globalPlan = await stage('R4_GLOBAL_PLAN', () => planGlobal4Scenes({
+    context: context.committedContext, continuity, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
+  }));
+  const initialStatePlan = await stage('R5_INITIAL_STATE', () => resolveSceneStates(globalPlan));
+  const initialRiskAssessment = await stage('R6_INITIAL_RISK', () => evaluateSceneRisk(initialStatePlan, request.capabilityMap, request.productionEligibilityPolicy));
+  const finalGlobalPlan = await stage('R6_BOUNDED_REPLAN', async () => {
+    let candidatePlan = globalPlan;
+    let candidateRiskAssessment = initialRiskAssessment;
+    const replannedIndexes = new Set<number>();
+    while (candidateRiskAssessment.scenes.some(scene => scene.status !== 'READY')) {
+      const target = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY' && !replannedIndexes.has(scene.index));
+      if (!target) {
+        const unresolved = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY');
+        if (unresolved) throw new RuntimeDiagnosticFailure({ ...riskDiagnostic(unresolved), replanFailureReason: 'risk_unresolved' });
+        throw new Error('risk_unresolved');
+      }
+      replannedIndexes.add(target.index);
+      try {
+        candidatePlan = await targetedReplan(
+          candidatePlan, context.committedContext, continuity, request.capabilityMap, target.index,
+          dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS, request.productionEligibilityPolicy
+        );
+      } catch (error) {
+        if (error instanceof ScenePlanningBlockedError) throw new RuntimeDiagnosticFailure(riskDiagnostic(target, error));
+        throw error;
+      }
+      const candidateStatePlan = resolveSceneStates(candidatePlan);
+      candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap, request.productionEligibilityPolicy);
+    }
+    return candidatePlan;
+  });
+  const statePlan = await stage('R5_FINAL_STATE', () => resolveSceneStates(finalGlobalPlan));
+  const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap, request.productionEligibilityPolicy));
+  await stage('R6_READY_GATE', () => {
+    const blocked = riskAssessment.scenes.find(scene => scene.status !== 'READY');
+    if (blocked) throw new RuntimeDiagnosticFailure(riskDiagnostic(blocked));
+  });
+  const blueprint = await stage('R7_A_HUMAN_REALISM', async () => {
+    const humanRealismPlan = await planHumanRealism({
+      context: context.committedContext, plan: finalGlobalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,
+      capabilityMap: request.capabilityMap, ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy }), intelligence: dependencies.intelligence
+    });
+    return dependencies.layerArtifactStore.createSceneBlueprint({
+      foundationId: context.foundationId,
+      creativeDirection: structuredClone(request.creativeDirection),
+      eligibilityBinding: {
+        capabilityMap: structuredClone(request.capabilityMap),
+        productionEligibilityPolicy: request.productionEligibilityPolicy === undefined ? null : structuredClone(request.productionEligibilityPolicy)
+      },
+      continuity,
+      globalPlan: finalGlobalPlan,
+      statePlan,
+      riskAssessment,
+      humanRealismPlan
+    });
+  });
+  return { foundation: context, blueprint };
+}
+
+/** Runs and durably commits only R1, R2-A, R2-B, and R2 Commit. */
+export async function runProductFoundation(
+  dependencies: ProductFoundationRuntimeDependencies,
+  request: ProductFoundationRuntimeRequest
+): Promise<ProductFoundationRuntimeResult> {
+  const trace: PreF1RuntimeTraceEntry[] = [];
+  const stage = createStageRunner(trace);
+  await stage('VALIDATE_INPUT', () => { if (!validFoundationRequest(request)) throw new Error('invalid'); });
+  const foundation = await executeProductFoundation(dependencies, request, stage);
+  return { foundation, trace };
+}
+
+/** Loads one committed L1 artifact, then runs and durably commits only R3 through R7-A. */
+export async function runSceneBlueprint(
+  dependencies: SceneBlueprintRuntimeDependencies,
+  request: SceneBlueprintRuntimeRequest
+): Promise<SceneBlueprintRuntimeResult> {
+  const trace: PreF1RuntimeTraceEntry[] = [];
+  const result = await executeSceneBlueprint(dependencies, request, createStageRunner(trace));
+  return { ...result, trace };
 }
 
 /**
@@ -166,86 +359,28 @@ function sameValue(left: unknown, right: unknown): boolean {
  * This layer owns only ordering, safe tracing, and fail-closed error mapping.
  */
 export function createProductionRuntime(dependencies: ProductionRuntimeDependencies) {
-  if (!dependencies?.intelligence || !dependencies.snapshotStore) throw new ProductionRuntimeError('VALIDATE_INPUT', []);
+  if (!dependencies?.intelligence || !dependencies.snapshotStore || !dependencies.layerArtifactStore) throw new ProductionRuntimeError('VALIDATE_INPUT', []);
 
   return {
     async run(request: ProductionRuntimeRequest): Promise<ProductionRuntimeResult> {
       const trace: PreF1RuntimeTraceEntry[] = [];
-      const stage = async <T>(name: PreF1RuntimeStage, operation: () => T | Promise<T>): Promise<T> => {
-        try {
-          const value = await operation();
-          trace.push({ stage: name, status: 'COMPLETED' });
-          return value;
-        } catch (error) {
-          throw new ProductionRuntimeError(name, trace, diagnosticFromError(error));
-        }
-      };
+      const stage = createStageRunner(trace);
 
       await stage('VALIDATE_INPUT', () => {
         if (!validRequest(request)) throw new Error('invalid');
       });
-      const evidence = await stage('R1_PRODUCT_EVIDENCE', () => {
-        if (dependencies.trustedProductEvidence) {
-          if (validateProductEvidence(dependencies.trustedProductEvidence.evidence, request.product).length > 0) throw new Error('invalid_trusted_evidence');
-          return dependencies.trustedProductEvidence.evidence;
-        }
-        return analyzeProductEvidence({ product: request.product, media: request.media, intelligence: dependencies.intelligence });
-      });
-      const productTruth = await stage('R2_A_PRODUCT_TRUTH', () => analyzeProductTruth({
-        product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion, intelligence: dependencies.intelligence
-      }));
-      const referenceAssessment = await stage('R2_B_REFERENCE_ASSESSMENT', () => analyzeReferenceAssessment({
-        product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion,
-        media: request.media, intelligence: dependencies.intelligence
-      }));
-      const context = await stage('R2_COMMIT', () => commitR2ProductContext({
-        product: request.product, evidence, sourceEvidenceVersion: request.sourceEvidenceVersion, productTruth, referenceAssessment
-      }));
-      const continuity = await stage('R3_CONTINUITY', () => synthesizeGlobalContinuity({
-        context, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
-      }));
-      const globalPlan = await stage('R4_GLOBAL_PLAN', () => planGlobal4Scenes({
-        context, continuity, creativeDirection: request.creativeDirection, intelligence: dependencies.intelligence
-      }));
-      const initialStatePlan = await stage('R5_INITIAL_STATE', () => resolveSceneStates(globalPlan));
-      const initialRiskAssessment = await stage('R6_INITIAL_RISK', () => evaluateSceneRisk(initialStatePlan, request.capabilityMap, request.productionEligibilityPolicy));
-      const finalGlobalPlan = await stage('R6_BOUNDED_REPLAN', async () => {
-        let candidatePlan = globalPlan;
-        let candidateStatePlan = initialStatePlan;
-        let candidateRiskAssessment = initialRiskAssessment;
-        const replannedIndexes = new Set<number>();
-        while (candidateRiskAssessment.scenes.some(scene => scene.status !== 'READY')) {
-          const target = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY' && !replannedIndexes.has(scene.index));
-          if (!target) {
-            const unresolved = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY');
-            if (unresolved) throw new RuntimeDiagnosticFailure({ ...riskDiagnostic(unresolved), replanFailureReason: 'risk_unresolved' });
-            throw new Error('risk_unresolved');
-          }
-          replannedIndexes.add(target.index);
-          try {
-            candidatePlan = await targetedReplan(
-              candidatePlan, context, continuity, request.capabilityMap, target.index,
-              dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS, request.productionEligibilityPolicy
-            );
-          } catch (error) {
-            if (error instanceof ScenePlanningBlockedError) throw new RuntimeDiagnosticFailure(riskDiagnostic(target, error));
-            throw error;
-          }
-          candidateStatePlan = resolveSceneStates(candidatePlan);
-          candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap, request.productionEligibilityPolicy);
-        }
-        return candidatePlan;
-      });
-      const statePlan = await stage('R5_FINAL_STATE', () => resolveSceneStates(finalGlobalPlan));
-      const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap, request.productionEligibilityPolicy));
-      await stage('R6_READY_GATE', () => {
-        const blocked = riskAssessment.scenes.find(scene => scene.status !== 'READY');
-        if (blocked) throw new RuntimeDiagnosticFailure(riskDiagnostic(blocked));
-      });
-      const humanRealismPlan = await stage('R7_A_HUMAN_REALISM', () => planHumanRealism({
-        context, plan: finalGlobalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,
-        capabilityMap: request.capabilityMap, ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy }), intelligence: dependencies.intelligence
-      }));
+      const foundation = await executeProductFoundation(dependencies, request, stage);
+      const { blueprint } = await executeSceneBlueprint(dependencies, {
+        foundationId: foundation.foundationId,
+        creativeDirection: request.creativeDirection,
+        capabilityMap: request.capabilityMap,
+        ...(request.productionEligibilityPolicy === undefined ? {} : { productionEligibilityPolicy: request.productionEligibilityPolicy })
+      }, stage);
+      const context = foundation.committedContext;
+      const finalGlobalPlan = blueprint.globalPlan;
+      const statePlan = blueprint.statePlan;
+      const riskAssessment = blueprint.riskAssessment;
+      const humanRealismPlan = blueprint.humanRealismPlan;
       const keyPointPlan = await stage('R4_1_KEY_POINTS', () => planKeyPoints({
         context, globalPlan: finalGlobalPlan, intelligence: dependencies.intelligence
       }));

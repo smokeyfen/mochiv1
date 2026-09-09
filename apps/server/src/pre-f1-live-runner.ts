@@ -11,6 +11,7 @@ import {
   type StructuredIntelligenceRequest
 } from '@mochi/providers';
 import { createProductionSnapshotStore, type ProductionSnapshotStore } from './production-snapshot.ts';
+import { createLayerArtifactStore, type LayerArtifactStore } from './layer-artifact-store.ts';
 import { createProductionRuntime, ProductionRuntimeError, type ProductionRuntimeRequest } from './production-runtime.ts';
 import { buildSmokeEvidenceRequest, loadSmokeManifest, type R1B2SmokeImage } from './smoke.ts';
 
@@ -46,6 +47,7 @@ export interface PreF1LiveRunnerDependencies {
   readonly prepareMedia?: typeof buildSmokeEvidenceRequest;
   readonly createIntelligence?: (environment: NodeJS.ProcessEnv) => IntelligenceProvider;
   readonly createSnapshotStore?: (storageRoot: string) => ProductionSnapshotStore;
+  readonly createLayerArtifactStore?: (storageRoot: string) => LayerArtifactStore;
   readonly createRuntime?: typeof createProductionRuntime;
 }
 
@@ -123,7 +125,8 @@ export async function runPreF1Live(dependencies: PreF1LiveRunnerDependencies): P
     };
     const runtime = (dependencies.createRuntime ?? createProductionRuntime)({
       intelligence,
-      snapshotStore: (dependencies.createSnapshotStore ?? (storageRoot => createProductionSnapshotStore({ storageRoot })))(environment.PRE_F1_SNAPSHOT_STORAGE_ROOT!)
+      snapshotStore: (dependencies.createSnapshotStore ?? (storageRoot => createProductionSnapshotStore({ storageRoot })))(environment.PRE_F1_SNAPSHOT_STORAGE_ROOT!),
+      layerArtifactStore: (dependencies.createLayerArtifactStore ?? (storageRoot => createLayerArtifactStore({ storageRoot })))(environment.PRE_F1_SNAPSHOT_STORAGE_ROOT!)
     });
     const result = await runtime.run({
       projectId: manifest.projectId,

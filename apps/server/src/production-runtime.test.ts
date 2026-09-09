@@ -12,6 +12,7 @@ import {
 import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1, type ActionCapabilityMap } from '@mochi/core';
 import { IntelligenceProviderError, type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import { compileProductionContract, MAX_SCENE_REPLAN_ATTEMPTS } from '@mochi/reasoning';
+import { createLayerArtifactStore } from './layer-artifact-store.ts';
 import { createProductionSnapshotStore, ProductionSnapshotError, type ProductionSnapshotStore } from './production-snapshot.ts';
 import {
   PRE_F1_RUNTIME_STAGES,
@@ -92,7 +93,7 @@ async function withRuntime(run: (value: { runtime: ReturnType<typeof createProdu
   const root = await mkdtemp(join(tmpdir(), 'mochi-pre-f1-'));
   const mock = createMockIntelligence(options);
   try {
-    await run({ runtime: createProductionRuntime({ intelligence: mock.provider, snapshotStore: createProductionSnapshotStore({ storageRoot: root }) }), requests: mock.requests, root });
+    await run({ runtime: createProductionRuntime({ intelligence: mock.provider, snapshotStore: createProductionSnapshotStore({ storageRoot: root }), layerArtifactStore: createLayerArtifactStore({ storageRoot: root }) }), requests: mock.requests, root });
   } finally { await rm(root, { recursive: true, force: true }); }
 }
 const runtimeError = (stage: string) => (error: unknown) => error instanceof ProductionRuntimeError && error.stage === stage && error.message === `PRE_F1_RUNTIME_ERROR:${stage}`;
@@ -111,7 +112,7 @@ test('PRE-F1 mocked integration completes only with an explicitly supplied test 
 test('trusted browser R1 evidence retains the R1 trace stage while making zero R1 intelligence calls', async () => {
   const root=await mkdtemp(join(tmpdir(),'mochi-trusted-r1-')); const mock=createMockIntelligence({trustedR1:true});
   const evidence={schemaVersion:SCHEMA_VERSION,productId:product.productId,canonicalAssetIds:['reference-1'],identityDescription:'Mochi snack',geometryNotes:['Round shape'],colorNotes:['White coating'],packagingNotes:['Simple package'],labelNotes:['Mochi label'],claims:[],prohibitedInferences:[],uncertainties:[],contradictions:[]} as const;
-  try { const result=await createProductionRuntime({intelligence:mock.provider,snapshotStore:createProductionSnapshotStore({storageRoot:root}),trustedProductEvidence:{evidence,sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}}).run({...request(),sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}); assert.equal(result.trace[1]?.stage,'R1_PRODUCT_EVIDENCE'); assert.equal(mock.requests.some(item=>item.instruction.startsWith('PRODUCT EVIDENCE:')),false); assert.equal(mock.requests.length,8); } finally { await rm(root,{recursive:true,force:true}); }
+  try { const result=await createProductionRuntime({intelligence:mock.provider,snapshotStore:createProductionSnapshotStore({storageRoot:root}),layerArtifactStore:createLayerArtifactStore({storageRoot:root}),trustedProductEvidence:{evidence,sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}}).run({...request(),sourceEvidenceVersion:'PRODUCT_ANALYSIS_RECEIPT_V1'}); assert.equal(result.trace[1]?.stage,'R1_PRODUCT_EVIDENCE'); assert.equal(mock.requests.some(item=>item.instruction.startsWith('PRODUCT EVIDENCE:')),false); assert.equal(mock.requests.length,8); } finally { await rm(root,{recursive:true,force:true}); }
 });
 
 test('PRE-F1 mocked integration reaches P0 through V1 fast-track while empirical classifications stay UNTESTED', async () => withRuntime(async ({ runtime, requests }) => {
@@ -138,7 +139,7 @@ test('PRE-F1 returns the exact P0 reloaded snapshot and exact R8 production cont
       save: value => backing.save(value), load: snapshotId => backing.load(snapshotId)
     };
     const mock = createMockIntelligence();
-    const result = await createProductionRuntime({ intelligence: mock.provider, snapshotStore: store }).run(request());
+    const result = await createProductionRuntime({ intelligence: mock.provider, snapshotStore: store, layerArtifactStore: createLayerArtifactStore({ storageRoot: root }) }).run(request());
     assert.deepEqual(await backing.load(result.snapshot.snapshotId), result.snapshot);
     assert.ok(received);
     assert.deepEqual(result.snapshot.productionContract, compileProductionContract(received.productionRequest));
@@ -212,20 +213,28 @@ test('R7-A and R7-B failures stop downstream', async () => {
 });
 
 test('R8 failure prevents any P0 persistence', async () => {
-  let reads = 0; const stable = safeMap();
-  const capabilityMap = new Proxy(stable, { get(target, property, receiver) {
-    if (typeof property === 'string' && property in target) return ++reads > 23 ? 'UNTESTED' : Reflect.get(target, property, receiver);
-    return Reflect.get(target, property, receiver);
-  } }) as ActionCapabilityMap;
+  const capabilityMap = safeMap();
   let creates = 0;
   const store: ProductionSnapshotStore = {
     async create() { creates += 1; throw new Error('must not persist'); },
     async save() { throw new Error('unused'); }, async load() { throw new Error('unused'); }
   };
   const mock = createMockIntelligence();
-  const runtime = createProductionRuntime({ intelligence: mock.provider, snapshotStore: store });
-  await assert.rejects(runtime.run(request(capabilityMap)), runtimeError('R8_PRODUCTION_CONTRACT'));
-  assert.equal(creates, 0);
+  const root = await mkdtemp(join(tmpdir(), 'mochi-r8-layer-'));
+  try {
+    const backing = createLayerArtifactStore({ storageRoot: root });
+    const layerArtifactStore = {
+      ...backing,
+      async createSceneBlueprint(value: Parameters<typeof backing.createSceneBlueprint>[0]) {
+        const blueprint = await backing.createSceneBlueprint(value);
+        capabilityMap.PICK_UP = 'UNTESTED';
+        return blueprint;
+      }
+    };
+    const runtime = createProductionRuntime({ intelligence: mock.provider, snapshotStore: store, layerArtifactStore });
+    await assert.rejects(runtime.run(request(capabilityMap)), runtimeError('R8_PRODUCTION_CONTRACT'));
+    assert.equal(creates, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('P0 storage failure is normalized and fail-closed', async () => {
@@ -234,15 +243,18 @@ test('P0 storage failure is normalized and fail-closed', async () => {
     async create() { throw new ProductionSnapshotError('STORAGE_FAILURE'); },
     async save() { throw new Error('unused'); }, async load() { throw new Error('unused'); }
   };
-  await assert.rejects(createProductionRuntime({ intelligence: mock.provider, snapshotStore: store }).run(request()), runtimeError('P0_CREATE_PERSIST'));
+  const root = await mkdtemp(join(tmpdir(), 'mochi-p0-layer-'));
+  try { await assert.rejects(createProductionRuntime({ intelligence: mock.provider, snapshotStore: store, layerArtifactStore: createLayerArtifactStore({ storageRoot: root }) }).run(request()), runtimeError('P0_CREATE_PERSIST')); }
+  finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('identical complete mocked runs are deterministic and have stable snapshot IDs', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mochi-pre-f1-stable-'));
   try {
     const one = createMockIntelligence(); const two = createMockIntelligence(); const store = createProductionSnapshotStore({ storageRoot: root });
-    const first = await createProductionRuntime({ intelligence: one.provider, snapshotStore: store }).run(request());
-    const second = await createProductionRuntime({ intelligence: two.provider, snapshotStore: store }).run(request());
+    const layerArtifactStore = createLayerArtifactStore({ storageRoot: root });
+    const first = await createProductionRuntime({ intelligence: one.provider, snapshotStore: store, layerArtifactStore }).run(request());
+    const second = await createProductionRuntime({ intelligence: two.provider, snapshotStore: store, layerArtifactStore }).run(request());
     assert.equal(first.snapshot.snapshotId, second.snapshot.snapshotId);
     assert.deepEqual(first.snapshot, second.snapshot);
     assert.equal(one.requests.length, 9); assert.equal(two.requests.length, 9);
