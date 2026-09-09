@@ -1,15 +1,18 @@
 import {
   SCHEMA_VERSION,
   validateCreativeDirectionInput,
+  validateKeyPointPlan,
   validateHumanRealism4ScenePlan,
   validateProductEvidence,
   validateProductInput,
   validateProductTruth,
   validateReferenceAssessment,
   type CreativeDirectionInput,
+  type DialoguePlan,
   type Global4ScenePlan,
   type GlobalContinuityState,
   type HumanRealism4ScenePlan,
+  type KeyPointPlan,
   type ProductEvidence,
   type ProductInput,
   type R2CommittedProductContext,
@@ -27,10 +30,12 @@ import { HUMAN_REALISM_GLOBAL_CONSTRAINTS } from './human-realism.ts';
 import { buildPlanningTruthCatalog, validatePlan } from './planner.ts';
 import { evaluateSceneRisk, type GlobalSceneRiskAssessment } from './risk.ts';
 import { resolveSceneStates } from './state.ts';
+import { validateDialogueUpstreamBinding } from './dialogue.ts';
 
 export const PRODUCT_REFERENCE_BINDING_V1 = 'PRODUCT_REFERENCE_BINDING_V1' as const;
 export const PRODUCT_FOUNDATION_V1 = 'PRODUCT_FOUNDATION_V1' as const;
 export const SCENE_BLUEPRINT_V1 = 'SCENE_BLUEPRINT_V1' as const;
+export const FINALIZED_SCRIPT_V1 = 'FINALIZED_SCRIPT_V1' as const;
 
 export interface ReferenceContentFingerprintV1 {
   readonly assetId: string;
@@ -74,8 +79,19 @@ export interface SceneBlueprintV1 {
   readonly humanRealismPlan: HumanRealism4ScenePlan;
 }
 
+/** Durable L3 authority. Upstream L1/L2 content remains authoritative by ID only. */
+export interface FinalizedScriptV1 {
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly scriptVersion: typeof FINALIZED_SCRIPT_V1;
+  readonly scriptId: string;
+  readonly blueprintId: string;
+  readonly keyPointPlan: KeyPointPlan;
+  readonly dialoguePlan: DialoguePlan;
+}
+
 const FOUNDATION_ID = /^pf_[0-9a-f]{64}$/;
 const BLUEPRINT_ID = /^sb_[0-9a-f]{64}$/;
+const SCRIPT_ID = /^fs_[0-9a-f]{64}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ACTION_IDS = [
   'REACH', 'PICK_UP', 'HOLD', 'MOVE_CLOSER', 'ROTATE_SLOW', 'PLACE_DOWN',
@@ -102,6 +118,7 @@ const ASSESSMENT_KEYS = ['schemaVersion', 'productId', 'sourceEvidenceVersion', 
 const ASSET_ASSESSMENT_KEYS = ['assetId', 'targetVisibility', 'identityConfidence', 'geometryCoverage', 'labelReadability', 'occlusion', 'backgroundInterference', 'multiProductAmbiguity'] as const;
 
 const BLUEPRINT_KEYS = ['schemaVersion', 'blueprintVersion', 'blueprintId', 'foundationId', 'creativeDirection', 'eligibilityBinding', 'continuity', 'globalPlan', 'statePlan', 'riskAssessment', 'humanRealismPlan'] as const;
+const SCRIPT_KEYS = ['schemaVersion', 'scriptVersion', 'scriptId', 'blueprintId', 'keyPointPlan', 'dialoguePlan'] as const;
 const CREATIVE_KEYS = ['audience', 'shootingContext', 'reviewerPersona', 'tone', 'voiceStyle', 'voiceGender', 'voiceRegion'] as const;
 const ELIGIBILITY_KEYS = ['capabilityMap', 'productionEligibilityPolicy'] as const;
 const CONTINUITY_KEYS = ['schemaVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'immutable'] as const;
@@ -283,5 +300,28 @@ export function validateSceneBlueprintV1(value: unknown, foundation: ProductFoun
     || validateHumanRealism4ScenePlan(
       blueprint.humanRealismPlan, expectedState, blueprint.humanRealismPlan?.globalConstraints
     ).length > 0) issues.push('human_realism');
+  return [...new Set(issues)];
+}
+
+/** Reuses locked L1/L2, R4.1, and R7-B validators to prove exact durable L3 lineage. */
+export function validateFinalizedScriptV1(
+  value: unknown,
+  blueprint: SceneBlueprintV1,
+  foundation: ProductFoundationV1
+): string[] {
+  if (validateSceneBlueprintV1(blueprint, foundation).length > 0) return ['blueprint'];
+  if (!exact(value, SCRIPT_KEYS)) return ['shape'];
+  const script = value as unknown as FinalizedScriptV1;
+  const issues: string[] = [];
+  if (script.schemaVersion !== SCHEMA_VERSION || script.scriptVersion !== FINALIZED_SCRIPT_V1) issues.push('version');
+  if (!SCRIPT_ID.test(script.scriptId)) issues.push('script_id');
+  if (script.blueprintId !== blueprint.blueprintId) issues.push('blueprint_lineage');
+
+  const context = foundation.committedContext;
+  const catalog = buildPlanningTruthCatalog(context);
+  if (validateKeyPointPlan(script.keyPointPlan, context, blueprint.globalPlan, catalog).length > 0) issues.push('key_points');
+  if (validateDialogueUpstreamBinding(
+    script.dialoguePlan, context, blueprint.globalPlan, script.keyPointPlan, blueprint.creativeDirection
+  ).length > 0) issues.push('dialogue');
   return [...new Set(issues)];
 }

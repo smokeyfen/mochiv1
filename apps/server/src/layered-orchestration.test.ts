@@ -6,7 +6,7 @@ import test from 'node:test';
 import { SCHEMA_VERSION, type CreativeDirectionInput, type ProductInput } from '@mochi/contracts';
 import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1 } from '@mochi/core';
 import type { IntelligenceProvider, StructuredIntelligenceRequest } from '@mochi/providers';
-import { validateProductFoundationV1, validateSceneBlueprintV1 } from '@mochi/reasoning';
+import { validateFinalizedScriptV1, validateProductFoundationV1, validateSceneBlueprintV1 } from '@mochi/reasoning';
 import {
   createLayerArtifactStore,
   LayerArtifactError,
@@ -17,7 +17,9 @@ import { canonicalJson } from './production-snapshot.ts';
 import {
   ProductionRuntimeError,
   runProductFoundation,
-  runSceneBlueprint
+  runSceneBlueprint,
+  runScriptFinalization,
+  ScriptFinalizationError
 } from './production-runtime.ts';
 
 const product: ProductInput = {
@@ -50,9 +52,17 @@ interface MockLayerProvider {
   readonly requests: StructuredIntelligenceRequest<unknown>[];
 }
 
-function createLayerIntelligence(options: { failHumanOnce?: boolean } = {}): MockLayerProvider {
+function createLayerIntelligence(options: {
+  failHumanOnce?: boolean;
+  failKeyPointsOnce?: boolean;
+  failDialogueGenerationOnce?: boolean;
+  rejectDialogueSemanticOnce?: boolean;
+} = {}): MockLayerProvider {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
   let humanFailuresRemaining = options.failHumanOnce ? 1 : 0;
+  let keyPointFailuresRemaining = options.failKeyPointsOnce ? 1 : 0;
+  let dialogueGenerationFailuresRemaining = options.failDialogueGenerationOnce ? 1 : 0;
+  let dialogueSemanticRejectionsRemaining = options.rejectDialogueSemanticOnce ? 1 : 0;
   const intelligence: IntelligenceProvider = {
     id: 'layer-mock',
     async analyzeStructured<T>(request: StructuredIntelligenceRequest<T>) {
@@ -117,6 +127,43 @@ function createLayerIntelligence(options: { failHumanOnce?: boolean } = {}): Moc
             postActionSettleBehavior: 'Dừng nhẹ.',
             cameraBehavior: 'Rung tay nhẹ.'
           }))
+        };
+      } else if (request.instruction.startsWith('KEY POINTS RULES:')) {
+        if (keyPointFailuresRemaining > 0) {
+          keyPointFailuresRemaining -= 1;
+          throw new Error('forced L3 key-point failure');
+        }
+        data = { secondaryTruthRefIds: ['identity', 'geometry:0', 'geometry:0'] };
+      } else if (request.instruction.startsWith('DIALOGUE FINALIZATION RULES:')) {
+        if (dialogueGenerationFailuresRemaining > 0) {
+          dialogueGenerationFailuresRemaining -= 1;
+          throw new Error('forced L3 dialogue failure');
+        }
+        data = {
+          scenes: Array.from({ length: 4 }, (_, offset) => ({
+            sceneId: `${product.productId}:scene:${offset + 1}`,
+            index: offset + 1,
+            dialogue: [
+              'Ủa, Mochi Original nhìn nhỏ xinh ha.',
+              'Viên bánh tròn cầm gọn tay nè.',
+              'Xoay lại thấy lớp áo màu trắng rõ luôn.',
+              'Mình thấy hợp để thử ăn vặt đó.'
+            ][offset],
+            addressedKeyPointIndexes: [1, 2]
+          }))
+        };
+      } else if (request.instruction.startsWith('DIALOGUE SEMANTIC VALIDATION RULES:')) {
+        const reject = dialogueSemanticRejectionsRemaining > 0;
+        dialogueSemanticRejectionsRemaining -= reject ? 1 : 0;
+        data = {
+          scenes: Array.from({ length: 4 }, (_, offset) => ({
+            coversKeyPoint1: !reject || offset !== 0,
+            coversKeyPoint2: true,
+            introducesUnsupportedProductFact: false,
+            naturalSouthernConversationalVietnamese: true,
+            containsStageDirectionOrNonSpeechText: false
+          })),
+          sameReviewerPersonaAcrossScenes: true
         };
       } else {
         throw new Error(`unexpected intelligence stage: ${request.instruction.slice(0, 40)}`);
@@ -269,5 +316,108 @@ test('F/G: failed L2 commits nothing and retry reuses the unchanged L1 artifact 
     assert.equal(l1.requests.length, 3);
     assert.equal(l2.requests.filter(item => /PRODUCT EVIDENCE|PRODUCT TRUTH|REFERENCE ASSESSMENT/.test(item.instruction)).length, 0);
     assert.deepEqual(validateSceneBlueprintV1(retried.blueprint, retried.foundation), []);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+async function createL3Inputs(root: string) {
+  const store = createLayerArtifactStore({ storageRoot: root });
+  const l1 = createLayerIntelligence();
+  const foundation = (await runProductFoundation({ intelligence: l1.intelligence, layerArtifactStore: store }, {
+    projectId: 'layer-project', product, media, sourceEvidenceVersion: 'layer-evidence-v1'
+  })).foundation;
+  const l2 = createLayerIntelligence();
+  const blueprint = (await runSceneBlueprint({ intelligence: l2.intelligence, layerArtifactStore: store }, {
+    foundationId: foundation.foundationId,
+    creativeDirection,
+    capabilityMap: createUntestedActionCapabilityMap(),
+    productionEligibilityPolicy: simpleActionFastTrackPolicyV1
+  })).blueprint;
+  return { store, l1, l2, foundation, blueprint };
+}
+
+test('L3 A/B/C/I/J: clean script finalization persists one provider-neutral authority in exactly three calls', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l3-'));
+  try {
+    const { store, l1, l2, foundation, blueprint } = await createL3Inputs(root);
+    const l3 = createLayerIntelligence();
+    const result = await runScriptFinalization({ intelligence: l3.intelligence, layerArtifactStore: store }, { blueprintId: blueprint.blueprintId });
+    assert.equal(result.script.scriptVersion, 'FINALIZED_SCRIPT_V1');
+    assert.match(result.script.scriptId, /^fs_[0-9a-f]{64}$/);
+    assert.equal(result.script.blueprintId, blueprint.blueprintId);
+    assert.deepEqual(validateFinalizedScriptV1(result.script, blueprint, foundation), []);
+    assert.equal(await artifactCount(root, 'finalized-scripts'), 1);
+    assert.equal(l3.requests.length, 3);
+    assert.deepEqual(l3.requests.map(request => request.instruction.split(':', 1)[0]), [
+      'KEY POINTS RULES', 'DIALOGUE FINALIZATION RULES', 'DIALOGUE SEMANTIC VALIDATION RULES'
+    ]);
+    assert.equal(l3.requests.some(request => /PRODUCT EVIDENCE|PRODUCT TRUTH|REFERENCE ASSESSMENT|CONTINUITY|GLOBAL PLANNER|HUMAN REALISM/.test(request.instruction)), false);
+    assert.equal(l1.requests.length, 3);
+    assert.equal(l2.requests.length, 3);
+    assert.deepEqual(await store.loadFinalizedScript(result.script.scriptId), result.script);
+    const scriptPath = join(root, 'finalized-scripts', `${result.script.scriptId}.json`);
+    const bytes = await readFile(scriptPath, 'utf8');
+    assert.equal(bytes, canonicalJson(result.script));
+    assert.doesNotMatch(bytes, /dataBase64|base64|credential|provider|prompt|modelResponse|rawResponse/i);
+
+    const tamperedContent = JSON.parse(bytes) as any;
+    tamperedContent.dialoguePlan.scenes[0].dialogue = 'tampered';
+    await writeFile(scriptPath, canonicalJson(tamperedContent), 'utf8');
+    await assert.rejects(store.loadFinalizedScript(result.script.scriptId),
+      (error: unknown) => error instanceof LayerArtifactError && error.code === 'CORRUPT_ARTIFACT');
+    await writeFile(scriptPath, bytes, 'utf8');
+    const tamperedId = JSON.parse(bytes) as any;
+    tamperedId.scriptId = `fs_${'0'.repeat(64)}`;
+    await writeFile(scriptPath, canonicalJson(tamperedId), 'utf8');
+    await assert.rejects(store.loadFinalizedScript(result.script.scriptId),
+      (error: unknown) => error instanceof LayerArtifactError && error.code === 'CORRUPT_ARTIFACT');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L3 D/E/F/G: failures do not commit and retry from one blueprint runs only L3', async () => {
+  for (const [option, expectedStage, expectedCalls] of [
+    [{ failKeyPointsOnce: true }, 'R4_1_KEY_POINTS', 1],
+    [{ failDialogueGenerationOnce: true }, 'R7_B_DIALOGUE', 2],
+    [{ rejectDialogueSemanticOnce: true }, 'R7_B_DIALOGUE', 3]
+  ] as const) {
+    const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l3-failure-'));
+    try {
+      const { store, l1, l2, foundation, blueprint } = await createL3Inputs(root);
+      const l3 = createLayerIntelligence(option);
+      await assert.rejects(runScriptFinalization({ intelligence: l3.intelligence, layerArtifactStore: store }, { blueprintId: blueprint.blueprintId }),
+        (error: unknown) => error instanceof ScriptFinalizationError
+          && error.diagnostic.layer === 'L3' && error.diagnostic.phase === 'ENGINE'
+          && error.diagnostic.engineStage === expectedStage);
+      assert.equal(l3.requests.length, expectedCalls);
+      assert.equal(await artifactCount(root, 'finalized-scripts'), 0);
+      assert.equal((await store.loadProductFoundation(foundation.foundationId)).foundationId, foundation.foundationId);
+      assert.equal((await store.loadSceneBlueprint(blueprint.blueprintId)).blueprintId, blueprint.blueprintId);
+      assert.equal(l1.requests.length, 3);
+      assert.equal(l2.requests.length, 3);
+
+      const retry = await runScriptFinalization({ intelligence: l3.intelligence, layerArtifactStore: store }, { blueprintId: blueprint.blueprintId });
+      assert.equal(retry.foundation.foundationId, foundation.foundationId);
+      assert.equal(retry.blueprint.blueprintId, blueprint.blueprintId);
+      assert.equal(await artifactCount(root, 'finalized-scripts'), 1);
+      assert.equal(l1.requests.length, 3);
+      assert.equal(l2.requests.length, 3);
+      assert.equal(l3.requests.some(request => /PRODUCT EVIDENCE|PRODUCT TRUTH|REFERENCE ASSESSMENT|CONTINUITY|GLOBAL PLANNER|HUMAN REALISM/.test(request.instruction)), false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
+test('L3 H: stale or tampered L2 lineage fails closed before L3 intelligence', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l3-lineage-'));
+  try {
+    const { blueprint } = await createL3Inputs(root);
+    const blueprintPath = join(root, 'scene-blueprints', `${blueprint.blueprintId}.json`);
+    const tampered = JSON.parse(await readFile(blueprintPath, 'utf8')) as any;
+    tampered.foundationId = `pf_${'0'.repeat(64)}`;
+    await writeFile(blueprintPath, canonicalJson(tampered), 'utf8');
+    const l3 = createLayerIntelligence();
+    await assert.rejects(runScriptFinalization({ intelligence: l3.intelligence, layerArtifactStore: createLayerArtifactStore({ storageRoot: root }) }, { blueprintId: blueprint.blueprintId }),
+      (error: unknown) => error instanceof ScriptFinalizationError
+        && JSON.stringify(error.diagnostic) === JSON.stringify({ layer: 'L3', phase: 'LOAD' }));
+    assert.equal(l3.requests.length, 0);
+    assert.equal(await artifactCount(root, 'finalized-scripts'), 0);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

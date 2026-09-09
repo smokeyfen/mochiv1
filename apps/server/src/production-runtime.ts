@@ -32,8 +32,10 @@ import {
   MAX_SCENE_REPLAN_ATTEMPTS,
   type ProductFoundationV1,
   type SceneBlueprintV1,
+  type FinalizedScriptV1,
   type ProductTruthErrorCode,
-  type ProductTruthIssueCategory
+  type ProductTruthIssueCategory,
+  validateFinalizedScriptV1
 } from '@mochi/reasoning';
 import {
   createProductReferenceBindingV1,
@@ -96,6 +98,34 @@ export interface SceneBlueprintRuntimeResult {
   readonly trace: readonly PreF1RuntimeTraceEntry[];
 }
 
+export interface ScriptFinalizationRuntimeRequest {
+  readonly blueprintId: string;
+}
+
+export interface ScriptFinalizationRuntimeResult {
+  readonly foundation: ProductFoundationV1;
+  readonly blueprint: SceneBlueprintV1;
+  readonly script: FinalizedScriptV1;
+}
+
+export type L3ScriptFinalizationPhase = 'INPUT' | 'LOAD' | 'ENGINE' | 'VALIDATE' | 'PERSIST';
+export type L3ScriptFinalizationEngineStage = 'R4_1_KEY_POINTS' | 'R7_B_DIALOGUE';
+export interface L3ScriptFinalizationDiagnostic {
+  readonly layer: 'L3';
+  readonly phase: L3ScriptFinalizationPhase;
+  readonly engineStage?: L3ScriptFinalizationEngineStage;
+}
+
+/** Bounded L3 error surface; it never carries provider/runtime detail. */
+export class ScriptFinalizationError extends Error {
+  readonly diagnostic: L3ScriptFinalizationDiagnostic;
+  constructor(phase: L3ScriptFinalizationPhase, engineStage?: L3ScriptFinalizationEngineStage) {
+    super(`L3_SCRIPT_FINALIZATION_ERROR:${phase}`);
+    this.name = 'ScriptFinalizationError';
+    this.diagnostic = engineStage === undefined ? { layer: 'L3', phase } : { layer: 'L3', phase, engineStage };
+  }
+}
+
 /** Bounded, provider-free root-cause data permitted through the production UI. */
 export type ProductionRuntimeDiagnostic =
   | { readonly kind: 'R2_A_PRODUCT_TRUTH'; readonly productTruthErrorCode: ProductTruthErrorCode; readonly providerFailureCode?: IntelligenceProviderErrorCode; readonly issueCategories?: readonly ProductTruthIssueCategory[] }
@@ -128,6 +158,7 @@ const ACTION_IDS = [
 const CAPABILITY_LEVELS = new Set(['UNTESTED', 'SAFE', 'RISKY', 'AVOID']);
 const ACTION_ID_SET = new Set<ActionId>(ACTION_IDS);
 const FOUNDATION_ID_PATTERN = /^pf_[0-9a-f]{64}$/;
+const BLUEPRINT_ID_PATTERN = /^sb_[0-9a-f]{64}$/;
 const STATE_PLANNING_CODES = new Set(['ACTION_EFFECT_MISMATCH', 'UNSATISFIABLE_INITIAL_STATE', 'PICK_UP_PRECONDITION', 'HOLD_PRECONDITION', 'MOVE_PRECONDITION', 'ROTATE_PRECONDITION', 'PLACE_PRECONDITION', 'INTERACTION_PRECONDITION']);
 const RISK_REASONS = new Set(['action_avoid', 'action_untested', 'action_risky', 'unsupported_secondary_action', 'product_state_transformation', 'invalid_pick_up_transition', 'invalid_hold_transition', 'invalid_rotate_slow_transition', 'action_not_simple_fast_track', 'complexity_3']);
 const REPLAN_FAILURE_REASONS = new Set(['scene_missing', 'no_eligible_safer_action', 'provider_failure', 'risk_unresolved']);
@@ -226,6 +257,7 @@ function createStageRunner(trace: PreF1RuntimeTraceEntry[]): StageRunner {
 
 export type ProductFoundationRuntimeDependencies = Pick<ProductionRuntimeDependencies, 'intelligence' | 'layerArtifactStore' | 'trustedProductEvidence'>;
 export type SceneBlueprintRuntimeDependencies = Pick<ProductionRuntimeDependencies, 'intelligence' | 'layerArtifactStore'>;
+export type ScriptFinalizationRuntimeDependencies = Pick<ProductionRuntimeDependencies, 'intelligence' | 'layerArtifactStore'>;
 
 async function executeProductFoundation(
   dependencies: ProductFoundationRuntimeDependencies,
@@ -352,6 +384,64 @@ export async function runSceneBlueprint(
   const trace: PreF1RuntimeTraceEntry[] = [];
   const result = await executeSceneBlueprint(dependencies, request, createStageRunner(trace));
   return { ...result, trace };
+}
+
+/** Loads L1/L2 by ID, then runs only R4.1 and R7-B before atomically committing L3. */
+export async function runScriptFinalization(
+  dependencies: ScriptFinalizationRuntimeDependencies,
+  request: ScriptFinalizationRuntimeRequest
+): Promise<ScriptFinalizationRuntimeResult> {
+  if (!dependencies?.intelligence || !dependencies.layerArtifactStore
+    || !request || !BLUEPRINT_ID_PATTERN.test(request.blueprintId)) {
+    throw new ScriptFinalizationError('INPUT');
+  }
+  let blueprint: SceneBlueprintV1;
+  let foundation: ProductFoundationV1;
+  try {
+    blueprint = await dependencies.layerArtifactStore.loadSceneBlueprint(request.blueprintId);
+    foundation = await dependencies.layerArtifactStore.loadProductFoundation(blueprint.foundationId);
+  } catch {
+    throw new ScriptFinalizationError('LOAD');
+  }
+
+  let keyPointPlan;
+  try {
+    keyPointPlan = await planKeyPoints({
+      context: foundation.committedContext, globalPlan: blueprint.globalPlan, intelligence: dependencies.intelligence
+    });
+  } catch {
+    throw new ScriptFinalizationError('ENGINE', 'R4_1_KEY_POINTS');
+  }
+  let dialoguePlan;
+  try {
+    dialoguePlan = await finalizeDialogue({
+      context: foundation.committedContext, globalPlan: blueprint.globalPlan, keyPointPlan,
+      creativeDirection: blueprint.creativeDirection, intelligence: dependencies.intelligence
+    });
+  } catch {
+    throw new ScriptFinalizationError('ENGINE', 'R7_B_DIALOGUE');
+  }
+  try {
+    const issues = validateFinalizedScriptV1({
+      schemaVersion: foundation.schemaVersion,
+      scriptVersion: 'FINALIZED_SCRIPT_V1',
+      scriptId: `fs_${'0'.repeat(64)}`,
+      blueprintId: blueprint.blueprintId,
+      keyPointPlan,
+      dialoguePlan
+    }, blueprint, foundation);
+    if (issues.length > 0) throw new Error('invalid');
+  } catch {
+    throw new ScriptFinalizationError('VALIDATE');
+  }
+  try {
+    const script = await dependencies.layerArtifactStore.createFinalizedScript({
+      blueprintId: blueprint.blueprintId, keyPointPlan, dialoguePlan
+    });
+    return { foundation, blueprint, script };
+  } catch {
+    throw new ScriptFinalizationError('PERSIST');
+  }
 }
 
 /**

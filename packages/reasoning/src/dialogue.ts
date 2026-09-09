@@ -69,6 +69,14 @@ const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<
 const sameOrderedStrings = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 const nonBlank = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+const comparableJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(comparableJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${comparableJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
 
 export const buildDialogueGenerationInstruction = (): string =>
   'DIALOGUE FINALIZATION RULES: Return structured JSON only. Return exactly four scene decisions in the supplied order, with only sceneId, index, dialogue, and addressedKeyPointIndexes. Each addressedKeyPointIndexes value must be [1,2]. Write Vietnamese spoken dialogue only: natural Southern Vietnamese, informal authentic product-review delivery, subtle regional wording without caricature, natural reactions and sentence rhythm, and the same reviewer persona throughout. Use one concise utterance intended to fit naturally inside an 8-second scene. Do not write formal Vietnamese, announcer or commercial-narrator delivery, stage directions, quotation labels, subtitles, visual instructions, or non-speech text. Address both supplied key points in every scene. Do not invent prices, discounts, promotions, mechanisms, benefits, or any product fact outside the two supplied key points. Let HOOK express natural reaction or curiosity, FEATURE give conversational explanation, PROOF give hands-on realization, and CTA give a soft personal recommendation without hard sell. Speaker identity must not vary.';
@@ -240,7 +248,7 @@ export function validateDialogueUpstreamBinding(
   if (dialogue.language !== 'vi-VN' || dialogue.voiceIdentityId !== voiceIdentityId) issues.push('voice');
   if (dialogue.scenes.length !== 4 || dialogue.scenes.some((scene, offset) =>
     scene.sceneId !== globalPlan.scenes[offset]?.sceneId || scene.index !== globalPlan.scenes[offset]?.index)) issues.push('scene_binding');
-  if (JSON.stringify(dialogue.inputBinding) !== JSON.stringify(buildDialogueInputBinding(globalPlan, keyPointPlan, creativeDirection))) {
+  if (comparableJson(dialogue.inputBinding) !== comparableJson(buildDialogueInputBinding(globalPlan, keyPointPlan, creativeDirection))) {
     issues.push('input_binding');
   }
   return issues;

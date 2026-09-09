@@ -64,11 +64,14 @@ export {
   PRODUCT_REFERENCE_BINDING_V1,
   PRODUCT_FOUNDATION_V1,
   SCENE_BLUEPRINT_V1,
+  FINALIZED_SCRIPT_V1,
   validateProductFoundationV1,
   validateSceneBlueprintV1,
+  validateFinalizedScriptV1,
   type ReferenceContentFingerprintV1,
   type ProductReferenceBindingV1,
   type ProductFoundationV1,
   type SceneBlueprintEligibilityBindingV1,
-  type SceneBlueprintV1
+  type SceneBlueprintV1,
+  type FinalizedScriptV1
 } from './layer-contracts.ts';

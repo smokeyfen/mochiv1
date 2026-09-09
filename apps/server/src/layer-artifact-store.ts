@@ -8,8 +8,11 @@ import {
   PRODUCT_FOUNDATION_V1,
   PRODUCT_REFERENCE_BINDING_V1,
   SCENE_BLUEPRINT_V1,
+  FINALIZED_SCRIPT_V1,
+  validateFinalizedScriptV1,
   validateProductFoundationV1,
   validateSceneBlueprintV1,
+  type FinalizedScriptV1,
   type ProductFoundationV1,
   type ProductReferenceBindingV1,
   type SceneBlueprintV1
@@ -18,6 +21,7 @@ import { canonicalJson } from './production-snapshot.ts';
 
 const FOUNDATION_ID = /^pf_[0-9a-f]{64}$/;
 const BLUEPRINT_ID = /^sb_[0-9a-f]{64}$/;
+const SCRIPT_ID = /^fs_[0-9a-f]{64}$/;
 
 export type LayerArtifactErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'CORRUPT_ARTIFACT' | 'ARTIFACT_CONFLICT' | 'STORAGE_FAILURE';
 
@@ -38,12 +42,15 @@ export interface CreateProductFoundationRequest {
 }
 
 export interface CreateSceneBlueprintRequest extends Omit<SceneBlueprintV1, 'schemaVersion' | 'blueprintVersion' | 'blueprintId'> {}
+export interface CreateFinalizedScriptRequest extends Omit<FinalizedScriptV1, 'schemaVersion' | 'scriptVersion' | 'scriptId'> {}
 
 export interface LayerArtifactStore {
   createProductFoundation(request: CreateProductFoundationRequest): Promise<ProductFoundationV1>;
   loadProductFoundation(foundationId: string): Promise<ProductFoundationV1>;
   createSceneBlueprint(request: CreateSceneBlueprintRequest): Promise<SceneBlueprintV1>;
   loadSceneBlueprint(blueprintId: string): Promise<SceneBlueprintV1>;
+  createFinalizedScript(request: CreateFinalizedScriptRequest): Promise<FinalizedScriptV1>;
+  loadFinalizedScript(scriptId: string): Promise<FinalizedScriptV1>;
 }
 
 export interface LayerArtifactStoreOptions {
@@ -53,6 +60,7 @@ export interface LayerArtifactStoreOptions {
 
 type FoundationContent = Omit<ProductFoundationV1, 'foundationId'>;
 type BlueprintContent = Omit<SceneBlueprintV1, 'blueprintId'>;
+type ScriptContent = Omit<FinalizedScriptV1, 'scriptId'>;
 
 function nonBlank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -62,7 +70,7 @@ function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function contentId(prefix: 'pf' | 'sb', content: FoundationContent | BlueprintContent): string {
+function contentId(prefix: 'pf' | 'sb' | 'fs', content: FoundationContent | BlueprintContent | ScriptContent): string {
   try { return `${prefix}_${sha256(canonicalJson(content))}`; }
   catch { throw new LayerArtifactError('INVALID_INPUT'); }
 }
@@ -199,6 +207,22 @@ export function createLayerArtifactStore(options: LayerArtifactStoreOptions): La
     return blueprint;
   }
 
+  async function loadFinalizedScript(scriptId: string): Promise<FinalizedScriptV1> {
+    const parsed = await read('finalized-scripts', scriptId, SCRIPT_ID);
+    if (!parsed || typeof parsed !== 'object' || typeof (parsed as { blueprintId?: unknown }).blueprintId !== 'string') {
+      throw new LayerArtifactError('CORRUPT_ARTIFACT');
+    }
+    const blueprint = await loadSceneBlueprint((parsed as { blueprintId: string }).blueprintId);
+    const foundation = await loadProductFoundation(blueprint.foundationId);
+    if (validateFinalizedScriptV1(parsed, blueprint, foundation).length > 0) throw new LayerArtifactError('CORRUPT_ARTIFACT');
+    const script = parsed as FinalizedScriptV1;
+    const { scriptId: _scriptId, ...content } = script;
+    if (script.scriptId !== scriptId || contentId('fs', content) !== scriptId) {
+      throw new LayerArtifactError('CORRUPT_ARTIFACT');
+    }
+    return script;
+  }
+
   return {
     async createProductFoundation(request): Promise<ProductFoundationV1> {
       const content: FoundationContent = {
@@ -229,6 +253,21 @@ export function createLayerArtifactStore(options: LayerArtifactStoreOptions): La
       await loadSceneBlueprint(blueprint.blueprintId);
       return blueprint;
     },
-    loadSceneBlueprint
+    loadSceneBlueprint,
+    async createFinalizedScript(request): Promise<FinalizedScriptV1> {
+      const blueprint = await loadSceneBlueprint(request.blueprintId);
+      const foundation = await loadProductFoundation(blueprint.foundationId);
+      const content: ScriptContent = {
+        schemaVersion: SCHEMA_VERSION,
+        scriptVersion: FINALIZED_SCRIPT_V1,
+        ...request
+      };
+      const script: FinalizedScriptV1 = { ...content, scriptId: contentId('fs', content) };
+      if (validateFinalizedScriptV1(script, blueprint, foundation).length > 0) throw new LayerArtifactError('INVALID_INPUT');
+      await publish('finalized-scripts', script.scriptId, script, SCRIPT_ID);
+      await loadFinalizedScript(script.scriptId);
+      return script;
+    },
+    loadFinalizedScript
   };
 }
