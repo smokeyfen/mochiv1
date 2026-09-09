@@ -1,0 +1,38 @@
+.voice-gender-cards {
+  border: 0;
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.voice-gender-cards legend {
+  color: #c9d4df;
+  font-size: .88rem;
+  font-weight: 680;
+  margin-bottom: 8px;
+}
+
+.voice-card {
+  background: #121f31;
+  border: 1px solid #3b4c62;
+  border-radius: 8px;
+  color: #9dacbd;
+  cursor: pointer;
+  min-width: 84px;
+  padding: 12px;
+}
+
+.voice-card.active {
+  background: #15333c;
+  border-color: var(--accent);
+  box-shadow: 0 0 9px rgb(39 194 189 / 12%);
+  color: #9af2ed;
+}
+
+.file-state {
+  color: #75d9d4;
+  display: block;
+  font-size: .78rem;
+  margin-top: 6px;
+}

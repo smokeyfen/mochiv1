@@ -7,6 +7,8 @@ import { SCHEMA_VERSION, type MochiProjectInput } from '@mochi/contracts';
 import { IntelligenceProviderError, type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import { ProductionWorkspaceError, ProductionWorkspaceService, type DeliveryOutputName } from './production-workspace.ts';
 import { RuntimeConfiguration } from './runtime-configuration.ts';
+import { createProductAnalysisReceiptStore } from './product-analysis-receipt.ts';
+import { createProductEvidenceService } from './product-evidence-service.ts';
 
 const project: MochiProjectInput = { schemaVersion:SCHEMA_VERSION, projectId:'delivery-project', product:{schemaVersion:SCHEMA_VERSION,productId:'delivery-product',name:'Mochi Original',details:'Round snack reference.',category:'snack',assets:[{schemaVersion:SCHEMA_VERSION,assetId:'reference-1',role:'PRODUCT_REFERENCE',source:'UPLOAD',mimeType:'image/jpeg'}]},creativeDirection:{audience:'người thích ăn vặt',shootingContext:'bàn gỗ',reviewerPersona:'người review thân thiện',tone:'gần gũi',voiceStyle:'review',voiceGender:'FEMALE',voiceRegion:'SOUTH'}};
 const references=[{assetId:'reference-1',mimeType:'image/jpeg',dataBase64:'AQ=='}] as const;
@@ -27,7 +29,7 @@ function createMock() {
     const data=[
       {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,canonicalAssetIds:['reference-1'],identityDescription:'Mochi snack',geometryNotes:['Round shape'],colorNotes:['White coating'],packagingNotes:['Simple package'],labelNotes:['Mochi label'],claims:[],prohibitedInferences:[],uncertainties:[],contradictions:[]},
       {identityDisposition:'RETAIN',exclusions:[]},
-      {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,sourceEvidenceVersion:'BROWSER_RUNTIME_V1',canonicalAssetIds:['reference-1'],assetAssessments:[{assetId:'reference-1',targetVisibility:'CLEAR',identityConfidence:'HIGH',geometryCoverage:'STRONG',labelReadability:'CLEAR',occlusion:'NONE',backgroundInterference:'LOW',multiProductAmbiguity:'NONE'}]},
+      {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,sourceEvidenceVersion:input.inputText?.includes('PRODUCT_ANALYSIS_RECEIPT_V1')?'PRODUCT_ANALYSIS_RECEIPT_V1':'BROWSER_RUNTIME_V1',canonicalAssetIds:['reference-1'],assetAssessments:[{assetId:'reference-1',targetVisibility:'CLEAR',identityConfidence:'HIGH',geometryCoverage:'STRONG',labelReadability:'CLEAR',occlusion:'NONE',backgroundInterference:'LOW',multiProductAmbiguity:'NONE'}]},
       {skinTone:'ấm',nailStyle:'ngắn',jewelry:'không',dominantHand:'RIGHT',surface:'gỗ',background:'trơn',lighting:'mềm'},
       {hook:{primaryTruthRefId:'identity',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},feature:{primaryTruthRefId:'geometry:0',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},proof:{primaryTruthRefId:'color:0',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},cta:{reuseTruthFromScene:1,dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}},
       {scenes:Array.from({length:4},()=>({approachBehavior:'Đưa tay tự nhiên.',gripAndContactBehavior:'Giữ chắc.',actionExecutionBehavior:'Thực hiện chậm.',postActionSettleBehavior:'Dừng nhẹ.',cameraBehavior:'Rung tay nhẹ.'}))},
@@ -43,6 +45,21 @@ const validVideoInspector={async inspect(){return {container:'MP4' as const,widt
 async function withWorkspace(run:(value:{service:ProductionWorkspaceService;mock:ReturnType<typeof createMock>})=>Promise<void>, inspector=validVideoInspector) { const root=await mkdtemp(join(tmpdir(),'mochi-delivery-')); const mock=createMock(); const service=new ProductionWorkspaceService(new RuntimeConfiguration(mock.provider),root,inspector); try { await run({service,mock}); } finally { await rm(root,{recursive:true,force:true}); } }
 async function ready(service:ProductionWorkspaceService) { const build=await service.build(project,references); for(const scene of build.scenes) await service.uploadAndQc(build.snapshotId,scene.sceneId,scene.candidateAssetId,{type:'video/mp4',bytes:Buffer.from(`video-${scene.index}`)}); await service.runSequence(build.snapshotId); assert.equal(service.finalAcceptance(build.snapshotId).status,'FINAL_ACCEPTANCE_PASS'); return build; }
 const active=(service:ProductionWorkspaceService):any=>(service as unknown as {active:any}).active;
+
+test('layered browser macro uses one R1 call, two L1 R2 calls, isolated L2/L3 work, and zero-intelligence L4 activation',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'mochi-layered-browser-'));const mock=createMock();const receipts=createProductAnalysisReceiptStore();const service=new ProductionWorkspaceService(new RuntimeConfiguration(mock.provider),root,validVideoInspector,receipts);
+  try{
+    const evidence=await createProductEvidenceService({intelligence:mock.provider}).analyze({product:project.product,media:references});
+    const receipt=receipts.commit({product:project.product,media:references,evidence});
+    assert.equal(mock.requests.length,1);
+    const l1=await service.createFoundation(project.projectId,project.product,references,receipt.analysisReceiptId);
+    assert.equal(l1.status,'PASS');assert.match(l1.foundationId,/^pf_[0-9a-f]{64}$/);assert.equal(mock.requests.length,3);
+    assert.deepEqual(mock.requests.map(request=>request.instruction.split(':',1)[0]),['PRODUCT EVIDENCE RULES','PRODUCT TRUTH RULES','REFERENCE ASSESSMENT RULES']);
+    const l2=await service.createBlueprint(l1.foundationId,project.creativeDirection);assert.equal(l2.scenes.length,4);assert.deepEqual(l2.scenes.map(scene=>scene.primaryAction),['PICK_UP','HOLD','ROTATE_SLOW','HOLD']);assert.equal(mock.requests.length,6);
+    const l3=await service.finalizeScript(l2.blueprintId);assert.equal(l3.scenes.length,4);assert.ok(l3.scenes.every(scene=>scene.keyPoints.length===2));assert.equal(mock.requests.length,9);
+    const beforeL4=mock.requests.length;const l4=await service.compileProduction(l3.scriptId);assert.equal(mock.requests.length,beforeL4);assert.equal(l4.status,'READY_FOR_FLOW');assert.equal(l4.scenes.length,4);assert.equal(service.activeSnapshotId(),l4.snapshotId);assert.deepEqual(l4.scenes,service.safeScenes());assert.ok(l4.scenes.every(scene=>scene.lifecycleStatus==='READY_FOR_FLOW'));
+  }finally{await rm(root,{recursive:true,force:true});}
+});
 
 test('Task 7B clean mocked browser E2E delivers byte-exact files and deterministic key points', async()=>withWorkspace(async({service,mock})=>{
   const build=await ready(service); const manifest=service.deliveryManifest(build.snapshotId);

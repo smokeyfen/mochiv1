@@ -3,23 +3,42 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   GENERATED_SCENE_CANDIDATE_V1, SCHEMA_VERSION, compileSceneAnchorsV1,
-  validateMochiProjectInput, validateProductionSnapshotV1, validateSceneAnchorAgainstSnapshot, type MochiProjectInput, type ProductionSnapshotV1, type SceneAnchorV1
+  validateMochiProjectInput, validateProductInput, validateProductionSnapshotV1, validateSceneAnchorAgainstSnapshot,
+  type CreativeDirectionInput, type MochiProjectInput, type ProductInput, type ProductionSnapshotV1, type SceneAnchorV1
 } from '@mochi/contracts';
 import {
   compileFlowProductionRequestV1, evaluateSceneQcV1, runManualCandidateSequenceQcV1,
   type FlowProductionRequestV1, type SceneQcReferenceMediaV1, type SceneQcReportV1, type SceneQcVideoMediaV1
 } from '@mochi/providers';
 import { simpleActionFastTrackPolicyV1 } from '@mochi/core';
-import { createProductionRuntime, ProductionRuntimeError, type PreF1RuntimeStage, type ProductionRuntimeDiagnostic } from './production-runtime.ts';
+import {
+  createProductionRuntime, ProductionCompileError, ProductionRuntimeError, ScriptFinalizationError,
+  runProductFoundation, runProductionCompile, runSceneBlueprint, runScriptFinalization,
+  type L3ScriptFinalizationDiagnostic, type L4ProductionCompileDiagnostic,
+  type PreF1RuntimeStage, type ProductionRuntimeDiagnostic
+} from './production-runtime.ts';
 import { createLayerArtifactStore } from './layer-artifact-store.ts';
 import { createProductionSnapshotStore } from './production-snapshot.ts';
 import { RuntimeConfiguration } from './runtime-configuration.ts';
 import { FfprobeVideoMetadataInspectorV1, VideoTechnicalValidationError, validateVideoTechnicalMetadataV1, type ValidatedVideoTechnicalMetadataV1, type VideoMetadataInspectorV1 } from './video-technical-validation.ts';
 import { createProductAnalysisReceiptStore, PRODUCT_ANALYSIS_RECEIPT_V1, type ProductAnalysisReceiptStore } from './product-analysis-receipt.ts';
 
-export type ProductionWorkspaceErrorCode = 'GEMINI_NOT_CONFIGURED'|'INVALID_SETUP'|'PRODUCT_ANALYSIS_STALE'|'PRODUCTION_BUILD_FAILED'|'PROMPT_BUDGET_EXCEEDED'|'INVALID_OR_STALE_VIDEO'|'VIDEO_TECHNICAL_INVALID'|'SCENE_QC_FAILED'|'CONTINUITY_QC_FAILED'|'REPAIR_NOT_AVAILABLE'|'DELIVERY_NOT_READY'|'DELIVERY_OUTPUT_NOT_FOUND';
-export class ProductionWorkspaceError extends Error { readonly code:ProductionWorkspaceErrorCode; readonly stage?:PreF1RuntimeStage; readonly diagnostic?:ProductionRuntimeDiagnostic; constructor(code:ProductionWorkspaceErrorCode,stage?:PreF1RuntimeStage,diagnostic?:ProductionRuntimeDiagnostic) { super(code); this.code=code; if(stage!==undefined)this.stage=stage; if(diagnostic!==undefined)this.diagnostic=diagnostic; this.name='ProductionWorkspaceError'; } }
+export type ProductionLayer = 'L1'|'L2'|'L3'|'L4';
+export type ProductionLayerDiagnostic = ProductionRuntimeDiagnostic|L3ScriptFinalizationDiagnostic|L4ProductionCompileDiagnostic;
+export type ProductionWorkspaceErrorCode = 'GEMINI_NOT_CONFIGURED'|'INVALID_SETUP'|'PRODUCT_ANALYSIS_STALE'|'PRODUCTION_BUILD_FAILED'|'PRODUCTION_LAYER_FAILED'|'PROMPT_BUDGET_EXCEEDED'|'INVALID_OR_STALE_VIDEO'|'VIDEO_TECHNICAL_INVALID'|'SCENE_QC_FAILED'|'CONTINUITY_QC_FAILED'|'REPAIR_NOT_AVAILABLE'|'DELIVERY_NOT_READY'|'DELIVERY_OUTPUT_NOT_FOUND';
+export class ProductionWorkspaceError extends Error {
+  readonly code:ProductionWorkspaceErrorCode; readonly stage?:PreF1RuntimeStage; readonly diagnostic?:ProductionLayerDiagnostic; readonly layer?:ProductionLayer;
+  constructor(code:ProductionWorkspaceErrorCode,options?:{readonly layer?:ProductionLayer;readonly stage?:PreF1RuntimeStage;readonly diagnostic?:ProductionLayerDiagnostic});
+  constructor(code:ProductionWorkspaceErrorCode,stage?:PreF1RuntimeStage,diagnostic?:ProductionRuntimeDiagnostic);
+  constructor(code:ProductionWorkspaceErrorCode,options?:{readonly layer?:ProductionLayer;readonly stage?:PreF1RuntimeStage;readonly diagnostic?:ProductionLayerDiagnostic}|PreF1RuntimeStage,legacyDiagnostic?:ProductionRuntimeDiagnostic) {
+    super(code); this.code=code; this.name='ProductionWorkspaceError';
+    const normalized=typeof options==='string'?{stage:options,...(legacyDiagnostic===undefined?{}:{diagnostic:legacyDiagnostic})}:options;
+    if(normalized?.layer!==undefined)this.layer=normalized.layer; if(normalized?.stage!==undefined)this.stage=normalized.stage; if(normalized?.diagnostic!==undefined)this.diagnostic=normalized.diagnostic;
+  }
+}
 export interface BrowserReferenceMedia { readonly assetId:string; readonly mimeType:string; readonly dataBase64:string; }
+export interface SafeBlueprintSceneView { readonly sceneId:string; readonly index:1|2|3|4; readonly role:'HOOK'|'FEATURE'|'PROOF'|'CTA'; readonly primaryAction:string; readonly startSummary:string; readonly endSummary:string; readonly referenceAssetIds:readonly string[]; }
+export interface SafeFinalizedScriptSceneView extends SafeBlueprintSceneView { readonly keyPoints:readonly [string,string]; readonly dialogue:string; readonly voiceLabel:string; }
 export interface SafeSceneView { readonly sceneId:string; readonly index:1|2|3|4; readonly role:'HOOK'|'FEATURE'|'PROOF'|'CTA'; readonly primaryAction:string; readonly startSummary:string; readonly endSummary:string; readonly keyPoints:readonly [string,string]; readonly dialogue:string; readonly voiceLabel:string; readonly visualRhythm:string; readonly prompt:string; readonly promptCharacterCount:number; readonly promptBudgetStatus:string; readonly lifecycleStatus:'WAITING'|'READY_FOR_FLOW'|'VIDEO_UPLOADED'|'QC_RUNNING'|'QC_PASS'|'QC_FAIL'; readonly referenceAssetIds:readonly string[]; readonly candidateAssetId:string; readonly attempt:number; readonly qcReport?:SafeSceneQcReport; }
 export interface SafeSceneQcReport { readonly result:'SCENE_QC_PASS'|'SCENE_QC_FAIL'; readonly frameGates:readonly {readonly gate:string;readonly status:'PASS'|'FAIL'}[]; readonly temporalGates:readonly {readonly gate:string;readonly status:'PASS'|'FAIL'}[]; readonly speechGates:readonly {readonly gate:string;readonly status:'PASS'|'FAIL'}[]; readonly expectedDialogue:string; readonly detectedTranscript:string; readonly exactDialogueMatch:'PASS'|'FAIL'; readonly presentationDynamics:{readonly status:'PASS'|'WARN';readonly notes:string}; }
 export interface SafeSequenceView { readonly status:'FOUR_SCENE_SEQUENCE_PASS'|'SEQUENCE_QC_FAILED'; readonly pairs:readonly {readonly fromSceneId:string;readonly toSceneId:string;readonly gates:readonly {readonly gate:string;readonly status:'PASS'|'FAIL'}[]}[]; readonly globalGates:readonly {readonly gate:string;readonly status:'PASS'|'FAIL'}[]; readonly visualVariation:'PASS'|'WARN'; }
@@ -42,19 +61,67 @@ export class ProductionWorkspaceService {
   private readonly storageRoot:string;
   private readonly videoMetadataInspector:VideoMetadataInspectorV1;
   private readonly receiptStore:ProductAnalysisReceiptStore;
-  constructor(runtimeConfiguration:RuntimeConfiguration, storageRoot=join(tmpdir(),`mochi-v1-browser-${process.pid}`), videoMetadataInspector:VideoMetadataInspectorV1=new FfprobeVideoMetadataInspectorV1(), receiptStore:ProductAnalysisReceiptStore=createProductAnalysisReceiptStore()) { this.runtimeConfiguration=runtimeConfiguration; this.storageRoot=storageRoot; this.videoMetadataInspector=videoMetadataInspector; this.receiptStore=receiptStore; }
+  private readonly layerArtifactStore;
+  private readonly productionSnapshotStore;
+  private readonly foundationRuntime=new Map<string,{readonly references:readonly BrowserReferenceMedia[];readonly productName:string}>();
+  constructor(runtimeConfiguration:RuntimeConfiguration, storageRoot=join(tmpdir(),`mochi-v1-browser-${process.pid}`), videoMetadataInspector:VideoMetadataInspectorV1=new FfprobeVideoMetadataInspectorV1(), receiptStore:ProductAnalysisReceiptStore=createProductAnalysisReceiptStore()) {
+    this.runtimeConfiguration=runtimeConfiguration; this.storageRoot=storageRoot; this.videoMetadataInspector=videoMetadataInspector; this.receiptStore=receiptStore;
+    this.layerArtifactStore=createLayerArtifactStore({storageRoot}); this.productionSnapshotStore=createProductionSnapshotStore({storageRoot});
+  }
   activeSnapshotId():string|undefined { return this.active?.snapshot.snapshotId; }
+  async createFoundation(projectId:string,product:ProductInput,references:readonly BrowserReferenceMedia[],analysisReceiptId:string):Promise<{readonly foundationId:string;readonly status:'PASS'}> {
+    const intelligence=this.runtimeConfiguration.provider(); if(!intelligence) throw new ProductionWorkspaceError('GEMINI_NOT_CONFIGURED');
+    if(typeof projectId!=='string'||projectId.trim().length===0||validateProductInput(product).length>0||!this.validReferences(product,references)) throw new ProductionWorkspaceError('INVALID_SETUP');
+    const receipt=this.receiptStore.resolve(analysisReceiptId,product,references); if(!receipt) throw new ProductionWorkspaceError('PRODUCT_ANALYSIS_STALE');
+    try {
+      const result=await runProductFoundation({intelligence,layerArtifactStore:this.layerArtifactStore,trustedProductEvidence:{evidence:receipt.evidence,sourceEvidenceVersion:receipt.version}},
+        {projectId,product,media:references,sourceEvidenceVersion:receipt.version});
+      this.foundationRuntime.set(result.foundation.foundationId,{references:structuredClone(references),productName:product.name});
+      while(this.foundationRuntime.size>32)this.foundationRuntime.delete(this.foundationRuntime.keys().next().value!);
+      return {foundationId:result.foundation.foundationId,status:'PASS'};
+    } catch(error) { this.throwLayerRuntime('L1',error); }
+  }
+  async createBlueprint(foundationId:string,creativeDirection:CreativeDirectionInput):Promise<{readonly foundationId:string;readonly blueprintId:string;readonly status:'PASS';readonly scenes:readonly SafeBlueprintSceneView[]}> {
+    const intelligence=this.runtimeConfiguration.provider(); if(!intelligence) throw new ProductionWorkspaceError('GEMINI_NOT_CONFIGURED');
+    try {
+      const result=await runSceneBlueprint({intelligence,layerArtifactStore:this.layerArtifactStore},{foundationId,creativeDirection,capabilityMap:{...capabilityMap},productionEligibilityPolicy:simpleActionFastTrackPolicyV1});
+      return {foundationId:result.foundation.foundationId,blueprintId:result.blueprint.blueprintId,status:'PASS',scenes:this.blueprintScenes(result.blueprint)};
+    } catch(error) { this.throwLayerRuntime('L2',error); }
+  }
+  async finalizeScript(blueprintId:string):Promise<{readonly blueprintId:string;readonly scriptId:string;readonly status:'PASS';readonly scenes:readonly SafeFinalizedScriptSceneView[]}> {
+    const intelligence=this.runtimeConfiguration.provider(); if(!intelligence) throw new ProductionWorkspaceError('GEMINI_NOT_CONFIGURED');
+    try {
+      const result=await runScriptFinalization({intelligence,layerArtifactStore:this.layerArtifactStore},{blueprintId});
+      return {blueprintId:result.blueprint.blueprintId,scriptId:result.script.scriptId,status:'PASS',scenes:this.scriptScenes(result.blueprint,result.script)};
+    } catch(error) {
+      if(error instanceof ScriptFinalizationError) throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer:'L3',diagnostic:error.diagnostic});
+      throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer:'L3'});
+    }
+  }
+  async compileProduction(scriptId:string):Promise<{readonly readyId:string;readonly snapshotId:string;readonly status:'READY_FOR_FLOW';readonly scenes:readonly SafeSceneView[]}> {
+    try {
+      let runtime:{readonly references:readonly BrowserReferenceMedia[];readonly productName:string};let expectedFoundationId:string;
+      try { const script=await this.layerArtifactStore.loadFinalizedScript(scriptId);const blueprint=await this.layerArtifactStore.loadSceneBlueprint(script.blueprintId);expectedFoundationId=blueprint.foundationId;const bound=this.foundationRuntime.get(expectedFoundationId);if(!bound)throw new Error('missing_runtime_references');runtime=bound; }
+      catch { throw new ProductionCompileError('LOAD'); }
+      const result=await runProductionCompile({layerArtifactStore:this.layerArtifactStore,productionSnapshotStore:this.productionSnapshotStore},{scriptId});
+      if(result.foundation.foundationId!==expectedFoundationId)throw new ProductionCompileError('LOAD');
+      this.activate(result.snapshot,runtime.productName,result.anchors,result.flowRequests,runtime.references);
+      return {readyId:result.ready.readyId,snapshotId:result.snapshot.snapshotId,status:'READY_FOR_FLOW',scenes:this.safeScenes()};
+    } catch(error) {
+      if(error instanceof ProductionCompileError) throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer:'L4',diagnostic:error.diagnostic});
+      throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer:'L4'});
+    }
+  }
   async build(project:MochiProjectInput, references:readonly BrowserReferenceMedia[], analysisReceiptId?:string):Promise<{readonly snapshotId:string;readonly snapshotStatus:'PERSISTED';readonly scenes:readonly SafeSceneView[]}> {
     const intelligence=this.runtimeConfiguration.provider(); if(!intelligence) throw new ProductionWorkspaceError('GEMINI_NOT_CONFIGURED');
     if(validateMochiProjectInput(project).length || references.length!==project.product.assets.length || references.some((reference,index)=>reference.assetId!==project.product.assets[index]!.assetId||!reference.mimeType.startsWith('image/')||reference.dataBase64.trim().length===0)) throw new ProductionWorkspaceError('INVALID_SETUP');
     const receipt=analysisReceiptId===undefined?undefined:this.receiptStore.resolve(analysisReceiptId,project.product,references);
     if(analysisReceiptId!==undefined&&!receipt) throw new ProductionWorkspaceError('PRODUCT_ANALYSIS_STALE');
-    let result; try { result=await createProductionRuntime({intelligence,snapshotStore:createProductionSnapshotStore({storageRoot:this.storageRoot}),layerArtifactStore:createLayerArtifactStore({storageRoot:this.storageRoot}),...(receipt?{trustedProductEvidence:{evidence:receipt.evidence,sourceEvidenceVersion:PRODUCT_ANALYSIS_RECEIPT_V1}}:{})}).run({projectId:project.projectId,product:project.product,creativeDirection:project.creativeDirection,media:references,sourceEvidenceVersion:receipt?.version??'BROWSER_RUNTIME_V1',capabilityMap:{...capabilityMap},productionEligibilityPolicy:simpleActionFastTrackPolicyV1}); } catch(error) { if(error instanceof ProductionRuntimeError) throw new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED',error.stage,error.diagnostic); throw new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED'); }
+    let result; try { result=await createProductionRuntime({intelligence,snapshotStore:this.productionSnapshotStore,layerArtifactStore:this.layerArtifactStore,...(receipt?{trustedProductEvidence:{evidence:receipt.evidence,sourceEvidenceVersion:PRODUCT_ANALYSIS_RECEIPT_V1}}:{})}).run({projectId:project.projectId,product:project.product,creativeDirection:project.creativeDirection,media:references,sourceEvidenceVersion:receipt?.version??'BROWSER_RUNTIME_V1',capabilityMap:{...capabilityMap},productionEligibilityPolicy:simpleActionFastTrackPolicyV1}); } catch(error) { if(error instanceof ProductionRuntimeError) throw new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED',{stage:error.stage,...(error.diagnostic===undefined?{}:{diagnostic:error.diagnostic})}); throw new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED'); }
     const anchors=compileSceneAnchorsV1(result.snapshot);
     let requests:readonly FlowProductionRequestV1[]; try { requests=anchors.map(anchor=>compileFlowProductionRequestV1(anchor,anchor.referenceAssetIds.map((logicalAssetId,index)=>({sceneId:anchor.sceneId,logicalAssetId,flowReferenceId:`manual-${index + 1}`})))) as unknown as readonly FlowProductionRequestV1[]; } catch { throw new ProductionWorkspaceError('PROMPT_BUDGET_EXCEEDED'); }
     const typedRequests=requests as unknown as [FlowProductionRequestV1,FlowProductionRequestV1,FlowProductionRequestV1,FlowProductionRequestV1];
-    const candidates=new Map<string,Candidate>(); anchors.forEach(anchor=>{const candidateAssetId=`candidate_${randomUUID()}`; candidates.set(anchor.sceneId,{snapshotId:result.snapshot.snapshotId,sceneId:anchor.sceneId,candidateAssetId,attempt:1});});
-    this.active={snapshot:result.snapshot,productName:project.product.name,anchors,requests:typedRequests,references:[...references],candidates};
+    this.activate(result.snapshot,project.product.name,anchors,typedRequests,references);
     return {snapshotId:result.snapshot.snapshotId,snapshotStatus:'PERSISTED',scenes:this.safeScenes()};
   }
   safeScenes():readonly SafeSceneView[] { const active=this.requireActive(); return active.anchors.map((anchor,index)=>this.safeScene(active,anchor,index)) as readonly SafeSceneView[]; }
@@ -89,6 +156,11 @@ export class ProductionWorkspaceService {
   private keyPointsText(active:Active):string { const points=active.snapshot.productionContract.scenes.flatMap(scene=>scene.keyPoints.map(point=>point.text)); if(points.length!==8||points.some(point=>typeof point!=='string'||point.trim().length===0)||points[0]!==active.productName) throw new ProductionWorkspaceError('DELIVERY_NOT_READY'); return `${points.join('\n')}\n`; }
   private deliveryReady(active:Active):boolean { const acceptance=this.evaluateFinalAcceptance(active); const stored=active.finalAcceptance; if(acceptance.status!=='FINAL_ACCEPTANCE_PASS'||stored?.status!=='FINAL_ACCEPTANCE_PASS'||stored.blockerCodes.length!==0) return false; const ids=this.activeCandidateAssetIds(active); if(!active.delivery||active.delivery.snapshotId!==active.snapshot.snapshotId||!this.sameCandidateIds(active.delivery.candidateAssetIds,ids)||active.delivery.finalAcceptance.status!=='FINAL_ACCEPTANCE_PASS') { active.delivery={snapshotId:active.snapshot.snapshotId,candidateAssetIds:ids,finalAcceptance:stored,delivered:false}; } return true; }
   private requireActive():Active { if(!this.active) throw new ProductionWorkspaceError('INVALID_SETUP'); return this.active; }
+  private activate(snapshot:ProductionSnapshotV1,productName:string,anchors:readonly [SceneAnchorV1,SceneAnchorV1,SceneAnchorV1,SceneAnchorV1],requests:readonly [FlowProductionRequestV1,FlowProductionRequestV1,FlowProductionRequestV1,FlowProductionRequestV1],references:readonly BrowserReferenceMedia[]):void { const candidates=new Map<string,Candidate>(); anchors.forEach(anchor=>{const candidateAssetId=`candidate_${randomUUID()}`;candidates.set(anchor.sceneId,{snapshotId:snapshot.snapshotId,sceneId:anchor.sceneId,candidateAssetId,attempt:1});}); this.active={snapshot,productName,anchors,requests,references:[...references],candidates}; }
+  private validReferences(product:ProductInput,references:readonly BrowserReferenceMedia[]):boolean { return Array.isArray(references)&&references.length===product.assets.length&&references.every((reference,index)=>reference.assetId===product.assets[index]!.assetId&&reference.mimeType===product.assets[index]!.mimeType&&reference.mimeType.startsWith('image/')&&reference.dataBase64.trim().length>0); }
+  private throwLayerRuntime(layer:'L1'|'L2',error:unknown):never { if(error instanceof ProductionRuntimeError)throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer,stage:error.stage,...(error.diagnostic===undefined?{}:{diagnostic:error.diagnostic})}); throw new ProductionWorkspaceError('PRODUCTION_LAYER_FAILED',{layer}); }
+  private blueprintScenes(blueprint:import('@mochi/reasoning').SceneBlueprintV1):readonly SafeBlueprintSceneView[] { return blueprint.globalPlan.scenes.map((scene,index)=>({sceneId:scene.sceneId,index:scene.index,role:scene.role,primaryAction:scene.primaryAction,startSummary:stateSummary(blueprint.statePlan.scenes[index]!.startState),endSummary:stateSummary(blueprint.statePlan.scenes[index]!.endState),referenceAssetIds:[...scene.referenceAssetIds]})); }
+  private scriptScenes(blueprint:import('@mochi/reasoning').SceneBlueprintV1,script:import('@mochi/reasoning').FinalizedScriptV1):readonly SafeFinalizedScriptSceneView[] { const skeleton=this.blueprintScenes(blueprint); return skeleton.map((scene,index)=>{const points=script.keyPointPlan.scenes[index]!.keyPoints;return {...scene,keyPoints:[points[0]!.text,points[1]!.text],dialogue:script.dialoguePlan.scenes[index]!.dialogue,voiceLabel:voiceLabel(script.dialoguePlan.voiceIdentityId)};}); }
   private safeScene(active:Active,anchor:SceneAnchorV1,index:number):SafeSceneView { const request=active.requests[index]!; const candidate=active.candidates.get(anchor.sceneId)!; const report=candidate.report; const points=active.snapshot.productionContract.scenes[index]!.keyPoints; const keyPoints:[string,string]=[points[0]!.text,points[1]!.text]; return {sceneId:anchor.sceneId,index:anchor.index,role:anchor.role,primaryAction:anchor.primaryAction,startSummary:stateSummary(anchor.startState),endSummary:stateSummary(anchor.endState),keyPoints,dialogue:anchor.dialogue,voiceLabel:voiceLabel(anchor.voiceIdentityId),visualRhythm:`${anchor.visualRhythm.presentationBeats.join(' · ')}${anchor.visualRhythm.cameraBehavior?` · ${anchor.visualRhythm.cameraBehavior}`:''}`,prompt:request.prompt,promptCharacterCount:request.promptUnicodeCharacterCount,promptBudgetStatus:request.promptBudgetStatus,lifecycleStatus:report?(report.result==='SCENE_QC_PASS'?'QC_PASS':'QC_FAIL'):candidate.video?'VIDEO_UPLOADED':'READY_FOR_FLOW',referenceAssetIds:anchor.referenceAssetIds,candidateAssetId:candidate.candidateAssetId,attempt:candidate.attempt,...(report?{qcReport:this.safeReport(report,anchor.dialogue)}:{})}; }
   private safeReport(report:SceneQcReportV1,expectedDialogue:string):SafeSceneQcReport { return {result:report.result,frameGates:report.frameGates,temporalGates:report.temporalGates,speechGates:report.speechGates,expectedDialogue,detectedTranscript:report.spokenTranscript,exactDialogueMatch:report.speechGates.find(gate=>gate.gate==='EXACT_DIALOGUE_LEXICAL_MATCH')!.status,presentationDynamics:{status:report.presentationDynamics.status,notes:report.presentationDynamics.notes}}; }
 }

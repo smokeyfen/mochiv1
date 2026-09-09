@@ -1,401 +1,48 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App, DeliveryCenter } from './App';
-import type { DeliveryManifest } from './production-client';
+import type { DeliveryManifest, SceneView } from './production-client';
 
-const createObjectUrl = vi.fn((file: File) => `blob:preview-${file.name}`);
-const revokeObjectUrl = vi.fn();
+const ids={foundation:`pf_${'1'.repeat(64)}`,blueprint:`sb_${'2'.repeat(64)}`,script:`fs_${'3'.repeat(64)}`,ready:`pr_${'4'.repeat(64)}`,snapshot:`ps_${'5'.repeat(64)}`};
+const createObjectUrl=vi.fn((file:File)=>`blob:preview-${file.name}`);const revokeObjectUrl=vi.fn();
+beforeEach(()=>{createObjectUrl.mockClear();revokeObjectUrl.mockClear();Object.defineProperty(URL,'createObjectURL',{configurable:true,value:createObjectUrl});Object.defineProperty(URL,'revokeObjectURL',{configurable:true,value:revokeObjectUrl});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn().mockResolvedValue(undefined)}});});
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
 
-beforeEach(() => {
-  createObjectUrl.mockClear();
-  revokeObjectUrl.mockClear();
-  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
+const runtimeResponse=(status:'GEMINI_READY'|'GEMINI_NOT_CONFIGURED')=>json({ok:true,status});
+function selectImages(names:readonly string[]=['front.jpg']){fireEvent.change(screen.getByLabelText('Add product images'),{target:{files:names.map(name=>new File(['image'],name,{type:'image/jpeg'}))}});}
+function enterValidInput(){fireEvent.change(screen.getByLabelText('Product Name'),{target:{value:'Mochi bottle'}});fireEvent.change(screen.getByLabelText('Product Details'),{target:{value:'Factual bottle description'}});fireEvent.change(screen.getByLabelText('Category'),{target:{value:'Beauty'}});selectImages();}
+function evidenceResponse():Response{const fetchMock=globalThis.fetch as unknown as ReturnType<typeof vi.fn>;const form=fetchMock.mock.calls.at(-1)?.[1]?.body as FormData;const product=JSON.parse(String(form.get('product'))) as {productId:string;assets:{assetId:string}[]};return json({ok:true,analysisReceiptId:'par_test_receipt_0123456789',receiptVersion:'PRODUCT_ANALYSIS_RECEIPT_V1',evidence:{schemaVersion:'1.0.0',productId:product.productId,canonicalAssetIds:product.assets.map(item=>item.assetId),identityDescription:'A compact white bottle',geometryNotes:['Rounded'],colorNotes:['White'],packagingNotes:['Pump'],labelNotes:['Front label'],claims:[{claimId:'claim-1',text:'Bottle shown',source:'REFERENCE_EVIDENCE',evidenceAssetIds:product.assets.map(item=>item.assetId),allowed:true}],prohibitedInferences:['Do not infer ingredients'],uncertainties:[],contradictions:[]}});}
+const roles=['HOOK','FEATURE','PROOF','CTA'] as const;const actions=['PICK_UP','HOLD','ROTATE_SLOW','HOLD'] as const;
+const skeletons=()=>roles.map((role,offset)=>({sceneId:`scene-${offset+1}`,index:offset+1,role,primaryAction:actions[offset]!,startSummary:`start ${offset+1}`,endSummary:`end ${offset+1}`,referenceAssetIds:[]}));
+const scripts=()=>skeletons().map((scene,offset)=>({...scene,keyPoints:[`point ${offset+1}a`,`point ${offset+1}b`],dialogue:`dialogue ${offset+1}`,voiceLabel:'Female — Leda / Leda Custom'}));
+const readyScenes=():SceneView[]=>scripts().map(scene=>({...scene,visualRhythm:'natural hold · subtle handheld',prompt:`safe prompt ${scene.index}`,promptCharacterCount:13,promptBudgetStatus:'TARGET',lifecycleStatus:'READY_FOR_FLOW',candidateAssetId:`candidate_${scene.index}`,attempt:1})) as unknown as SceneView[];
+type RouterOptions={l1Fail?:boolean;l3Fail?:boolean;l4Fail?:boolean;deferFoundation?:Promise<Response>;qcPass?:boolean};
+function mockLayerApi(options:RouterOptions={}){const fetchMock=vi.fn().mockImplementation((url:unknown)=>{const path=String(url);if(path==='/api/runtime/status')return Promise.resolve(runtimeResponse('GEMINI_READY'));if(path==='/api/product-evidence')return Promise.resolve(evidenceResponse());if(path==='/api/production/foundation'){if(options.deferFoundation)return options.deferFoundation;if(options.l1Fail)return Promise.resolve(json({ok:false,error:{code:'PRODUCTION_LAYER_FAILED',layer:'L1',stage:'R2_A_PRODUCT_TRUTH'}},400));return Promise.resolve(json({ok:true,foundationId:ids.foundation,status:'PASS'}));}if(path==='/api/production/blueprint')return Promise.resolve(json({ok:true,foundationId:ids.foundation,blueprintId:ids.blueprint,status:'PASS',scenes:skeletons()}));if(path==='/api/production/script'){if(options.l3Fail)return Promise.resolve(json({ok:false,error:{code:'PRODUCTION_LAYER_FAILED',layer:'L3',diagnostic:{layer:'L3',phase:'ENGINE',engineStage:'R4_1_KEY_POINTS'}}},400));return Promise.resolve(json({ok:true,blueprintId:ids.blueprint,scriptId:ids.script,status:'PASS',scenes:scripts()}));}if(path==='/api/production/compile'){if(options.l4Fail)return Promise.resolve(json({ok:false,error:{code:'PRODUCTION_LAYER_FAILED',layer:'L4',diagnostic:{layer:'L4',phase:'COMPILE',compileStage:'FLOW_REQUEST'}}},400));return Promise.resolve(json({ok:true,readyId:ids.ready,snapshotId:ids.snapshot,status:'READY_FOR_FLOW',scenes:readyScenes()}));}if(path==='/api/production/upload'&&options.qcPass){const scene={...readyScenes()[0]!,lifecycleStatus:'QC_PASS',qcReport:{result:'SCENE_QC_PASS',frameGates:[{gate:'PRODUCT_FIDELITY',status:'PASS'}],temporalGates:[{gate:'ACTION_COMPLETION',status:'PASS'}],speechGates:[{gate:'EXACT_DIALOGUE_LEXICAL_MATCH',status:'PASS'}],expectedDialogue:'dialogue 1',detectedTranscript:'dialogue 1',exactDialogueMatch:'PASS',presentationDynamics:{status:'PASS',notes:'natural'}}};return Promise.resolve(json({ok:true,scene}));}return Promise.resolve(json({ok:false,error:{code:'NOT_FOUND'}},404));});vi.stubGlobal('fetch',fetchMock);return fetchMock;}
+async function setup(){render(<App/>);enterValidInput();await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());}
+async function through(layer:1|2|3|4){fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Product Foundation Ready'})).toBeInTheDocument());if(layer===1)return;fireEvent.click(screen.getByRole('button',{name:'Build Scene Blueprint'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Blueprint Ready'})).toBeInTheDocument());if(layer===2)return;fireEvent.click(screen.getByRole('button',{name:'Finalize Script'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Script Ready'})).toBeInTheDocument());if(layer===3)return;fireEvent.click(screen.getByRole('button',{name:'Prepare for Flow'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Ready for Flow'})).toBeInTheDocument());}
+
+describe('layered production workflow',()=>{
+  it('starts with L2, L3, and L4 locked and removes the old one-click action',async()=>{mockLayerApi();await setup();expect(within(screen.getByRole('article',{name:'L2 Scene Blueprint'})).getByText('LOCKED')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Build Scene Blueprint'})).toBeDisabled();expect(screen.getByRole('button',{name:'Finalize Script'})).toBeDisabled();expect(screen.getByRole('button',{name:'Prepare for Flow'})).toBeDisabled();expect(screen.queryByRole('button',{name:'Create 4-scene plan'})).not.toBeInTheDocument();});
+  it('shows Analyze Product RUNNING and PASS and prevents duplicate submission',async()=>{let resolve:(value:Response)=>void=()=>{};const pending=new Promise<Response>(done=>{resolve=done;});const fetchMock=mockLayerApi({deferFoundation:pending});await setup();const button=screen.getByRole('button',{name:'Analyze Product'});fireEvent.click(button);await waitFor(()=>expect(screen.getByRole('button',{name:'Analyzing Product…'})).toBeDisabled());fireEvent.click(screen.getByRole('button',{name:'Analyzing Product…'}));expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/product-evidence')).toHaveLength(1);resolve(json({ok:true,foundationId:ids.foundation,status:'PASS'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Product Foundation Ready'})).toBeInTheDocument());});
+  it('shows L1 failure and a specific retry without unlocking L2',async()=>{mockLayerApi({l1Fail:true});await setup();fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Retry Product Foundation'})).toBeInTheDocument());expect(within(screen.getByRole('article',{name:'L1 Product Foundation'})).getByText('FAIL')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Build Scene Blueprint'})).toBeDisabled();});
+  it('fresh Analyze Product calls R1 once, then L1 once, and unlocks only L2',async()=>{const fetchMock=mockLayerApi();await setup();await through(1);expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/product-evidence')).toHaveLength(1);expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/foundation')).toHaveLength(1);expect(screen.getByRole('button',{name:'Build Scene Blueprint'})).toBeEnabled();expect(screen.getByRole('button',{name:'Finalize Script'})).toBeDisabled();expect(screen.getByText('PRODUCT FOUNDATION PASS')).toBeInTheDocument();});
+  it('L2 renders exactly four skeleton cards with the locked action spine and unlocks L3',async()=>{mockLayerApi();await setup();await through(2);expect(screen.getAllByText(/Scene [1-4] —/)).toHaveLength(4);expect(screen.getAllByText('Script not finalized')).toHaveLength(4);expect(screen.getByText('PICK UP')).toBeInTheDocument();expect(screen.getByText('ROTATE SLOW')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Finalize Script'})).toBeEnabled();});
+  it('L3 matures the same four cards with two key points, dialogue, voice, and unlocks L4',async()=>{mockLayerApi();await setup();await through(2);const first=screen.getByText('Scene 1 — HOOK').closest('article');fireEvent.click(screen.getByRole('button',{name:'Finalize Script'}));await waitFor(()=>expect(screen.getByRole('button',{name:'✓ Script Ready'})).toBeInTheDocument());expect(screen.getByText('Scene 1 — HOOK').closest('article')).toBe(first);expect(screen.getByText('point 1a')).toBeInTheDocument();expect(screen.getByText(/dialogue 1/)).toBeInTheDocument();expect(screen.getAllByText('PRODUCTION_COMPILE_PENDING')).toHaveLength(4);expect(screen.getByRole('button',{name:'Prepare for Flow'})).toBeEnabled();});
+  it('L4 matures all four cards to READY_FOR_FLOW with prompt controls',async()=>{mockLayerApi();await setup();await through(4);const cards=within(screen.getByRole('region',{name:'Four-scene production'}));expect(cards.getAllByText('READY_FOR_FLOW')).toHaveLength(4);expect(cards.getAllByRole('button',{name:'View Prompt'})).toHaveLength(4);expect(cards.getAllByLabelText(/Upload Generated MP4 Scene/)).toHaveLength(4);});
+  it('L3 failure keeps L1/L2 PASS and retries with the same blueprintId',async()=>{const fetchMock=mockLayerApi({l3Fail:true});await setup();await through(2);fireEvent.click(screen.getByRole('button',{name:'Finalize Script'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Retry Script Finalization'})).toBeInTheDocument());expect(within(screen.getByRole('article',{name:'L1 Product Foundation'})).getByText('PASS')).toBeInTheDocument();expect(within(screen.getByRole('article',{name:'L2 Scene Blueprint'})).getByText('PASS')).toBeInTheDocument();expect(screen.getByText(/R4_1_KEY_POINTS/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Retry Script Finalization'}));await waitFor(()=>expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/script')).toHaveLength(2));const bodies=fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/script').map(call=>JSON.parse(String(call[1]?.body)));expect(bodies).toEqual([{blueprintId:ids.blueprint},{blueprintId:ids.blueprint}]);});
+  it('L4 failure keeps L1/L2/L3 PASS and retries with the same scriptId',async()=>{const fetchMock=mockLayerApi({l4Fail:true});await setup();await through(3);fireEvent.click(screen.getByRole('button',{name:'Prepare for Flow'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Retry Production Compile'})).toBeInTheDocument());for(const name of ['L1 Product Foundation','L2 Scene Blueprint','L3 Script Finalization'])expect(within(screen.getByRole('article',{name})).getByText('PASS')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Retry Production Compile'}));await waitFor(()=>expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/compile')).toHaveLength(2));expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/compile').map(call=>JSON.parse(String(call[1]?.body)))).toEqual([{scriptId:ids.script},{scriptId:ids.script}]);});
+  it('factual and reference mutations visibly invalidate the full lineage',async()=>{mockLayerApi();await setup();await through(4);fireEvent.change(screen.getByLabelText('Product Name'),{target:{value:'Changed bottle'}});await waitFor(()=>expect(within(screen.getByRole('article',{name:'L1 Product Foundation'})).getByText('NEEDS_REANALYSIS')).toBeInTheDocument());for(const name of ['L2 Scene Blueprint','L3 Script Finalization','L4 Production Compile'])expect(within(screen.getByRole('article',{name})).getByText('STALE')).toBeInTheDocument();expect(screen.queryByText('Scene 1 — HOOK')).not.toBeInTheDocument();});
+  it('creative mutation preserves L1 and invalidates only L2-L4 without another R1 call',async()=>{const fetchMock=mockLayerApi();await setup();await through(4);fireEvent.change(screen.getByLabelText('Audience'),{target:{value:'GIFT_BUYERS'}});await waitFor(()=>expect(within(screen.getByRole('article',{name:'L2 Scene Blueprint'})).getByText('NEEDS_REBUILD')).toBeInTheDocument());expect(within(screen.getByRole('article',{name:'L1 Product Foundation'})).getByText('PASS')).toBeInTheDocument();expect(within(screen.getByRole('article',{name:'L3 Script Finalization'})).getByText('STALE')).toBeInTheDocument();expect(within(screen.getByRole('article',{name:'L4 Production Compile'})).getByText('STALE')).toBeInTheDocument();expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/product-evidence')).toHaveLength(1);});
+  it('voice selection changes visible selected state and preserves aria-pressed',async()=>{mockLayerApi();await setup();const female=screen.getByRole('button',{name:'NỮ'}),male=screen.getByRole('button',{name:'NAM'});fireEvent.click(male);expect(male).toHaveAttribute('aria-pressed','true');expect(male).toHaveClass('active');expect(female).toHaveAttribute('aria-pressed','false');});
+  it('View Prompt becomes Hide Prompt and Copy Prompt shows Copied feedback',async()=>{mockLayerApi();await setup();await through(4);const view=screen.getAllByRole('button',{name:'View Prompt'})[0]!;fireEvent.click(view);expect(screen.getByRole('button',{name:'Hide Prompt'})).toBeInTheDocument();const copy=screen.getAllByRole('button',{name:'Copy Prompt'})[0]!;fireEvent.click(copy);await waitFor(()=>expect(screen.getAllByRole('button',{name:'Copied'}).length).toBeGreaterThan(0));expect(navigator.clipboard.writeText).toHaveBeenCalledWith('safe prompt 1');});
+  it('keeps Product Evidence presentation and reference interaction feedback',async()=>{mockLayerApi();await setup();expect(screen.getByText('1 product reference selected')).toBeInTheDocument();await through(1);expect(screen.getByText('A compact white bottle')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'View analysis details'}));expect(screen.getByText('Prohibited Inferences')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Remove'}));expect(screen.getByText('0 product references selected')).toBeInTheDocument();});
+  it('keeps manual upload and Scene QC behavior after L4',async()=>{mockLayerApi({qcPass:true});await setup();await through(4);const upload=screen.getByLabelText('Upload Generated MP4 Scene 1');fireEvent.change(upload,{target:{files:[new File(['video'],'scene.mp4',{type:'video/mp4'})]}});await waitFor(()=>expect(screen.getByText('Scene QC PASS')).toBeInTheDocument());expect(screen.getByText('PRODUCT FIDELITY · PASS')).toBeInTheDocument();});
 });
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
-
-function selectProductImages(names: readonly string[] = ['front.jpg']) {
-  const images = names.map(name => new File(['image bytes'], name, { type: 'image/jpeg' }));
-  fireEvent.change(screen.getByLabelText('Add product images'), { target: { files: images } });
-}
-
-function selectProductImage(name = 'front.jpg') {
-  selectProductImages([name]);
-}
-
-function enterValidProjectInput() {
-  fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Mochi bottle' } });
-  fireEvent.change(screen.getByLabelText('Product Details'), { target: { value: 'Factual bottle description' } });
-  fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'Beauty' } });
-  fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'PRACTICAL_BUYERS' } });
-  fireEvent.change(screen.getByLabelText('Shooting Context'), { target: { value: 'INDOOR_TABLE_REVIEW' } });
-  selectProductImage();
-}
-
-const delivery:DeliveryManifest={version:'DELIVERY_PACKAGE_V1',status:'READY_FOR_DELIVERY',outputs:[
-  {filename:'scene-01.mp4',mimeType:'video/mp4'},{filename:'scene-02.mp4',mimeType:'video/mp4'},{filename:'scene-03.mp4',mimeType:'video/mp4'},{filename:'scene-04.mp4',mimeType:'video/mp4'},{filename:'key-points.txt',mimeType:'text/plain; charset=utf-8'}
-]};
-
-function evidenceResponse(claims?: readonly Record<string, unknown>[] | ((assetIds: readonly string[]) => readonly Record<string, unknown>[])): Response {
-  const request = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-  const body = request.mock.calls.at(-1)?.[1]?.body as FormData;
-  const product = JSON.parse(body.get('product') as string) as { productId: string; assets: readonly { assetId: string }[] };
-  return new Response(JSON.stringify({
-    ok: true,
-    analysisReceiptId: 'par_test_receipt_0123456789', receiptVersion: 'PRODUCT_ANALYSIS_RECEIPT_V1',
-    evidence: {
-      schemaVersion: '1.0.0', productId: product.productId, canonicalAssetIds: product.assets.map(asset => asset.assetId),
-      identityDescription: 'A compact white bottle', geometryNotes: ['Rounded bottle'], colorNotes: ['White'], packagingNotes: ['Pump top'], labelNotes: ['Front label'],
-      claims: typeof claims === 'function' ? claims(product.assets.map(asset => asset.assetId)) : claims ?? [{ claimId: 'claim-1', text: 'Bottle shown in reference', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: product.assets.map(asset => asset.assetId), allowed: true }],
-      prohibitedInferences: ['Do not infer ingredients'], uncertainties: [], contradictions: []
-    }
-  }), { status: 200, headers: { 'content-type': 'application/json' } });
-}
-function planResponse():Response { return new Response(JSON.stringify({ok:true,snapshotId:'snapshot-current',snapshotStatus:'PERSISTED',scenes:[1,2,3,4].map(index=>({sceneId:`scene-${index}`,index,role:['HOOK','FEATURE','PROOF','CTA'][index-1],primaryAction:'HOLD',startSummary:'start',endSummary:'end',keyPoints:[`point ${index}a`,`point ${index}b`],dialogue:`dialogue ${index}`,voiceLabel:'Female — Leda / Leda Custom',visualRhythm:'steady',prompt:'safe prompt',promptCharacterCount:11,promptBudgetStatus:'TARGET',lifecycleStatus:'READY_FOR_FLOW',referenceAssetIds:[],candidateAssetId:`candidate-${index}`,attempt:1}))}),{status:200,headers:{'content-type':'application/json'}}); }
-const statusResponse=(status:'GEMINI_READY'|'GEMINI_NOT_CONFIGURED') => new Response(JSON.stringify({ok:true,status}),{status:200,headers:{'content-type':'application/json'}});
-function mockReadyRuntime(analysis:(()=>Response)|undefined=undefined) {
-  const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):Promise.resolve(analysis?.() ?? new Response('{}')));
-  vi.stubGlobal('fetch',fetchMock); return fetchMock;
-}
-
-describe('App', () => {
-  it('renders the simplified deterministic creative controls', () => {
-    render(<App />);
-    for (const label of ['Product Name', 'Product Details', 'Category', 'Add product images', 'Audience', 'Shooting Context']) {
-      expect(screen.getByLabelText(label)).toBeInTheDocument();
-    }
-    expect(screen.getByLabelText('Audience').tagName).toBe('SELECT');
-    expect(screen.getByLabelText('Shooting Context').tagName).toBe('SELECT');
-    expect(screen.getAllByRole('option', { name: /Tự động theo sản phẩm/ })).toHaveLength(2);
-    expect(screen.getByLabelText('Audience')).toHaveValue('AUTO_PRODUCT_FIT');
-    expect(screen.getByLabelText('Shooting Context')).toHaveValue('AUTO_PRODUCT_FIT');
-    expect(screen.queryByLabelText('Reviewer Persona')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Tone')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'NỮ' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'NAM' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
-  });
-
-  it('derives setup readiness without a manual validation action', () => {
-    render(<App />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Setup needs attention');
-    expect(screen.queryByRole('button', { name: /Validate project input/i })).not.toBeInTheDocument();
-  });
-
-  it('builds a valid canonical input with audience under creativeDirection', () => {
-    render(<App />);
-    enterValidProjectInput();
-    expect(screen.getByText('Setup ready')).toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Create 4-scene plan'})).toBeDisabled();
-  });
-
-  it('keeps automatic validation current after product edits', () => {
-    render(<App />);
-    enterValidProjectInput();
-    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Updated Mochi bottle' } });
-    expect(screen.getByText('Setup ready')).toBeInTheDocument();
-  });
-
-  it('keeps setup ready after creative or voice gender edits', () => {
-    render(<App />);
-    enterValidProjectInput();
-    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'GIFT_BUYERS' } });
-    expect(screen.getByText('Setup ready')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
-    expect(screen.getByText('Setup ready')).toBeInTheDocument();
-
-  });
-
-  it('locks the V1 voice surface to Female or Male with South review metadata', () => {
-    render(<App />);
-    enterValidProjectInput();
-    fireEvent.click(screen.getByRole('button', { name: 'NAM' }));
-    expect(screen.queryByRole('option', { name: 'NORTH' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Voice Region')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Voice Style')).not.toBeInTheDocument();
-  });
-
-  it('creates a generic logical product reference and removes it from canonical input', () => {
-    render(<App />);
-    enterValidProjectInput();
-    expect(screen.getByAltText('Product reference preview')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Reference role for asset-/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('assets required');
-    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:preview-front.jpg');
-  });
-
-  it('removes a selected image from a still-valid canonical input', () => {
-    render(<App />);
-    enterValidProjectInput();
-    selectProductImage('side.jpg');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
-  });
-
-  it('assigns PRODUCT_REFERENCE to multiple arbitrary uploads and invalidates READY_FOR_ANALYSIS on add/remove', () => {
-    render(<App />);
-    enterValidProjectInput();
-    selectProductImages(['any-order-one.jpg', 'any-order-two.png']);
-    expect(screen.queryByRole('combobox', { name: /reference role/i })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
-  });
-
-  it('keeps browser runtime data out of canonical preview while exposing the Product Analysis action', () => {
-    render(<App />);
-    enterValidProjectInput();
-    expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeInTheDocument();
-    expect(screen.getByText('Runtime Setup')).toBeInTheDocument();
-  });
-
-  it('posts factual product input only and renders validated Product Evidence', async () => {
-    const fetchMock = mockReadyRuntime(() => evidenceResponse());
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    expect(screen.getByRole('status')).toHaveTextContent('ANALYZING PRODUCT');
-    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
-    expect(screen.getByText('A compact white bottle')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'View analysis details'}));
-    expect(screen.getByText('Physical Evidence')).toBeInTheDocument();
-    expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
-    expect(screen.getByText('ALLOWED')).toBeInTheDocument();
-    expect(screen.getByText('1 reference')).toBeInTheDocument();
-    expect(screen.getByText('No recorded uncertainties.')).toBeInTheDocument();
-    const body = fetchMock.mock.calls.find(call => String(call[0]) === '/api/product-evidence')?.[1]?.body as FormData;
-    expect(JSON.parse(body.get('product') as string)).not.toHaveProperty('creativeDirection');
-    expect([...body.keys()]).toEqual(['product', expect.stringMatching(/^asset:asset-/)]);
-  });
-
-  it('clears product evidence immediately after a factual edit and ignores a late result', async () => {
-    let resolveFetch: ((value: Response) => void) | undefined;
-    const fetchMock = vi.fn().mockImplementation((url:unknown) => String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):new Promise<Response>(resolve => { resolveFetch = resolve; }));
-    vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Changed bottle' } });
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
-    resolveFetch!(evidenceResponse());
-    await Promise.resolve();
-    expect(screen.queryByText('Analysis locked to current product + references')).not.toBeInTheDocument();
-    expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
-  });
-
-  it('keeps evidence through creative edits but clears it on adding or removing a reference', async () => {
-    const fetchMock = mockReadyRuntime(() => evidenceResponse());
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'YOUNG_ADULTS_GEN_Z' } });
-    expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument();
-    expect(fetchMock.mock.calls.filter(call => String(call[0]) === '/api/product-evidence')).toHaveLength(1);
-    selectProductImage('side.jpg');
-    expect(screen.queryByText('Analysis locked to current product + references')).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
-    expect(screen.getByText('Add factual product input and reference images, then analyze the product.')).toBeInTheDocument();
-  });
-
-  it('keeps provider and malformed response details out of the user-facing error', async () => {
-    mockReadyRuntime(() => new Response(JSON.stringify({ ok: false, error: { code: 'ANALYSIS_UNAVAILABLE', detail: 'Bearer raw-secret' } }), { status: 503 }));
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ANALYSIS UNAVAILABLE'));
-    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
-    expect(screen.getByRole('alert')).not.toHaveTextContent('Bearer');
-  });
-
-  it('keeps Product Evidence diagnostics bounded in Developer details while preserving the friendly error', async () => {
-    mockReadyRuntime(() => new Response(JSON.stringify({ ok: false, error: { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'], detail: 'raw-server-secret' } }), { status: 502 }));
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Product analysis could not be completed: INVALID ANALYSIS RESPONSE.'));
-    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-server-secret');
-    fireEvent.click(screen.getByText('Developer details'));
-    expect(screen.getByRole('alert')).toHaveTextContent('PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT');
-    expect(screen.getByRole('alert')).toHaveTextContent('["unknown_canonical_asset"]');
-    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Changed bottle' } });
-    expect(screen.queryByText('Developer details')).not.toBeInTheDocument();
-  });
-
-  it('renders each claim allowed state directly without exposing supporting asset IDs', async () => {
-    const fetchMock = mockReadyRuntime(() => evidenceResponse(assetIds => [
-      { claimId: 'claim-allowed', text: 'Reference-supported bottle', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: [...assetIds, ...assetIds], allowed: true },
-      { claimId: 'claim-blocked', text: 'Unverified marketing claim', source: 'USER_INPUT', evidenceAssetIds: [], allowed: false }
-    ]));
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
-    await waitFor(() => expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'View analysis details'}));
-    expect(screen.getByText('REFERENCE_EVIDENCE')).toBeInTheDocument();
-    expect(screen.getByText('USER_INPUT')).toBeInTheDocument();
-    expect(screen.getByText('ALLOWED')).toBeInTheDocument();
-    expect(screen.getByText('NOT ALLOWED')).toBeInTheDocument();
-    expect(screen.getByText('2 references')).toBeInTheDocument();
-    const body = fetchMock.mock.calls.find(call => String(call[0]) === '/api/product-evidence')?.[1]?.body as FormData;
-    const assetId = (JSON.parse(body.get('product') as string) as { assets: readonly { assetId: string }[] }).assets[0]!.assetId;
-    expect(screen.queryByText(assetId)).not.toBeInTheDocument();
-    expect(screen.getByText('Unverified marketing claim').parentElement).toHaveTextContent('NOT ALLOWED');
-  });
-
-  it('owns Runtime Setup before analysis and gates analysis through safe server status', async () => {
-    const apiKey='browser-only-test-secret';
-    const fetchMock=vi.fn().mockImplementation((url:unknown, init?:RequestInit) => {
-      const path=String(url);
-      if(path==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_NOT_CONFIGURED'));
-      if(path==='/api/runtime/connect') { expect(JSON.parse(String(init?.body))).toEqual({apiKey}); return Promise.resolve(statusResponse('GEMINI_READY')); }
-      if(path==='/api/runtime/disconnect') return Promise.resolve(statusResponse('GEMINI_NOT_CONFIGURED'));
-      return Promise.resolve(evidenceResponse());
-    });
-    vi.stubGlobal('fetch',fetchMock);
-    render(<App />);
-    expect(screen.getByText('Runtime Setup')).toBeInTheDocument();
-    expect(screen.queryByText('Production Workspace')).not.toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/runtime/status'));
-    const analyze=screen.getByRole('button',{name:'Analyze Product'});
-    expect(analyze).toBeDisabled();
-    expect(screen.getByLabelText('Gemini API Key')).toHaveValue('');
-    expect(screen.getByRole('button',{name:'Connect'})).toBeInTheDocument();
-    expect(screen.queryByRole('button',{name:'Disconnect'})).not.toBeInTheDocument();
-    expect(screen.getByText('Connect Gemini to analyze the product.')).toBeInTheDocument();
-    enterValidProjectInput();
-    const selectedBefore=screen.getByAltText('Product reference preview').getAttribute('src');
-    fireEvent.change(screen.getByLabelText('Gemini API Key'),{target:{value:apiKey}});
-    fireEvent.click(screen.getByRole('button',{name:'Connect'}));
-    await waitFor(() => expect(screen.getByText('GEMINI_READY')).toBeInTheDocument());
-    expect(analyze).toBeEnabled();
-    expect(screen.getByText('Model')).toBeInTheDocument();
-    expect(screen.getByText('Gemini 3.5 Flash-Lite')).toBeInTheDocument();
-    expect(screen.getByText('LOCKED')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Gemini API Key')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button',{name:'Connect'})).not.toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Disconnect'})).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain(apiKey);
-    expect(window.localStorage.getItem('GEMINI_API_KEY')).toBeNull();
-    fireEvent.click(screen.getByRole('button',{name:'Disconnect'}));
-    await waitFor(() => expect(screen.getByText('GEMINI_NOT_CONFIGURED')).toBeInTheDocument());
-    expect(screen.getByLabelText('Gemini API Key')).toHaveValue('');
-    expect(screen.queryByText('LOCKED')).not.toBeInTheDocument();
-    expect(analyze).toBeDisabled();
-    expect(screen.getByAltText('Product reference preview').getAttribute('src')).toBe(selectedBefore);
-  });
-
-  it('renders the safe production runtime stage without exposing a raw failure', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown) => {
-      if(String(url)==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_READY'));
-      if(String(url)==='/api/product-evidence') return Promise.resolve(evidenceResponse());
-      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:2},trace:'provider exception raw-secret'}}),{status:400,headers:{'content-type':'application/json'}}));
-      return Promise.resolve(new Response('{}'));
-    });
-    vi.stubGlobal('fetch',fetchMock);
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());
-    fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));
-    await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'}));
-    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('The planned physical actions could not be validated.'));
-    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
-    expect(screen.getByRole('alert')).not.toHaveTextContent('provider exception');
-    fireEvent.click(screen.getByText('Developer details'));
-    expect(screen.getByRole('alert')).toHaveTextContent('"primaryAction":"ROTATE_SLOW"');
-  });
-
-  it('shows the bounded R2_A diagnostic in Developer details without browser exposure of raw model or provider detail', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown) => {
-      if(String(url)==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_READY'));
-      if(String(url)==='/api/product-evidence') return Promise.resolve(evidenceResponse());
-      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'},rawModelOutput:'data:image/png;base64,raw-secret',prompt:'/private/prompt',providerMessage:'Bearer credential'}}),{status:400,headers:{'content-type':'application/json'}}));
-      return Promise.resolve(new Response('{}'));
-    });
-    vi.stubGlobal('fetch',fetchMock);
-    render(<App />);
-    enterValidProjectInput();
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());
-    fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));
-    await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'}));
-    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Product truth could not be prepared.'));
-    expect(screen.getByRole('alert')).not.toHaveTextContent(/raw-secret|base64|\/private|Bearer|credential/i);
-    fireEvent.click(screen.getByText('Developer details'));
-    expect(screen.getByRole('alert')).toHaveTextContent('R2_A_PRODUCT_TRUTH');
-    expect(screen.getByRole('alert')).toHaveTextContent('"productTruthErrorCode":"PROVIDER_FAILURE"');
-    expect(screen.getByRole('alert')).toHaveTextContent('"providerFailureCode":"INVALID_RESPONSE"');
-    expect(screen.getByRole('alert')).not.toHaveTextContent(/raw-secret|base64|\/private|Bearer|credential/i);
-  });
-
-  it('clears a current plan and receipt for every factual or reference change', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):String(url)==='/api/product-evidence'?Promise.resolve(evidenceResponse()):String(url)==='/api/production/build'?Promise.resolve(planResponse()):Promise.resolve(new Response('{}'))); vi.stubGlobal('fetch',fetchMock);
-    render(<App />); enterValidProjectInput(); await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled()); fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument());
-    const edits:[string,()=>void][]=[['name',()=>fireEvent.change(screen.getByLabelText('Product Name'),{target:{value:'Changed'}})],['details',()=>fireEvent.change(screen.getByLabelText('Product Details'),{target:{value:'Changed'}})],['category',()=>fireEvent.change(screen.getByLabelText('Category'),{target:{value:'Changed'}})],['reference add',()=>selectProductImage('replacement.jpg')],['reference remove',()=>fireEvent.click(screen.getAllByRole('button',{name:'Remove'})[0]!)]];
-    for(const [index,[,edit]] of edits.entries()){edit(); expect(screen.queryByText('Scene 1 — HOOK')).not.toBeInTheDocument(); expect(screen.queryByLabelText('Upload Generated MP4 Scene 1')).not.toBeInTheDocument(); expect(screen.queryByText('Analysis locked to current product + references')).not.toBeInTheDocument(); expect(screen.getByRole('button',{name:'Create 4-scene plan'})).toBeDisabled(); if(index<edits.length-1){fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument());}}
-    expect(screen.getByText('Product changed — analyze again.')).toBeInTheDocument();
-  });
-
-  it('preserves analysis but clears the old plan for every creative change without another analysis call', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):String(url)==='/api/product-evidence'?Promise.resolve(evidenceResponse()):String(url)==='/api/production/build'?Promise.resolve(planResponse()):Promise.resolve(new Response('{}'))); vi.stubGlobal('fetch',fetchMock);
-    render(<App />); enterValidProjectInput(); await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled()); fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument());
-    const edits:[()=>void,()=>void,()=>void]=[()=>fireEvent.change(screen.getByLabelText('Audience'),{target:{value:'GIFT_BUYERS'}}),()=>fireEvent.change(screen.getByLabelText('Shooting Context'),{target:{value:'HOME_LIFESTYLE'}}),()=>fireEvent.click(screen.getByRole('button',{name:'NAM'}))];
-    for(const [index,edit] of edits.entries()){edit(); expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument(); expect(screen.queryByText('Scene 1 — HOOK')).not.toBeInTheDocument(); expect(screen.getByRole('button',{name:'Create 4-scene plan'})).toBeEnabled(); expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/product-evidence')).toHaveLength(1); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/build')).toHaveLength(index+2));}
-    const body=fetchMock.mock.calls.filter(call=>String(call[0])==='/api/production/build').at(-1)?.[1]?.body as FormData; expect(JSON.parse(body.get('project') as string).creativeDirection).toMatchObject({audience:'GIFT_BUYERS',shootingContext:'HOME_LIFESTYLE',voiceGender:'MALE'});
-  });
-
-  it('derives the five workflow states from current setup, analysis, and plan state', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):String(url)==='/api/product-evidence'?Promise.resolve(evidenceResponse()):String(url)==='/api/production/build'?Promise.resolve(planResponse()):Promise.resolve(new Response('{}'))); vi.stubGlobal('fetch',fetchMock);
-    render(<App />); enterValidProjectInput(); const workflow=within(screen.getByRole('navigation',{name:'Production workflow'})); expect(workflow.getByText('Setup').parentElement).toHaveTextContent('COMPLETE'); expect(workflow.getByText('Product Analysis').parentElement).toHaveTextContent('CURRENT'); expect(workflow.getByText('Production Plan').parentElement).toHaveTextContent('NOT_READY');
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled()); fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(workflow.getByText('Product Analysis').parentElement).toHaveTextContent('COMPLETE')); expect(workflow.getByText('Production Plan').parentElement).toHaveTextContent('CURRENT'); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(workflow.getByText('Production Plan').parentElement).toHaveTextContent('COMPLETE')); expect(workflow.getByText('Scene QC').parentElement).toHaveTextContent('CURRENT');
-  });
-
-  it('does not clear a current plan when Gemini disconnects or reconnects', async () => {
-    const fetchMock=vi.fn().mockImplementation((url:unknown,init?:RequestInit)=>{const path=String(url); if(path==='/api/runtime/status')return Promise.resolve(statusResponse('GEMINI_READY')); if(path==='/api/product-evidence')return Promise.resolve(evidenceResponse()); if(path==='/api/production/build')return Promise.resolve(planResponse()); if(path==='/api/runtime/disconnect')return Promise.resolve(statusResponse('GEMINI_NOT_CONFIGURED')); if(path==='/api/runtime/connect')return Promise.resolve(statusResponse('GEMINI_READY')); return Promise.resolve(new Response('{}'));}); vi.stubGlobal('fetch',fetchMock);
-    render(<App />); enterValidProjectInput(); await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled()); fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button',{name:'Disconnect'})); await waitFor(()=>expect(screen.getByText('GEMINI_NOT_CONFIGURED')).toBeInTheDocument()); expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Gemini API Key'),{target:{value:'test-key'}}); fireEvent.click(screen.getByRole('button',{name:'Connect'})); await waitFor(()=>expect(screen.getByText('GEMINI_READY')).toBeInTheDocument()); expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument();
-  });
-
-  it('shows Delivery Center only after READY_FOR_DELIVERY and displays exactly five filenames', () => {
-    render(<DeliveryCenter snapshotId="snapshot-1" delivery={{...delivery,status:'NOT_READY'}} onDelivery={vi.fn()} />);
-    expect(screen.queryByRole('heading',{name:'Delivery'})).not.toBeInTheDocument();
-    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />);
-    expect(screen.getByRole('heading',{name:'Delivery'})).toBeInTheDocument();
-    expect(delivery.outputs.map(output=>screen.getByText(output.filename))).toHaveLength(5);
-  });
-
-  it('downloads the exact requested individual delivery filename', async () => {
-    const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{}); const bytes=new Uint8Array([7,8,9]);
-    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(bytes,{status:200})));
-    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button',{name:'Download Scene 2'}));
-    await waitFor(()=>expect(globalThis.fetch).toHaveBeenCalledWith('/api/production/delivery/scene-02.mp4?snapshotId=snapshot-1'));
-    expect(click).toHaveBeenCalledTimes(1); const blob=createObjectUrl.mock.calls.at(-1)?.[0] as Blob; expect(blob.size).toBe(bytes.length);
-  });
-
-  it('writes all five exact outputs through the folder picker', async () => {
-    const writes:{name:string;blob:Blob}[]=[]; const picker=vi.fn().mockResolvedValue({getFileHandle:async(name:string)=>({createWritable:async()=>({write:async(blob:Blob)=>{writes.push({name,blob});},close:async()=>{}})})}); Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:picker});
-    const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/production/delivery/receipt'?Promise.resolve(new Response(JSON.stringify({ok:true,delivery:{...delivery,status:'DELIVERED'}}))):Promise.resolve(new Response(`bytes:${String(url)}`))); vi.stubGlobal('fetch',fetchMock); const onDelivery=vi.fn();
-    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={onDelivery} />); fireEvent.click(screen.getByRole('button',{name:'Save 5 files to folder'}));
-    await waitFor(()=>expect(onDelivery).toHaveBeenCalledWith(expect.objectContaining({status:'DELIVERED'}))); expect(writes.map(item=>item.name)).toEqual(delivery.outputs.map(output=>output.filename)); expect(writes.every(item=>item.blob.size>0)).toBe(true);
-  });
-
-  it('keeps individual-download fallback when the directory picker is unavailable', async () => {
-    Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:undefined}); const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{}); const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/production/delivery/receipt'?Promise.resolve(new Response(JSON.stringify({ok:true,delivery:{...delivery,status:'DELIVERED'}}))):Promise.resolve(new Response('fallback'))); vi.stubGlobal('fetch',fetchMock);
-    render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()} />); fireEvent.click(screen.getByRole('button',{name:'Save 5 files to folder'}));
-    await waitFor(()=>expect(fetchMock.mock.calls.filter(call=>String(call[0]).startsWith('/api/production/delivery/scene-'))).toHaveLength(4)); expect(fetchMock.mock.calls.some(call=>String(call[0]).includes('key-points.txt'))).toBe(true); expect(click).toHaveBeenCalledTimes(5);
-  });
+const delivery:DeliveryManifest={version:'DELIVERY_PACKAGE_V1',status:'READY_FOR_DELIVERY',outputs:[{filename:'scene-01.mp4',mimeType:'video/mp4'},{filename:'scene-02.mp4',mimeType:'video/mp4'},{filename:'scene-03.mp4',mimeType:'video/mp4'},{filename:'scene-04.mp4',mimeType:'video/mp4'},{filename:'key-points.txt',mimeType:'text/plain; charset=utf-8'}]};
+describe('Delivery preservation',()=>{
+  it('appears only when ready and keeps exactly five output names',()=>{render(<DeliveryCenter snapshotId="snapshot-1" delivery={{...delivery,status:'NOT_READY'}} onDelivery={vi.fn()}/>);expect(screen.queryByRole('heading',{name:'Delivery'})).not.toBeInTheDocument();render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()}/>);expect(delivery.outputs.map(output=>screen.getByText(output.filename))).toHaveLength(5);});
+  it('downloads the exact requested filename',async()=>{const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(new Uint8Array([7,8,9]))));render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={vi.fn()}/>);fireEvent.click(screen.getByRole('button',{name:'Download Scene 2'}));await waitFor(()=>expect(globalThis.fetch).toHaveBeenCalledWith('/api/production/delivery/scene-02.mp4?snapshotId=snapshot-1'));expect(click).toHaveBeenCalledOnce();});
+  it('writes all five outputs through the folder picker',async()=>{const names:string[]=[];Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:vi.fn().mockResolvedValue({getFileHandle:async(name:string)=>({createWritable:async()=>({write:async()=>{names.push(name);},close:async()=>{}})})})});vi.stubGlobal('fetch',vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/production/delivery/receipt'?Promise.resolve(json({ok:true,delivery:{...delivery,status:'DELIVERED'}})):Promise.resolve(new Response('bytes'))));const onDelivery=vi.fn();render(<DeliveryCenter snapshotId="snapshot-1" delivery={delivery} onDelivery={onDelivery}/>);fireEvent.click(screen.getByRole('button',{name:'Save 5 files to folder'}));await waitFor(()=>expect(onDelivery).toHaveBeenCalledWith(expect.objectContaining({status:'DELIVERED'})));expect(names).toEqual(delivery.outputs.map(output=>output.filename));});
 });
