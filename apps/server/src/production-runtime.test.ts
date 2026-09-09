@@ -51,7 +51,7 @@ function createMockIntelligence(options: MockOptions = {}) {
       requests.push(input as StructuredIntelligenceRequest<unknown>);
       if (input.instruction.startsWith('TARGETED REPLAN:')) {
         return { data: input.parse(options.invalidReplan ? {} : {
-          physicalObjective: 'mục tiêu replanned', primaryAction: 'HOLD', desiredStateEffect: 'REMAIN_HELD',
+          physicalObjective: 'mục tiêu replanned', primaryAction: 'HOLD',
           dialogueDraft: 'R4 replanned draft', referenceAssetIds: ['reference-1']
         }) };
       }
