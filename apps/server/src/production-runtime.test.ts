@@ -40,7 +40,7 @@ const request = (capabilityMap = safeMap()): ProductionRuntimeRequest => ({
 });
 const riskyRotateMap = (): ActionCapabilityMap => ({ ...safeMap(), ROTATE_SLOW: 'RISKY' });
 
-type MockOptions = { readonly failOnCall?: number; readonly normalizedFailureOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly invalidStateSequence?: boolean; readonly trustedR1?: boolean };
+type MockOptions = { readonly failOnCall?: number; readonly normalizedFailureOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly forbiddenR4Action?: boolean; readonly trustedR1?: boolean };
 function createMockIntelligence(options: MockOptions = {}) {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
   let normalCalls = options.trustedR1 ? 1 : 0;
@@ -71,11 +71,11 @@ function createMockIntelligence(options: MockOptions = {}) {
         },
         { skinTone: 'ấm', nailStyle: 'ngắn', jewelry: 'không', dominantHand: 'RIGHT', surface: 'gỗ', background: 'trơn', lighting: 'mềm' },
         {
-          productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
-          hook:{primaryTruthRefId:'identity',physicalObjective:'mục tiêu 1',primaryAction:options.invalidStateSequence?'REACH':'PICK_UP',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
-          feature:{primaryTruthRefId:'geometry:0',physicalObjective:'mục tiêu 2',primaryAction:'HOLD',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
-          proof:{primaryTruthRefId:'color:0',physicalObjective:'mục tiêu 3',primaryAction:'ROTATE_SLOW',dialogueDraft:'R4 draft',referenceAssetIds:options.staleReplanReference?['reference-1','reference-1']:['reference-1'],transitionToNext:'MATCH_CUT'},
-          cta:{reuseTruthFromScene:1,physicalObjective:'mục tiêu 4',primaryAction:'PLACE_DOWN',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}
+          ...(options.forbiddenR4Action ? {primaryAction:'REACH'} : {}),
+          hook:{primaryTruthRefId:'identity',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
+          feature:{primaryTruthRefId:'geometry:0',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
+          proof:{primaryTruthRefId:'color:0',dialogueDraft:'R4 draft',referenceAssetIds:options.staleReplanReference?['reference-1','reference-1']:['reference-1'],transitionToNext:'MATCH_CUT'},
+          cta:{reuseTruthFromScene:1,dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}
         },
         { scenes: Array.from({ length: 4 }, () => ({ approachBehavior: 'Đưa tay tự nhiên.', gripAndContactBehavior: 'Giữ chắc.', actionExecutionBehavior: 'Thực hiện chậm.', postActionSettleBehavior: 'Dừng nhẹ.', cameraBehavior: 'Rung tay nhẹ.' })) },
         { secondaryTruthRefIds: ['identity', 'geometry:0', 'geometry:0'] },
@@ -120,8 +120,8 @@ test('PRE-F1 mocked integration reaches P0 through V1 fast-track while empirical
   assert.equal(capabilityMap.PICK_UP, 'UNTESTED');
   assert.equal(capabilityMap.HOLD, 'UNTESTED');
   assert.equal(capabilityMap.ROTATE_SLOW, 'UNTESTED');
-  assert.equal(requests.length, 10);
-  assert.ok(requests.some(item => item.instruction.startsWith('TARGETED REPLAN:')));
+  assert.equal(requests.length, 9);
+  assert.equal(requests.some(item => item.instruction.startsWith('TARGETED REPLAN:')), false);
   assert.deepEqual(result.trace.map(entry => entry.stage), PRE_F1_RUNTIME_STAGES);
   assert.deepEqual(validateProductionSnapshotV1(result.snapshot), []);
   assert.equal(result.snapshot.productionContract.scenes[3]?.primaryAction, 'HOLD');
@@ -164,11 +164,10 @@ test('R2 atomic commit failure stops before R3', async () => withRuntime(async (
   assert.equal(requests.length, 3);
 }, { blockedReference: true }));
 
-test('R5 runtime failures preserve the state code, scene index, and primary action', async () => withRuntime(async ({ runtime }) => {
+test('R4 rejects provider-authored actions before initial R5', async () => withRuntime(async ({ runtime }) => {
   await assert.rejects(runtime.run(request()), (error: unknown) => error instanceof ProductionRuntimeError
-    && runtimeError('R5_INITIAL_STATE')(error)
-    && JSON.stringify(error.diagnostic) === JSON.stringify({kind:'R5_STATE_PLANNING',code:'HOLD_PRECONDITION',sceneIndex:2,primaryAction:'HOLD'}));
-}, { invalidStateSequence: true }));
+    && runtimeError('R4_GLOBAL_PLAN')(error));
+}, { forbiddenR4Action: true }));
 
 test('R6 non-READY stops before R7-A, R7-B, R8, and P0 without mutating capability input', async () => withRuntime(async ({ runtime, requests }) => {
   const map = createUntestedActionCapabilityMap(); const before = structuredClone(map);

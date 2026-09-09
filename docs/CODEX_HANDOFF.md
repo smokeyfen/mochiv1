@@ -7,6 +7,8 @@
 
 ## Current verified state
 
+R4 qualification-path corrective is IMPLEMENTATION PASS / awaiting independent diff audit. The initial global planner uses the compiler-owned `V1_REVIEW_ACTION_SPINE_V1`: PICK_UP, HOLD, ROTATE_SLOW, HOLD for HOOK, FEATURE, PROOF, CTA. Effects come from unchanged `ACTION_SEMANTICS`; physical objectives and source metadata are deterministic. Provider decisions contain only `hook`, `feature`, `proof`, and `cta`: the first three select `primaryTruthRefId`, `dialogueDraft`, `referenceAssetIds`, and `transitionToNext`; CTA selects `reuseTruthFromScene` (1–3), `dialogueDraft`, and `referenceAssetIds`. Exact-key validation rejects physical fields and source metadata. R4 calls `resolveSceneStates` before returning; resolution failure is `PLANNER_ERROR:COMPILER_INVARIANT`. Shared plan validation and bounded replan retain their existing authority. Regressions prove the full R5 chain for LEFT/RIGHT hands and four R6 READY scenes with the all-UNTESTED map plus the current fast-track policy, without a normal-path targeted replan. Required verification passes: typecheck, 337 tests (0 failures), web build, and diff check. Next is ChatGPT independent diff audit, then one clean Analyze Product + Create 4-scene plan qualification; no Flow generation is authorized by this checkpoint.
+
 MochiV1 has completed and locked the R1 Product Evidence application path.
 
 - R1 Application Path: **FINAL LOCKED**
