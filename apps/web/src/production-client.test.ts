@@ -57,3 +57,17 @@ it('keeps bounded L3/L4 diagnostics and makes malformed diagnostics generic',asy
   .mockResolvedValueOnce(response({code:'PRODUCTION_LAYER_FAILED',layer:'L4',diagnostic:{layer:'L4',phase:'COMPILE',compileStage:'FLOW_REQUEST'}}))
   .mockResolvedValueOnce(response({code:'PRODUCTION_LAYER_FAILED',layer:'L4',diagnostic:{layer:'L4',phase:'COMPILE',compileStage:'PRIVATE',message:'raw secret'}})));
   await expect(createFinalizedScript(layerIds.blueprint)).rejects.toMatchObject({layer:'L3',diagnostic:{engineStage:'R4_1_KEY_POINTS'}});await expect(compileProduction(layerIds.script)).rejects.toMatchObject({layer:'L4',diagnostic:{compileStage:'FLOW_REQUEST'}});await expect(compileProduction(layerIds.script)).rejects.toMatchObject({code:'PRODUCTION_LAYER_FAILED',layer:'L4',diagnostic:undefined});});
+
+it.each([
+  ['GEMINI_NOT_CONFIGURED',()=>createProductFoundation('project-1',productInput,files,'par_receipt')],
+  ['INVALID_SETUP',()=>createSceneBlueprint(layerIds.foundation,creative)],
+  ['PRODUCT_ANALYSIS_STALE',()=>createFinalizedScript(layerIds.blueprint)],
+  ['GEMINI_NOT_CONFIGURED',()=>compileProduction(layerIds.script)]
+] as const)('preserves the exact bounded %s layer endpoint error',async(code,invoke)=>{vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({ok:false,error:{code}}),{status:400})));await expect(invoke()).rejects.toMatchObject({code,stage:undefined,diagnostic:undefined,layer:undefined} satisfies Partial<ProductionClientError>);});
+
+it('rejects unknown safe-error lookalikes and extra server error fields',async()=>{vi.stubGlobal('fetch',vi.fn()
+  .mockResolvedValueOnce(new Response(JSON.stringify({ok:false,error:{code:'PRIVATE_PROVIDER_ERROR'}}),{status:400}))
+  .mockResolvedValueOnce(new Response(JSON.stringify({ok:false,error:{code:'INVALID_SETUP',message:'private path'}}),{status:400})));
+  await expect(createSceneBlueprint(layerIds.foundation,creative)).rejects.toMatchObject({code:'INVALID_RESPONSE'});
+  await expect(compileProduction(layerIds.script)).rejects.toMatchObject({code:'INVALID_RESPONSE'});
+});
