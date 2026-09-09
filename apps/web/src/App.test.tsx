@@ -286,7 +286,7 @@ describe('App', () => {
     const fetchMock=vi.fn().mockImplementation((url:unknown) => {
       if(String(url)==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_READY'));
       if(String(url)==='/api/product-evidence') return Promise.resolve(evidenceResponse());
-      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',trace:'provider exception raw-secret'}}),{status:400,headers:{'content-type':'application/json'}}));
+      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:2},trace:'provider exception raw-secret'}}),{status:400,headers:{'content-type':'application/json'}}));
       return Promise.resolve(new Response('{}'));
     });
     vi.stubGlobal('fetch',fetchMock);
@@ -299,6 +299,8 @@ describe('App', () => {
     await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('The planned physical actions could not be validated.'));
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw-secret');
     expect(screen.getByRole('alert')).not.toHaveTextContent('provider exception');
+    fireEvent.click(screen.getByText('Developer details'));
+    expect(screen.getByRole('alert')).toHaveTextContent('"primaryAction":"ROTATE_SLOW"');
   });
 
   it('clears a current plan and receipt for every factual or reference change', async () => {

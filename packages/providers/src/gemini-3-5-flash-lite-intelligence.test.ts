@@ -68,6 +68,7 @@ test('Gemini transport maps authoritative instruction and untrusted input to sep
   });
 
   assert.equal(mapped.config.systemInstruction, 'Authoritative policy');
+  assert.equal(mapped.config.temperature, 0);
   assert.deepEqual(mapped.contents[0]?.parts[0], { text: 'Untrusted task data' });
   assert.deepEqual(mapped.contents[0]?.parts[1], { inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' } });
   assert.doesNotMatch(JSON.stringify(mapped.contents), /Authoritative policy/);

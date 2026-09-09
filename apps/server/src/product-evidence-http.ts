@@ -24,6 +24,8 @@ type HttpFailureCode =
   | 'ANALYSIS_AUTHENTICATION'
   | 'ANALYSIS_CONFIGURATION'
   | 'INVALID_ANALYSIS_RESPONSE'
+  | 'PROVIDER_INVALID_RESPONSE'
+  | 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT'
   | 'ANALYSIS_PROVIDER_FAILURE'
   | 'NOT_FOUND';
 
@@ -111,19 +113,19 @@ function mapServiceError(error: unknown): Response {
     if (error.code === 'UNAVAILABLE') return failure(503, 'ANALYSIS_UNAVAILABLE');
     if (error.code === 'AUTHENTICATION') return failure(503, 'ANALYSIS_AUTHENTICATION');
     if (error.code === 'CONFIGURATION') return failure(503, 'ANALYSIS_CONFIGURATION');
-    if (error.code === 'INVALID_RESPONSE') return failure(502, 'INVALID_ANALYSIS_RESPONSE');
+    if (error.code === 'INVALID_RESPONSE') return failure(502, 'PROVIDER_INVALID_RESPONSE');
     return failure(400, 'INVALID_REQUEST');
   }
   if (error instanceof ProductEvidenceError) {
     if (error.code === 'INVALID_INPUT') return failure(400, 'INVALID_PRODUCT_INPUT');
     if (error.code === 'MISSING_MEDIA') return failure(400, 'MISSING_MEDIA');
     if (error.code === 'INVALID_MEDIA') return failure(400, 'INVALID_MEDIA');
-    if (error.code === 'INVALID_MODEL_OUTPUT') return failure(502, 'INVALID_ANALYSIS_RESPONSE');
+    if (error.code === 'INVALID_MODEL_OUTPUT') return failure(502, 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', error.issueCodes);
     return failure(502, 'ANALYSIS_PROVIDER_FAILURE');
   }
   return failure(502, 'ANALYSIS_PROVIDER_FAILURE');
 }
 
-function failure(status: number, code: HttpFailureCode): Response {
-  return Response.json({ ok: false, error: { code } }, { status });
+function failure(status: number, code: HttpFailureCode, issueCodes?: readonly string[]): Response {
+  return Response.json({ ok: false, error: { code, ...(issueCodes === undefined ? {} : { issueCodes }) } }, { status });
 }

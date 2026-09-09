@@ -40,7 +40,7 @@ const request = (capabilityMap = safeMap()): ProductionRuntimeRequest => ({
 });
 const riskyRotateMap = (): ActionCapabilityMap => ({ ...safeMap(), ROTATE_SLOW: 'RISKY' });
 
-type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly trustedR1?: boolean };
+type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly invalidStateSequence?: boolean; readonly trustedR1?: boolean };
 function createMockIntelligence(options: MockOptions = {}) {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
   let normalCalls = options.trustedR1 ? 1 : 0;
@@ -74,7 +74,7 @@ function createMockIntelligence(options: MockOptions = {}) {
         { skinTone: 'ấm', nailStyle: 'ngắn', jewelry: 'không', dominantHand: 'RIGHT', surface: 'gỗ', background: 'trơn', lighting: 'mềm' },
         {
           productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
-          hook:{primaryTruthRefId:'identity',physicalObjective:'mục tiêu 1',primaryAction:'PICK_UP',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
+          hook:{primaryTruthRefId:'identity',physicalObjective:'mục tiêu 1',primaryAction:options.invalidStateSequence?'REACH':'PICK_UP',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
           feature:{primaryTruthRefId:'geometry:0',physicalObjective:'mục tiêu 2',primaryAction:'HOLD',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},
           proof:{primaryTruthRefId:'color:0',physicalObjective:'mục tiêu 3',primaryAction:'ROTATE_SLOW',dialogueDraft:'R4 draft',referenceAssetIds:options.staleReplanReference?['reference-1','reference-1']:['reference-1'],transitionToNext:'MATCH_CUT'},
           cta:{reuseTruthFromScene:1,physicalObjective:'mục tiêu 4',primaryAction:'PLACE_DOWN',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}
@@ -160,6 +160,12 @@ test('R2 atomic commit failure stops before R3', async () => withRuntime(async (
   assert.equal(requests.length, 3);
 }, { blockedReference: true }));
 
+test('R5 runtime failures preserve the state code, scene index, and primary action', async () => withRuntime(async ({ runtime }) => {
+  await assert.rejects(runtime.run(request()), (error: unknown) => error instanceof ProductionRuntimeError
+    && runtimeError('R5_INITIAL_STATE')(error)
+    && JSON.stringify(error.diagnostic) === JSON.stringify({kind:'R5_STATE_PLANNING',code:'HOLD_PRECONDITION',sceneIndex:2,primaryAction:'HOLD'}));
+}, { invalidStateSequence: true }));
+
 test('R6 non-READY stops before R7-A, R7-B, R8, and P0 without mutating capability input', async () => withRuntime(async ({ runtime, requests }) => {
   const map = createUntestedActionCapabilityMap(); const before = structuredClone(map);
   await assert.rejects(runtime.run(request(map)), runtimeError('R6_BOUNDED_REPLAN'));
@@ -187,7 +193,9 @@ test('a RISKY planned action is replanned through the existing bounded authority
 }, { staleReplanReference: true }));
 
 test('a bounded replan never exceeds the locked MAX_SCENE_REPLAN_ATTEMPTS and fails before downstream artifacts', async () => withRuntime(async ({ runtime, requests }) => {
-  await assert.rejects(runtime.run(request(riskyRotateMap())), runtimeError('R6_BOUNDED_REPLAN'));
+  await assert.rejects(runtime.run(request(riskyRotateMap())), (error: unknown) => error instanceof ProductionRuntimeError
+    && runtimeError('R6_BOUNDED_REPLAN')(error)
+    && JSON.stringify(error.diagnostic) === JSON.stringify({kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:MAX_SCENE_REPLAN_ATTEMPTS}));
   assert.equal(requests.filter(item => item.instruction.startsWith('TARGETED REPLAN:')).length, MAX_SCENE_REPLAN_ATTEMPTS);
   assert.equal(requests.some(item => item.instruction.startsWith('HUMAN REALISM RULES:')), false);
   assert.equal(requests.some(item => item.instruction.startsWith('KEY POINTS RULES:')), false);

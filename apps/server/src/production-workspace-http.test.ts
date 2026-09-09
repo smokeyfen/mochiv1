@@ -32,3 +32,10 @@ test('production build HTTP omits noncanonical stages and retains the generic fa
   const unsafe=new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED','PROVIDER_EXCEPTION' as never); const unsafeResponse=await buildHandler(unsafe)(buildRequest()); assert.deepEqual(await unsafeResponse.json(),{ok:false,error:{code:'PRODUCTION_BUILD_FAILED'}});
   const fallbackResponse=await buildHandler(new Error('raw provider exception'))(buildRequest()); assert.deepEqual(await fallbackResponse.json(),{ok:false,error:{code:'PRODUCTION_BUILD_FAILED'}});
 });
+
+test('production build HTTP preserves only the bounded R6 diagnostic', async()=>{
+  const error=new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED','R6_BOUNDED_REPLAN',{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:2});
+  Object.assign(error,{message:'raw provider secret',trace:'stack',path:'/private'});
+  const response=await buildHandler(error)(buildRequest());
+  assert.deepEqual(await response.json(),{ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:2}}});
+});

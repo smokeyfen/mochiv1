@@ -7,7 +7,7 @@ import {
   type CreativeDirectionInput,
   type PreF1RuntimeStage,
   type ProductInput,
-  type ProductionSnapshotV1, type ProductEvidence, validateProductEvidence
+  type ActionId, type ProductionSnapshotV1, type ProductEvidence, validateProductEvidence
 } from '@mochi/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import { isSimpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
@@ -24,6 +24,8 @@ import {
   planHumanRealism,
   planKeyPoints,
   resolveSceneStates,
+  ScenePlanningBlockedError,
+  StatePlanningError,
   synthesizeGlobalContinuity,
   targetedReplan,
   MAX_SCENE_REPLAN_ATTEMPTS
@@ -59,16 +61,28 @@ export interface ProductionRuntimeResult {
   readonly trace: readonly PreF1RuntimeTraceEntry[];
 }
 
+/** Bounded, provider-free root-cause data permitted through the production UI. */
+export type ProductionRuntimeDiagnostic =
+  | { readonly kind: 'R5_STATE_PLANNING'; readonly code: string; readonly sceneIndex: 1|2|3|4; readonly primaryAction: ActionId }
+  | { readonly kind: 'R6_SCENE_RISK'; readonly sceneIndex: 1|2|3|4; readonly primaryAction: ActionId; readonly riskStatus: 'CONDITIONAL'|'BLOCKED'; readonly productionEligibility: 'EMPIRICAL_SAFE'|'FAST_TRACK_AUTHORIZED'|'BLOCKED'; readonly riskReasons: readonly string[]; readonly replanFailureReason?: string; readonly attempt?: number };
+
 export class ProductionRuntimeError extends Error {
   readonly stage: PreF1RuntimeStage;
   readonly trace: readonly PreF1RuntimeTraceEntry[];
+  readonly diagnostic?: ProductionRuntimeDiagnostic;
 
-  constructor(stage: PreF1RuntimeStage, trace: readonly PreF1RuntimeTraceEntry[]) {
+  constructor(stage: PreF1RuntimeStage, trace: readonly PreF1RuntimeTraceEntry[], diagnostic?: ProductionRuntimeDiagnostic) {
     super(`PRE_F1_RUNTIME_ERROR:${stage}`);
     this.name = 'ProductionRuntimeError';
     this.stage = stage;
     this.trace = trace;
+    if (diagnostic !== undefined) this.diagnostic = diagnostic;
   }
+}
+
+class RuntimeDiagnosticFailure extends Error {
+  readonly diagnostic: ProductionRuntimeDiagnostic;
+  constructor(diagnostic: ProductionRuntimeDiagnostic) { super('RUNTIME_DIAGNOSTIC_FAILURE'); this.diagnostic = diagnostic; }
 }
 
 const ACTION_IDS = [
@@ -76,6 +90,46 @@ const ACTION_IDS = [
   'OPEN_SIMPLE', 'PRESS_BUTTON', 'POUR_SIMPLE', 'APPLY_SIMPLE', 'POINT'
 ] as const;
 const CAPABILITY_LEVELS = new Set(['UNTESTED', 'SAFE', 'RISKY', 'AVOID']);
+const ACTION_ID_SET = new Set<ActionId>(ACTION_IDS);
+const STATE_PLANNING_CODES = new Set(['ACTION_EFFECT_MISMATCH', 'UNSATISFIABLE_INITIAL_STATE', 'PICK_UP_PRECONDITION', 'HOLD_PRECONDITION', 'MOVE_PRECONDITION', 'ROTATE_PRECONDITION', 'PLACE_PRECONDITION', 'INTERACTION_PRECONDITION']);
+const RISK_REASONS = new Set(['action_avoid', 'action_untested', 'action_risky', 'unsupported_secondary_action', 'product_state_transformation', 'invalid_pick_up_transition', 'invalid_hold_transition', 'invalid_rotate_slow_transition', 'action_not_simple_fast_track', 'complexity_3']);
+const REPLAN_FAILURE_REASONS = new Set(['scene_missing', 'no_eligible_safer_action', 'provider_failure', 'risk_unresolved']);
+
+function isSceneIndex(value: unknown): value is 1|2|3|4 { return value === 1 || value === 2 || value === 3 || value === 4; }
+function isActionId(value: unknown): value is ActionId { return typeof value === 'string' && ACTION_ID_SET.has(value as ActionId); }
+function hasSafeReasons(value: unknown): value is readonly string[] { return Array.isArray(value) && value.length <= 8 && value.every(reason => typeof reason === 'string' && RISK_REASONS.has(reason)); }
+
+/** Validates the exact small diagnostic contract again at every untyped transport edge. */
+export function isProductionRuntimeDiagnostic(value: unknown): value is ProductionRuntimeDiagnostic {
+  if (!value || typeof value !== 'object') return false;
+  const diagnostic = value as Record<string, unknown>;
+  if (diagnostic.kind === 'R5_STATE_PLANNING') return Object.keys(diagnostic).length === 4
+    && typeof diagnostic.code === 'string' && STATE_PLANNING_CODES.has(diagnostic.code)
+    && isSceneIndex(diagnostic.sceneIndex) && isActionId(diagnostic.primaryAction);
+  return diagnostic.kind === 'R6_SCENE_RISK'
+    && Object.keys(diagnostic).every(key => ['kind','sceneIndex','primaryAction','riskStatus','productionEligibility','riskReasons','replanFailureReason','attempt'].includes(key))
+    && isSceneIndex(diagnostic.sceneIndex) && isActionId(diagnostic.primaryAction)
+    && (diagnostic.riskStatus === 'CONDITIONAL' || diagnostic.riskStatus === 'BLOCKED')
+    && (diagnostic.productionEligibility === 'EMPIRICAL_SAFE' || diagnostic.productionEligibility === 'FAST_TRACK_AUTHORIZED' || diagnostic.productionEligibility === 'BLOCKED')
+    && hasSafeReasons(diagnostic.riskReasons)
+    && (diagnostic.replanFailureReason === undefined || (typeof diagnostic.replanFailureReason === 'string' && REPLAN_FAILURE_REASONS.has(diagnostic.replanFailureReason)))
+    && (diagnostic.attempt === undefined || (typeof diagnostic.attempt === 'number' && Number.isInteger(diagnostic.attempt) && diagnostic.attempt >= 0 && diagnostic.attempt <= MAX_SCENE_REPLAN_ATTEMPTS));
+}
+
+function stateDiagnostic(error: unknown): ProductionRuntimeDiagnostic | undefined {
+  return error instanceof StatePlanningError && isSceneIndex(error.sceneIndex) && isActionId(error.primaryAction)
+    ? { kind: 'R5_STATE_PLANNING', code: error.code, sceneIndex: error.sceneIndex, primaryAction: error.primaryAction }
+    : undefined;
+}
+
+function diagnosticFromError(error: unknown): ProductionRuntimeDiagnostic | undefined {
+  return error instanceof RuntimeDiagnosticFailure ? error.diagnostic : stateDiagnostic(error);
+}
+
+function riskDiagnostic(scene: { readonly index:number; readonly actionId:string; readonly status:string; readonly productionEligibility:string; readonly reasons:readonly string[] }, replan?: ScenePlanningBlockedError): Extract<ProductionRuntimeDiagnostic, { readonly kind: 'R6_SCENE_RISK' }> {
+  const base = { kind: 'R6_SCENE_RISK' as const, sceneIndex: scene.index as 1|2|3|4, primaryAction: scene.actionId as ActionId, riskStatus: scene.status as 'CONDITIONAL'|'BLOCKED', productionEligibility: scene.productionEligibility as 'EMPIRICAL_SAFE'|'FAST_TRACK_AUTHORIZED'|'BLOCKED', riskReasons: [...scene.reasons] };
+  return replan === undefined ? base : { ...base, replanFailureReason: replan.reasons[0] ?? 'risk_unresolved', attempt: replan.attempts };
+}
 
 function validRequest(request: ProductionRuntimeRequest): boolean {
   if (!request || typeof request.projectId !== 'string' || request.projectId.trim().length === 0
@@ -106,8 +160,8 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
           const value = await operation();
           trace.push({ stage: name, status: 'COMPLETED' });
           return value;
-        } catch {
-          throw new ProductionRuntimeError(name, trace);
+        } catch (error) {
+          throw new ProductionRuntimeError(name, trace, diagnosticFromError(error));
         }
       };
 
@@ -146,12 +200,21 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
         const replannedIndexes = new Set<number>();
         while (candidateRiskAssessment.scenes.some(scene => scene.status !== 'READY')) {
           const target = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY' && !replannedIndexes.has(scene.index));
-          if (!target) throw new Error('risk_unresolved');
+          if (!target) {
+            const unresolved = candidateRiskAssessment.scenes.find(scene => scene.status !== 'READY');
+            if (unresolved) throw new RuntimeDiagnosticFailure({ ...riskDiagnostic(unresolved), replanFailureReason: 'risk_unresolved' });
+            throw new Error('risk_unresolved');
+          }
           replannedIndexes.add(target.index);
-          candidatePlan = await targetedReplan(
-            candidatePlan, context, continuity, request.capabilityMap, target.index,
-            dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS, request.productionEligibilityPolicy
-          );
+          try {
+            candidatePlan = await targetedReplan(
+              candidatePlan, context, continuity, request.capabilityMap, target.index,
+              dependencies.intelligence, MAX_SCENE_REPLAN_ATTEMPTS, request.productionEligibilityPolicy
+            );
+          } catch (error) {
+            if (error instanceof ScenePlanningBlockedError) throw new RuntimeDiagnosticFailure(riskDiagnostic(target, error));
+            throw error;
+          }
           candidateStatePlan = resolveSceneStates(candidatePlan);
           candidateRiskAssessment = evaluateSceneRisk(candidateStatePlan, request.capabilityMap, request.productionEligibilityPolicy);
         }
@@ -160,7 +223,8 @@ export function createProductionRuntime(dependencies: ProductionRuntimeDependenc
       const statePlan = await stage('R5_FINAL_STATE', () => resolveSceneStates(finalGlobalPlan));
       const riskAssessment = await stage('R6_FINAL_RISK', () => evaluateSceneRisk(statePlan, request.capabilityMap, request.productionEligibilityPolicy));
       await stage('R6_READY_GATE', () => {
-        if (riskAssessment.scenes.some(scene => scene.status !== 'READY')) throw new Error('risk_not_ready');
+        const blocked = riskAssessment.scenes.find(scene => scene.status !== 'READY');
+        if (blocked) throw new RuntimeDiagnosticFailure(riskDiagnostic(blocked));
       });
       const humanRealismPlan = await stage('R7_A_HUMAN_REALISM', () => planHumanRealism({
         context, plan: finalGlobalPlan, statePlan, risk: riskAssessment, creativeDirection: request.creativeDirection,

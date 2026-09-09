@@ -81,4 +81,13 @@ describe('analyzeProductEvidence', () => {
       expect(String(error)).not.toContain('transport detail');
     }
   });
+
+  it('preserves only Product Evidence validator categories while distinguishing provider invalid output', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'] } }), { status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'PROVIDER_INVALID_RESPONSE' } }), { status: 502 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'] });
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'PROVIDER_INVALID_RESPONSE', issueCodes: [] });
+  });
 });

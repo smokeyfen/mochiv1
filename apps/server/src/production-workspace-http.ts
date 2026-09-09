@@ -1,7 +1,7 @@
 import { validateMochiProjectInput, type MochiProjectInput } from '@mochi/contracts';
 import { ProductionWorkspaceError, ProductionWorkspaceService, type BrowserReferenceMedia, type DeliveryOutputName } from './production-workspace.ts';
 import { RuntimeConfiguration } from './runtime-configuration.ts';
-import { isPreF1RuntimeStage, type PreF1RuntimeStage } from './production-runtime.ts';
+import { isPreF1RuntimeStage, isProductionRuntimeDiagnostic, type PreF1RuntimeStage, type ProductionRuntimeDiagnostic } from './production-runtime.ts';
 
 export function createProductionWorkspaceHttpHandler(dependencies:{readonly runtime:RuntimeConfiguration;readonly workspace:ProductionWorkspaceService}):(request:Request)=>Promise<Response> {
   return async request=>{
@@ -32,6 +32,6 @@ function deliveryOutput(request:Request,workspace:ProductionWorkspaceService,fil
 function decodeProject(value:FormDataEntryValue|null):MochiProjectInput|undefined { if(typeof value!=='string') return; try { const project=JSON.parse(value) as MochiProjectInput; return validateMochiProjectInput(project).length===0?project:undefined; } catch { return; } }
 async function decodeReferences(form:FormData,project:MochiProjectInput):Promise<readonly BrowserReferenceMedia[]|undefined>{ const result:BrowserReferenceMedia[]=[]; for(const asset of project.product.assets){const value=form.get(`asset:${asset.assetId}`); if(typeof value==='string'||!(value instanceof Blob)||value.type!==asset.mimeType||!value.type.startsWith('image/')||value.size===0)return; result.push({assetId:asset.assetId,mimeType:value.type,dataBase64:Buffer.from(await value.arrayBuffer()).toString('base64')});} return result; }
 function field(form:FormData,key:string):string|undefined { const value=form.get(key); return typeof value==='string'&&value.trim().length>0?value:undefined; }
-function map(error:unknown):Response { if(error instanceof ProductionWorkspaceError) return failure(error.code,error.code==='PRODUCTION_BUILD_FAILED'&&isPreF1RuntimeStage(error.stage)?error.stage:undefined); return failure('PRODUCTION_BUILD_FAILED'); }
+function map(error:unknown):Response { if(error instanceof ProductionWorkspaceError) return failure(error.code,error.code==='PRODUCTION_BUILD_FAILED'&&isPreF1RuntimeStage(error.stage)?error.stage:undefined,error.code==='PRODUCTION_BUILD_FAILED'&&isProductionRuntimeDiagnostic(error.diagnostic)?error.diagnostic:undefined); return failure('PRODUCTION_BUILD_FAILED'); }
 function isDeliveryOutputName(value:string):value is DeliveryOutputName { return ['scene-01.mp4','scene-02.mp4','scene-03.mp4','scene-04.mp4','key-points.txt'].includes(value); }
-function failure(code:string,stage?:PreF1RuntimeStage):Response { return Response.json({ok:false,error:{code,...(stage?{stage}:{})}},{status:code==='GEMINI_NOT_CONFIGURED'?503:code==='DELIVERY_NOT_READY'||code==='DELIVERY_OUTPUT_NOT_FOUND'?409:400}); }
+function failure(code:string,stage?:PreF1RuntimeStage,diagnostic?:ProductionRuntimeDiagnostic):Response { return Response.json({ok:false,error:{code,...(stage?{stage}:{}),...(diagnostic?{diagnostic}:{})}},{status:code==='GEMINI_NOT_CONFIGURED'?503:code==='DELIVERY_NOT_READY'||code==='DELIVERY_OUTPUT_NOT_FOUND'?409:400}); }

@@ -262,6 +262,22 @@ test('malformed and wrong-product output fail closed', async () => {
   }
 });
 
+test('invalid model output retains only stable validator issue categories', async () => {
+  const input = product();
+  const malformed = stubProvider({});
+  await assert.rejects(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: malformed.provider }), (error: unknown) =>
+    error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT' && error.issueCodes.join(',') === 'model_output_shape');
+
+  const dynamicAssetId = 'asset-private-7b4b3d';
+  const invalid = stubProvider({ ...evidenceFor(input), canonicalAssetIds: [dynamicAssetId] });
+  await assert.rejects(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: invalid.provider }), (error: unknown) => {
+    if (!(error instanceof ProductEvidenceError)) return false;
+    assert.deepEqual(error.issueCodes, ['unknown_canonical_asset']);
+    assert.doesNotMatch(JSON.stringify(error.issueCodes), /private|7b4b3d|asset-/);
+    return true;
+  });
+});
+
 test('unknown evidence assets and evidence claims without assets fail closed', async () => {
   const input = product();
   const unknownAsset = { ...evidenceFor(input), canonicalAssetIds: ['unknown'] };

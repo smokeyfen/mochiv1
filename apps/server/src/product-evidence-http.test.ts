@@ -69,7 +69,7 @@ function requestFor(form: FormData, method = 'POST', path = '/api/product-eviden
 }
 
 async function responseBody(response: Response) {
-  return await response.json() as { ok: boolean; error?: { code: string }; evidence?: ProductEvidence; analysisReceiptId?:string; receiptVersion?:string };
+  return await response.json() as { ok: boolean; error?: { code: string; issueCodes?: readonly string[] }; evidence?: ProductEvidence; analysisReceiptId?:string; receiptVersion?:string };
 }
 
 test('valid multipart ProductInput maps one generic reference to one service call', async () => {
@@ -166,7 +166,7 @@ test('normalized service errors receive stable safe HTTP mappings', async () => 
     { error: new IntelligenceProviderError('UNAVAILABLE', true), status: 503, code: 'ANALYSIS_UNAVAILABLE' },
     { error: new IntelligenceProviderError('AUTHENTICATION', false), status: 503, code: 'ANALYSIS_AUTHENTICATION' },
     { error: new IntelligenceProviderError('CONFIGURATION', false), status: 503, code: 'ANALYSIS_CONFIGURATION' },
-    { error: new IntelligenceProviderError('INVALID_RESPONSE', false), status: 502, code: 'INVALID_ANALYSIS_RESPONSE' },
+    { error: new IntelligenceProviderError('INVALID_RESPONSE', false), status: 502, code: 'PROVIDER_INVALID_RESPONSE' },
     { error: new ProductEvidenceError('PROVIDER_FAILURE'), status: 502, code: 'ANALYSIS_PROVIDER_FAILURE' }
   ];
   for (const expected of cases) {
@@ -175,6 +175,20 @@ test('normalized service errors receive stable safe HTTP mappings', async () => 
     const body = await responseBody(response);
     assert.equal(response.status, expected.status);
     assert.equal(body.error?.code, expected.code);
+  }
+});
+
+test('Product Evidence model validation and provider invalid responses remain distinct and data-free', async () => {
+  const input = product();
+  const invalidEvidence = new ProductEvidenceError('INVALID_MODEL_OUTPUT', ['unknown_canonical_asset:asset-private-7b4b3d']);
+  const invalidResponse = new IntelligenceProviderError('INVALID_RESPONSE', false);
+  for (const [error, expected] of [[invalidEvidence, { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'] }], [invalidResponse, { code: 'PROVIDER_INVALID_RESPONSE' }]] as const) {
+    const { service } = createStubService(async () => { throw error; });
+    const response = await createProductEvidenceHttpHandler({ service })(requestFor(validForm(input)));
+    const body = await responseBody(response);
+    assert.equal(response.status, 502);
+    assert.deepEqual(body.error, expected);
+    assert.doesNotMatch(JSON.stringify(body), /private|7b4b3d|asset-/);
   }
 });
 

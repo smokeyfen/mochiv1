@@ -20,12 +20,14 @@ export type ProductEvidenceClientErrorCode =
   | 'ANALYSIS_AUTHENTICATION'
   | 'ANALYSIS_CONFIGURATION'
   | 'INVALID_ANALYSIS_RESPONSE'
+  | 'PROVIDER_INVALID_RESPONSE'
+  | 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT'
   | 'ANALYSIS_PROVIDER_FAILURE'
   | 'NETWORK_ERROR'
   | 'INVALID_RESPONSE';
 
 export class ProductEvidenceClientError extends Error {
-  constructor(readonly code: ProductEvidenceClientErrorCode) {
+  constructor(readonly code: ProductEvidenceClientErrorCode, readonly issueCodes: readonly string[] = []) {
     super(code);
     this.name = 'ProductEvidenceClientError';
   }
@@ -42,7 +44,16 @@ const clientErrorCodes = new Set<ProductEvidenceClientErrorCode>([
   'INVALID_REQUEST', 'INVALID_PRODUCT_INPUT', 'MISSING_MEDIA', 'INVALID_MEDIA',
   'PAYLOAD_TOO_LARGE', 'ANALYSIS_RATE_LIMITED', 'ANALYSIS_UNAVAILABLE',
   'ANALYSIS_AUTHENTICATION', 'ANALYSIS_CONFIGURATION', 'INVALID_ANALYSIS_RESPONSE',
+  'PROVIDER_INVALID_RESPONSE', 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT',
   'ANALYSIS_PROVIDER_FAILURE', 'NETWORK_ERROR', 'INVALID_RESPONSE'
+]);
+const productEvidenceIssueCodes = new Set([
+  'model_output_shape', 'schema_version', 'product_id', 'product_id_mismatch', 'canonical_assets_required', 'identity_description',
+  'duplicate_canonical_asset', 'unknown_canonical_asset', 'blank_geometry_note', 'blank_color_note', 'blank_packaging_note', 'blank_label_note',
+  'blank_prohibited_inference_note', 'unsupported_visual_material', 'claim_id', 'claim_text', 'duplicate_claim', 'reference_claim_requires_evidence',
+  'user_input_claim_must_not_bind_reference', 'nonvisual_reference_claim', 'product_details_claim_mislabeled', 'unsupported_visual_material_claim',
+  'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset', 'material_certainty_uncertainty_overlap',
+  'contradiction_statements', 'contradiction_reason', 'unknown_contradiction_asset', 'logical_asset_id_in_prose'
 ]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -135,7 +146,17 @@ async function decodeResponse(response: Response, product: ProductInput): Promis
   if (!response.ok) {
     if (isRecord(body) && hasExactKeys(body, ['ok', 'error']) && body.ok === false && isRecord(body.error) &&
       typeof body.error.code === 'string' && clientErrorCodes.has(body.error.code as ProductEvidenceClientErrorCode)) {
-      throw new ProductEvidenceClientError(body.error.code as ProductEvidenceClientErrorCode);
+      const issueCodes = body.error.code === 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT'
+        && Array.isArray(body.error.issueCodes)
+        && body.error.issueCodes.length > 0
+        && body.error.issueCodes.length <= 16
+        && body.error.issueCodes.every(code => typeof code === 'string' && productEvidenceIssueCodes.has(code))
+        ? [...body.error.issueCodes] as readonly string[]
+        : [];
+      if (body.error.code === 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT' && issueCodes.length === 0) {
+        throw new ProductEvidenceClientError('INVALID_RESPONSE');
+      }
+      throw new ProductEvidenceClientError(body.error.code as ProductEvidenceClientErrorCode, issueCodes);
     }
     throw new ProductEvidenceClientError('INVALID_RESPONSE');
   }

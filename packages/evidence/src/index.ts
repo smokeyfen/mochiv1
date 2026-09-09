@@ -19,13 +19,29 @@ export type ProductEvidenceErrorCode =
   | 'INVALID_MODEL_OUTPUT'
   | 'PROVIDER_FAILURE';
 
+/** Stable, data-free categories permitted to leave the evidence boundary. */
+export type ProductEvidenceIssueCode = string;
+export const PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE = 'model_output_shape';
+const PRODUCT_EVIDENCE_ISSUE_CODES = new Set([
+  PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE, 'schema_version', 'product_id', 'product_id_mismatch', 'canonical_assets_required', 'identity_description',
+  'duplicate_canonical_asset', 'unknown_canonical_asset', 'blank_geometry_note', 'blank_color_note', 'blank_packaging_note', 'blank_label_note',
+  'blank_prohibited_inference_note', 'unsupported_visual_material', 'claim_id', 'claim_text', 'duplicate_claim', 'reference_claim_requires_evidence',
+  'user_input_claim_must_not_bind_reference', 'nonvisual_reference_claim', 'product_details_claim_mislabeled', 'unsupported_visual_material_claim',
+  'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset', 'material_certainty_uncertainty_overlap',
+  'contradiction_statements', 'contradiction_reason', 'unknown_contradiction_asset', 'logical_asset_id_in_prose'
+]);
+
 export class ProductEvidenceError extends Error {
   readonly code: ProductEvidenceErrorCode;
+  readonly issueCodes: readonly ProductEvidenceIssueCode[];
 
-  constructor(code: ProductEvidenceErrorCode) {
+  constructor(code: ProductEvidenceErrorCode, issueCodes: readonly ProductEvidenceIssueCode[] = []) {
     super(`PRODUCT_EVIDENCE_ERROR:${code}`);
     this.name = 'ProductEvidenceError';
     this.code = code;
+    this.issueCodes = code === 'INVALID_MODEL_OUTPUT'
+      ? (safeProductEvidenceIssueCodes(issueCodes).length > 0 ? safeProductEvidenceIssueCodes(issueCodes) : [PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE])
+      : [];
   }
 }
 
@@ -198,12 +214,18 @@ export async function analyzeProductEvidence(
   }
 
   if (!isProductEvidence(result.data)) {
-    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT');
+    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT', [PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE]);
   }
-  if (validateProductEvidence(result.data, request.product).length > 0) {
-    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT');
+  const issues = validateProductEvidence(result.data, request.product);
+  if (issues.length > 0) {
+    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT', safeProductEvidenceIssueCodes(issues));
   }
   return result.data;
+}
+
+/** Drops validator values such as logical IDs while retaining only stable categories. */
+export function safeProductEvidenceIssueCodes(issues: readonly string[]): readonly ProductEvidenceIssueCode[] {
+  return [...new Set(issues.map(issue => issue.split(':', 1)[0]!).filter(issue => PRODUCT_EVIDENCE_ISSUE_CODES.has(issue)))].slice(0, 16);
 }
 
 function validateRuntimeMedia(product: ProductInput, media: readonly IntelligenceMediaInput[]): void {

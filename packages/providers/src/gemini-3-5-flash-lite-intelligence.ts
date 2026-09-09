@@ -62,7 +62,8 @@ export function createGeminiGenerateContentRequest(request: GeminiStructuredTran
     config: {
       systemInstruction: request.instruction,
       responseMimeType: 'application/json',
-      responseJsonSchema: request.outputSchema
+      responseJsonSchema: request.outputSchema,
+      temperature: 0
     }
   };
 }
