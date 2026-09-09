@@ -39,3 +39,12 @@ test('production build HTTP preserves only the bounded R6 diagnostic', async()=>
   const response=await buildHandler(error)(buildRequest());
   assert.deepEqual(await response.json(),{ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'ROTATE_SLOW',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky'],replanFailureReason:'risk_unresolved',attempt:2}}});
 });
+
+test('production build HTTP preserves only the bounded R2_A Product Truth diagnostic', async()=>{
+  const error=new ProductionWorkspaceError('PRODUCTION_BUILD_FAILED','R2_A_PRODUCT_TRUTH',{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'INVALID_MODEL_OUTPUT',providerFailureCode:'INVALID_RESPONSE',issueCategories:['DECISION_SHAPE']});
+  Object.assign(error,{rawModelOutput:'data:image/png;base64,secret',prompt:'private prompt',providerMessage:'credential',stack:'private stack',path:'/private/model.json'});
+  const response=await buildHandler(error)(buildRequest());
+  const value=await response.json();
+  assert.deepEqual(value,{ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'INVALID_MODEL_OUTPUT',providerFailureCode:'INVALID_RESPONSE',issueCategories:['DECISION_SHAPE']}}});
+  assert.doesNotMatch(JSON.stringify(value),/base64|secret|prompt|credential|stack|\/private/i);
+});

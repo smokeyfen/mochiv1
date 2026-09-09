@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { SCHEMA_VERSION, type MochiProjectInput } from '@mochi/contracts';
-import { type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
+import { IntelligenceProviderError, type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import { ProductionWorkspaceError, ProductionWorkspaceService, type DeliveryOutputName } from './production-workspace.ts';
 import { RuntimeConfiguration } from './runtime-configuration.ts';
 
@@ -17,14 +17,15 @@ const global=['PRODUCT_CONSISTENCY','HAND_CONSISTENCY','ENVIRONMENT_LIGHTING_CON
 const pass=(gates:readonly string[])=>gates.map(gate=>({gate,status:'PASS'}));
 
 function createMock() {
-  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false; let sceneQcThrows=false; let targetedReplanThrows=false;
+  const requests: StructuredIntelligenceRequest<unknown>[]=[]; let runtimeCall=0; let scene2Fail=false; let sequenceFail=false; let sceneQcThrows=false; let targetedReplanThrows=false; let productTruthThrows=false;
   const provider: IntelligenceProvider={id:'mock-delivery',async analyzeStructured<T>(input:StructuredIntelligenceRequest<T>){requests.push(input as StructuredIntelligenceRequest<unknown>); const parsed=(input.instruction.startsWith('SCENE_QC_V1:')||input.instruction.startsWith('SEQUENCE_QC_V1:'))?JSON.parse(input.inputText??'{}') as Record<string,unknown>:{};
+    if(input.instruction.startsWith('PRODUCT TRUTH RULES:')&&productTruthThrows) { const failure=new IntelligenceProviderError('INVALID_RESPONSE',false); Object.assign(failure,{rawModelOutput:'secret Base64 /private/model.json',providerMessage:'credential'}); throw failure; }
     if(input.instruction.startsWith('TARGETED REPLAN:')) { if(targetedReplanThrows) throw new Error('raw provider exception must not leave the server'); return {data:input.parse({physicalObjective:'mục tiêu replanned',primaryAction:'HOLD',dialogueDraft:'R4 replanned draft',referenceAssetIds:['reference-1']})}; }
     if(input.instruction.startsWith('SCENE_QC_V1:')) { if(sceneQcThrows) throw new Error('mock QC unavailable'); const sceneId=parsed.sceneId as string, candidateAssetId=parsed.candidateAssetId as string, failed=scene2Fail&&sceneId.endsWith(':scene:2'); return {data:input.parse({sceneId,candidateAssetId,frame:failed?[{gate:'PRODUCT_FIDELITY',status:'FAIL'},...pass(frame.slice(1))]:pass(frame),temporal:pass(temporal),speechDetected:true,spokenTranscript:parsed.expectedDialogue,dialogueComplete:true,unexpectedSpeechDetected:false,presentationDynamics:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     if(input.instruction.startsWith('SEQUENCE_QC_V1:')) { const reports=parsed.reports as {sceneId:string}[]; return {data:input.parse({pairs:[0,1,2].map(index=>({fromSceneId:reports[index]!.sceneId,toSceneId:reports[index+1]!.sceneId,gates:sequenceFail?[{gate:'PRODUCT_IDENTITY_CONTINUITY',status:'FAIL'},...pass(pair.slice(1))]:pass(pair)})),global:pass(global),visualVariation:{status:'WARN',meaningfulVisualProgression:true,excessiveStaticHold:false,rhythmIntentObserved:true,notes:'non-critical'}})}; }
     const data=[
       {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,canonicalAssetIds:['reference-1'],identityDescription:'Mochi snack',geometryNotes:['Round shape'],colorNotes:['White coating'],packagingNotes:['Simple package'],labelNotes:['Mochi label'],claims:[],prohibitedInferences:[],uncertainties:[],contradictions:[]},
-      {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,sourceEvidenceVersion:'BROWSER_RUNTIME_V1',canonicalAssetIds:['reference-1'],retainedFactIds:['identity','geometry:0','color:0','packaging:0','label:0'],exclusions:[]},
+      {identityDisposition:'RETAIN',exclusions:[]},
       {schemaVersion:SCHEMA_VERSION,productId:project.product.productId,sourceEvidenceVersion:'BROWSER_RUNTIME_V1',canonicalAssetIds:['reference-1'],assetAssessments:[{assetId:'reference-1',targetVisibility:'CLEAR',identityConfidence:'HIGH',geometryCoverage:'STRONG',labelReadability:'CLEAR',occlusion:'NONE',backgroundInterference:'LOW',multiProductAmbiguity:'NONE'}]},
       {skinTone:'ấm',nailStyle:'ngắn',jewelry:'không',dominantHand:'RIGHT',surface:'gỗ',background:'trơn',lighting:'mềm'},
       {productId:project.product.productId,sourceEvidenceVersion:'BROWSER_RUNTIME_V1',canonicalAssetIds:['reference-1'],hook:{primaryTruthRefId:'identity',physicalObjective:'mục tiêu 1',primaryAction:'PICK_UP',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},feature:{primaryTruthRefId:'geometry:0',physicalObjective:'mục tiêu 2',primaryAction:'HOLD',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},proof:{primaryTruthRefId:'color:0',physicalObjective:'mục tiêu 3',primaryAction:'ROTATE_SLOW',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1'],transitionToNext:'MATCH_CUT'},cta:{reuseTruthFromScene:1,physicalObjective:'mục tiêu 4',primaryAction:'PLACE_DOWN',dialogueDraft:'R4 draft',referenceAssetIds:['reference-1']}},
@@ -34,7 +35,7 @@ function createMock() {
       {scenes:Array.from({length:4},()=>({coversKeyPoint1:true,coversKeyPoint2:true,introducesUnsupportedProductFact:false,naturalSouthernConversationalVietnamese:true,containsStageDirectionOrNonSpeechText:false})),sameReviewerPersonaAcrossScenes:true}
     ][runtimeCall++ % 9]; return {data:input.parse(data)};
   }};
-  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;},setSceneQcThrows:(value:boolean)=>{sceneQcThrows=value;},setTargetedReplanThrows:(value:boolean)=>{targetedReplanThrows=value;}};
+  return {provider,requests,setScene2Fail:(value:boolean)=>{scene2Fail=value;},setSequenceFail:(value:boolean)=>{sequenceFail=value;},setSceneQcThrows:(value:boolean)=>{sceneQcThrows=value;},setTargetedReplanThrows:(value:boolean)=>{targetedReplanThrows=value;},setProductTruthThrows:(value:boolean)=>{productTruthThrows=value;}};
 }
 
 const validVideoInspector={async inspect(){return {container:'MP4' as const,width:1080,height:1920,durationMs:8000,rotationDegrees:0 as const};}};
@@ -53,6 +54,15 @@ test('Task 7B clean mocked browser E2E delivers byte-exact files and determinist
 test('a ProductionRuntimeError retains its canonical failing stage at the workspace boundary', async()=>withWorkspace(async({service,mock})=>{
   mock.setTargetedReplanThrows(true);
   await assert.rejects(service.build(project,references),(error:unknown)=>error instanceof ProductionWorkspaceError&&error.code==='PRODUCTION_BUILD_FAILED'&&error.stage==='R6_BOUNDED_REPLAN');
+}));
+
+test('R2_A safe diagnostic crosses the workspace boundary without raw provider detail', async()=>withWorkspace(async({service,mock})=>{
+  mock.setProductTruthThrows(true);
+  await assert.rejects(service.build(project,references),(error:unknown)=>error instanceof ProductionWorkspaceError
+    && error.stage==='R2_A_PRODUCT_TRUTH'
+    && JSON.stringify(error.diagnostic)===JSON.stringify({kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'})
+    && !JSON.stringify(error).includes('secret')
+    && !JSON.stringify(error).includes('/private'));
 }));
 
 test('failed Scene 2 repair creates attempt two, preserves other reports, and requires a rerun before delivery', async()=>withWorkspace(async({service,mock})=>{

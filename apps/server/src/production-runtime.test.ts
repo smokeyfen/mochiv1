@@ -10,7 +10,7 @@ import {
   type ProductInput
 } from '@mochi/contracts';
 import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1, type ActionCapabilityMap } from '@mochi/core';
-import { type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
+import { IntelligenceProviderError, type IntelligenceProvider, type StructuredIntelligenceRequest } from '@mochi/providers';
 import { compileProductionContract, MAX_SCENE_REPLAN_ATTEMPTS } from '@mochi/reasoning';
 import { createProductionSnapshotStore, ProductionSnapshotError, type ProductionSnapshotStore } from './production-snapshot.ts';
 import {
@@ -40,7 +40,7 @@ const request = (capabilityMap = safeMap()): ProductionRuntimeRequest => ({
 });
 const riskyRotateMap = (): ActionCapabilityMap => ({ ...safeMap(), ROTATE_SLOW: 'RISKY' });
 
-type MockOptions = { readonly failOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly invalidStateSequence?: boolean; readonly trustedR1?: boolean };
+type MockOptions = { readonly failOnCall?: number; readonly normalizedFailureOnCall?: number; readonly blockedReference?: boolean; readonly invalidReplan?: boolean; readonly staleReplanReference?: boolean; readonly invalidStateSequence?: boolean; readonly trustedR1?: boolean };
 function createMockIntelligence(options: MockOptions = {}) {
   const requests: StructuredIntelligenceRequest<unknown>[] = [];
   let normalCalls = options.trustedR1 ? 1 : 0;
@@ -56,6 +56,7 @@ function createMockIntelligence(options: MockOptions = {}) {
         }) };
       }
       const call = normalCalls++;
+      if (call === options.normalizedFailureOnCall) throw new IntelligenceProviderError('INVALID_RESPONSE', false);
       if (call === options.failOnCall) throw new Error('untrusted provider detail');
       const data = [
         {
@@ -63,10 +64,7 @@ function createMockIntelligence(options: MockOptions = {}) {
           identityDescription: 'Mochi snack', geometryNotes: ['Round shape'], colorNotes: ['White coating'],
           packagingNotes: ['Simple package'], labelNotes: ['Mochi label'], claims: [], prohibitedInferences: [], uncertainties: [], contradictions: []
         },
-        {
-          schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
-          retainedFactIds: ['identity', 'geometry:0', 'color:0', 'packaging:0', 'label:0'], exclusions: []
-        },
+        { identityDisposition: 'RETAIN', exclusions: [] },
         {
           schemaVersion: SCHEMA_VERSION, productId: product.productId, sourceEvidenceVersion, canonicalAssetIds: ['reference-1'],
           assetAssessments: [{ assetId: 'reference-1', targetVisibility: 'CLEAR', identityConfidence: options.blockedReference ? 'LOW' : 'HIGH', geometryCoverage: 'STRONG', labelReadability: 'CLEAR', occlusion: 'NONE', backgroundInterference: 'LOW', multiProductAmbiguity: 'NONE' }]
@@ -154,6 +152,12 @@ test('R1 through R4.1 failures stop immediately at their safe boundary', async (
     assert.equal(requests.length, expectedCalls);
   }, { failOnCall });
 });
+
+test('R2_A preserves only the ProductTruth code and normalized provider failure code', async () => withRuntime(async ({ runtime }) => {
+  await assert.rejects(runtime.run(request()), (error: unknown) => error instanceof ProductionRuntimeError
+    && error.stage === 'R2_A_PRODUCT_TRUTH'
+    && JSON.stringify(error.diagnostic) === JSON.stringify({kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'}));
+}, { normalizedFailureOnCall: 1 }));
 
 test('R2 atomic commit failure stops before R3', async () => withRuntime(async ({ runtime, requests }) => {
   await assert.rejects(runtime.run(request()), runtimeError('R2_COMMIT'));

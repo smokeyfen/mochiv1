@@ -56,12 +56,8 @@ const evidenceFor = (input: ProductInput): ProductEvidence => ({
   }]
 });
 
-const completeDecision = (input: ProductInput, evidence: ProductEvidence): ProductTruthDecision => ({
-  schemaVersion: SCHEMA_VERSION,
-  productId: input.productId,
-  sourceEvidenceVersion,
-  canonicalAssetIds: evidence.canonicalAssetIds,
-  retainedFactIds: buildProductTruthCandidateFacts(evidence).map(fact => fact.factId),
+const completeDecision = (): ProductTruthDecision => ({
+  identityDisposition: 'RETAIN',
   exclusions: []
 });
 
@@ -87,7 +83,7 @@ async function expectTruthError(promise: Promise<unknown>, code: ProductTruthErr
 test('valid evidence and complete decision compile a deterministic ProductTruth', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const { provider } = stubProvider(completeDecision(input, evidence));
+  const { provider } = stubProvider(completeDecision());
   const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
 
   assert.equal(truth.productId, input.productId);
@@ -106,20 +102,23 @@ test('valid evidence and complete decision compile a deterministic ProductTruth'
   assert.deepEqual(validateProductTruth(truth, input, evidence, sourceEvidenceVersion), []);
 });
 
-test('an uncertain or contradicted candidate may be excluded while retained text stays exact', async () => {
+test('one exclusion removes exactly the selected source fact while all retained facts stay compiler-derived', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const decision = completeDecision(input, evidence);
-  decision.retainedFactIds = decision.retainedFactIds.filter(id => id !== 'geometry:1' && id !== 'packaging:0');
-  decision.exclusions = [
-    { factId: 'geometry:1', reason: 'UNCERTAIN' },
-    { factId: 'packaging:0', reason: 'CONTRADICTED' }
-  ];
+  const decision: ProductTruthDecision = {
+    identityDisposition: 'RETAIN', exclusions: [{ factId: 'geometry:1', reason: 'UNCERTAIN' }]
+  };
   const { provider } = stubProvider(decision);
   const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
 
   assert.equal(truth.facts.some(fact => fact.factId === 'geometry:1'), false);
-  assert.equal(truth.facts.some(fact => fact.factId === 'packaging:0'), false);
+  assert.equal(truth.facts.some(fact => fact.factId === 'packaging:0'), true);
+  assert.deepEqual(
+    truth.facts.map(fact => fact.factId),
+    buildProductTruthCandidateFacts(evidence)
+      .filter(fact => fact.factId !== 'identity' && !decision.exclusions.some(exclusion => exclusion.factId === fact.factId))
+      .map(fact => fact.factId)
+  );
   assert.deepEqual(truth.exclusions, decision.exclusions);
   assert.equal(truth.facts[0]?.text, evidence.geometryNotes[0]);
 });
@@ -127,7 +126,7 @@ test('an uncertain or contradicted candidate may be excluded while retained text
 test('Product Truth preserves composition uncertainty without turning it into a material fact', async () => {
   const input = product();
   const evidence = { ...evidenceFor(input), geometryNotes: ['A ribbed or folded body structure is visible.'], uncertainties: [{ subject: 'Material composition', assetIds: ['reference-1'], reason: 'Appearance does not establish material.' }] };
-  const { provider } = stubProvider(completeDecision(input, evidence));
+  const { provider } = stubProvider(completeDecision());
   const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
   assert.deepEqual(truth.facts.map(fact => fact.text), ['A ribbed or folded body structure is visible.', 'The package is predominantly yellow.', 'The bottle is presented as a capped retail package.', 'A Cocoon label is visible.']);
   assert.deepEqual(truth.unresolvedUncertainties, evidence.uncertainties);
@@ -137,7 +136,7 @@ test('Product Truth preserves composition uncertainty without turning it into a 
 test('Product Truth has no Creative Direction input and is unchanged by browser-only creative controls', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const { provider, requests } = stubProvider(completeDecision(input, evidence));
+  const { provider, requests } = stubProvider(completeDecision());
   const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
   assert.equal('creativeDirection' in ({ product: input, evidence, sourceEvidenceVersion }), false);
   assert.doesNotMatch(buildProductTruthInputText({ product: input, evidence, sourceEvidenceVersion }), /audience|shootingContext|voiceGender|reviewerPersona|tone/i);
@@ -145,51 +144,64 @@ test('Product Truth has no Creative Direction input and is unchanged by browser-
   assert.equal(truth.identityDescription, evidence.identityDescription);
 });
 
-test('decision schema binds identity, version, assets, and candidate IDs to the exact source', () => {
+test('decision schema contains only identity disposition and non-identity semantic exclusions', () => {
   const input = product();
   const evidence = evidenceFor(input);
   const schema = buildProductTruthDecisionSchema({ product: input, evidence, sourceEvidenceVersion });
-  assert.deepEqual(schema.properties.productId.enum, [input.productId]);
-  assert.deepEqual(schema.properties.sourceEvidenceVersion.enum, [sourceEvidenceVersion]);
-  assert.deepEqual(schema.properties.canonicalAssetIds.enum, [evidence.canonicalAssetIds]);
-  assert.deepEqual(schema.properties.retainedFactIds.items.enum, buildProductTruthCandidateFacts(evidence).map(fact => fact.factId));
+  assert.deepEqual(Object.keys(schema.properties), ['identityDisposition', 'exclusions']);
+  assert.deepEqual(schema.required, ['identityDisposition', 'exclusions']);
+  assert.deepEqual(schema.properties.identityDisposition.enum, ['RETAIN', 'INSUFFICIENT_SUPPORT']);
+  assert.deepEqual(schema.properties.exclusions.items.properties.reason.enum, ['UNCERTAIN', 'CONTRADICTED', 'INSUFFICIENT_SUPPORT']);
+  assert.deepEqual(
+    schema.properties.exclusions.items.properties.factId.enum,
+    buildProductTruthCandidateFacts(evidence).filter(fact => fact.factId !== 'identity').map(fact => fact.factId)
+  );
+  for (const forbidden of ['schemaVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'retainedFactIds']) {
+    assert.equal(forbidden in schema.properties, false);
+  }
   assert.equal(schema.additionalProperties, false);
   assert.equal(schema.properties.exclusions.items.additionalProperties, false);
 });
 
-test('the complete candidate partition rejects unknown, duplicate, overlap, and omitted IDs', async () => {
+test('unknown, duplicate, identity, and invalid-reason exclusions fail closed without dynamic fact IDs', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const cases: ProductTruthDecision[] = [
-    { ...completeDecision(input, evidence), retainedFactIds: [...completeDecision(input, evidence).retainedFactIds, 'unknown'] },
-    { ...completeDecision(input, evidence), retainedFactIds: [...completeDecision(input, evidence).retainedFactIds, 'geometry:0'] },
-    { ...completeDecision(input, evidence), exclusions: [{ factId: 'geometry:0', reason: 'UNCERTAIN' }] },
-    { ...completeDecision(input, evidence), retainedFactIds: completeDecision(input, evidence).retainedFactIds.slice(0, -1) },
-    { ...completeDecision(input, evidence), exclusions: [{ factId: 'label:0', reason: 'UNCERTAIN' }, { factId: 'label:0', reason: 'CONTRADICTED' }] }
+  const cases: readonly [unknown, string][] = [
+    [{ identityDisposition: 'RETAIN', exclusions: [{ factId: 'private-fact-123', reason: 'UNCERTAIN' }] }, 'UNKNOWN_EXCLUSION'],
+    [{ identityDisposition: 'RETAIN', exclusions: [{ factId: 'label:0', reason: 'UNCERTAIN' }, { factId: 'label:0', reason: 'CONTRADICTED' }] }, 'DUPLICATE_EXCLUSION'],
+    [{ identityDisposition: 'RETAIN', exclusions: [{ factId: 'identity', reason: 'INSUFFICIENT_SUPPORT' }] }, 'IDENTITY_EXCLUSION'],
+    [{ identityDisposition: 'RETAIN', exclusions: [{ factId: 'label:0', reason: 'MODEL_REASON' }] }, 'INVALID_EXCLUSION_REASON']
   ];
-  for (const decision of cases) {
+  for (const [decision, expectedCategory] of cases) {
     const { provider } = stubProvider(decision);
-    await expectTruthError(analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider }), 'INVALID_MODEL_OUTPUT');
+    await assert.rejects(
+      analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider }),
+      (error: unknown) => error instanceof ProductTruthError
+        && error.code === 'INVALID_MODEL_OUTPUT'
+        && error.diagnostic.issueCategories?.includes(expectedCategory as never) === true
+        && !JSON.stringify(error.diagnostic).includes('private-fact-123')
+        && !JSON.stringify(error.diagnostic).includes('label:0')
+    );
   }
 });
 
-test('identity exclusion fails closed as insufficient truth', async () => {
+test('identity insufficient disposition fails closed as insufficient truth', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const decision = completeDecision(input, evidence);
-  decision.retainedFactIds = decision.retainedFactIds.filter(id => id !== 'identity');
-  decision.exclusions = [{ factId: 'identity', reason: 'INSUFFICIENT_SUPPORT' }];
+  const decision: ProductTruthDecision = { identityDisposition: 'INSUFFICIENT_SUPPORT', exclusions: [] };
   const { provider } = stubProvider(decision);
-  await expectTruthError(
+  await assert.rejects(
     analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider }),
-    'INSUFFICIENT_TRUTH'
+    (error: unknown) => error instanceof ProductTruthError
+      && error.code === 'INSUFFICIENT_TRUTH'
+      && error.diagnostic.issueCategories?.[0] === 'IDENTITY_INSUFFICIENT'
   );
 });
 
 test('truth request keeps authoritative rules, untrusted factual input, and media separate', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const { provider, requests } = stubProvider(completeDecision(input, evidence));
+  const { provider, requests } = stubProvider(completeDecision());
   await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
   const request = requests[0]!;
 
@@ -207,14 +219,14 @@ test('truth request keeps authoritative rules, untrusted factual input, and medi
 test('invalid evidence and source version fail before intelligence execution', async () => {
   const input = product();
   const invalidEvidence = { ...evidenceFor(input), canonicalAssetIds: ['unknown'] };
-  const first = stubProvider(completeDecision(input, evidenceFor(input)));
+  const first = stubProvider(completeDecision());
   await expectTruthError(
     analyzeProductTruth({ product: input, evidence: invalidEvidence, sourceEvidenceVersion, intelligence: first.provider }),
     'INVALID_EVIDENCE'
   );
   assert.equal(first.requests.length, 0);
 
-  const second = stubProvider(completeDecision(input, evidenceFor(input)));
+  const second = stubProvider(completeDecision());
   await expectTruthError(
     analyzeProductTruth({ product: input, evidence: evidenceFor(input), sourceEvidenceVersion: ' ', intelligence: second.provider }),
     'INVALID_SOURCE_VERSION'
@@ -225,34 +237,39 @@ test('invalid evidence and source version fail before intelligence execution', a
 test('malformed decision and generic provider failures fail closed without raw detail', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const malformed = stubProvider({ retainedFactIds: [] });
-  await expectTruthError(
+  const malformed = stubProvider({ identityDisposition: 'RETAIN', exclusions: [], productId: 'model-authored' });
+  await assert.rejects(
     analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: malformed.provider }),
-    'INVALID_MODEL_OUTPUT'
+    (error: unknown) => error instanceof ProductTruthError
+      && error.code === 'INVALID_MODEL_OUTPUT'
+      && JSON.stringify(error.diagnostic) === JSON.stringify({ productTruthErrorCode: 'INVALID_MODEL_OUTPUT', issueCategories: ['DECISION_SHAPE'] })
   );
 
-  const failing = stubProvider(completeDecision(input, evidence), new Error('raw transport request and secret detail'));
+  const failing = stubProvider(completeDecision(), new Error('raw transport request and secret detail'));
   await expectTruthError(
     analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: failing.provider }),
     'PROVIDER_FAILURE'
   );
 });
 
-test('normalized intelligence errors survive the ProductTruth boundary unchanged', async () => {
+test('normalized intelligence errors become bounded ProductTruth provider diagnostics', async () => {
   const input = product();
   const evidence = evidenceFor(input);
   const providerError = new IntelligenceProviderError('UNAVAILABLE', true);
-  const { provider } = stubProvider(completeDecision(input, evidence), providerError);
+  const { provider } = stubProvider(completeDecision(), providerError);
   await assert.rejects(
     analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider }),
-    (error: unknown) => error === providerError && error instanceof IntelligenceProviderError && error.code === 'UNAVAILABLE'
+    (error: unknown) => error instanceof ProductTruthError
+      && error.code === 'PROVIDER_FAILURE'
+      && error.diagnostic.providerFailureCode === 'UNAVAILABLE'
+      && !JSON.stringify(error).includes('raw')
   );
 });
 
 test('contract validation rejects ProductTruth mutations and disallowed claims', async () => {
   const input = product();
   const evidence = evidenceFor(input);
-  const { provider } = stubProvider(completeDecision(input, evidence));
+  const { provider } = stubProvider(completeDecision());
   const truth = await analyzeProductTruth({ product: input, evidence, sourceEvidenceVersion, intelligence: provider });
 
   const withDisallowedClaim = {

@@ -23,3 +23,15 @@ it('rejects a diagnostic primary action outside the exact V1 ActionId allowlist'
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:{kind:'R6_SCENE_RISK',sceneIndex:3,primaryAction:'NOT_A_V1_ACTION',riskStatus:'CONDITIONAL',productionEligibility:'BLOCKED',riskReasons:['action_risky']}}}),{status:400,headers:{'content-type':'application/json'}})));
   await expect(buildProduction(project,files,'receipt-test')).rejects.toMatchObject({code:'PRODUCTION_BUILD_FAILED',stage:'R6_BOUNDED_REPLAN',diagnostic:undefined} satisfies Partial<ProductionClientError>);
 });
+
+it('decodes only bounded R2_A Product Truth diagnostics', async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'},rawModelOutput:'secret Base64',prompt:'/private/prompt'}}),{status:400,headers:{'content-type':'application/json'}})));
+  await expect(buildProduction(project,files,'receipt-test')).rejects.toMatchObject({
+    code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'}
+  } satisfies Partial<ProductionClientError>);
+});
+
+it('rejects unbounded or unknown Product Truth diagnostics', async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'INVALID_MODEL_OUTPUT',issueCategories:['unknown_exclusion:private-fact-id']}}}),{status:400,headers:{'content-type':'application/json'}})));
+  await expect(buildProduction(project,files,'receipt-test')).rejects.toMatchObject({code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:undefined} satisfies Partial<ProductionClientError>);
+});

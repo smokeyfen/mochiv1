@@ -12,7 +12,7 @@ import {
 import { isDeepStrictEqual } from 'node:util';
 import { isSimpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import { analyzeProductEvidence } from '@mochi/evidence';
-import { type IntelligenceMediaInput, type IntelligenceProvider } from '@mochi/providers';
+import { type IntelligenceMediaInput, type IntelligenceProvider, type IntelligenceProviderErrorCode } from '@mochi/providers';
 import {
   analyzeProductTruth,
   analyzeReferenceAssessment,
@@ -23,12 +23,15 @@ import {
   planGlobal4Scenes,
   planHumanRealism,
   planKeyPoints,
+  ProductTruthError,
   resolveSceneStates,
   ScenePlanningBlockedError,
   StatePlanningError,
   synthesizeGlobalContinuity,
   targetedReplan,
-  MAX_SCENE_REPLAN_ATTEMPTS
+  MAX_SCENE_REPLAN_ATTEMPTS,
+  type ProductTruthErrorCode,
+  type ProductTruthIssueCategory
 } from '@mochi/reasoning';
 import { type ProductionSnapshotStore } from './production-snapshot.ts';
 
@@ -63,6 +66,7 @@ export interface ProductionRuntimeResult {
 
 /** Bounded, provider-free root-cause data permitted through the production UI. */
 export type ProductionRuntimeDiagnostic =
+  | { readonly kind: 'R2_A_PRODUCT_TRUTH'; readonly productTruthErrorCode: ProductTruthErrorCode; readonly providerFailureCode?: IntelligenceProviderErrorCode; readonly issueCategories?: readonly ProductTruthIssueCategory[] }
   | { readonly kind: 'R5_STATE_PLANNING'; readonly code: string; readonly sceneIndex: 1|2|3|4; readonly primaryAction: ActionId }
   | { readonly kind: 'R6_SCENE_RISK'; readonly sceneIndex: 1|2|3|4; readonly primaryAction: ActionId; readonly riskStatus: 'CONDITIONAL'|'BLOCKED'; readonly productionEligibility: 'EMPIRICAL_SAFE'|'FAST_TRACK_AUTHORIZED'|'BLOCKED'; readonly riskReasons: readonly string[]; readonly replanFailureReason?: string; readonly attempt?: number };
 
@@ -94,6 +98,9 @@ const ACTION_ID_SET = new Set<ActionId>(ACTION_IDS);
 const STATE_PLANNING_CODES = new Set(['ACTION_EFFECT_MISMATCH', 'UNSATISFIABLE_INITIAL_STATE', 'PICK_UP_PRECONDITION', 'HOLD_PRECONDITION', 'MOVE_PRECONDITION', 'ROTATE_PRECONDITION', 'PLACE_PRECONDITION', 'INTERACTION_PRECONDITION']);
 const RISK_REASONS = new Set(['action_avoid', 'action_untested', 'action_risky', 'unsupported_secondary_action', 'product_state_transformation', 'invalid_pick_up_transition', 'invalid_hold_transition', 'invalid_rotate_slow_transition', 'action_not_simple_fast_track', 'complexity_3']);
 const REPLAN_FAILURE_REASONS = new Set(['scene_missing', 'no_eligible_safer_action', 'provider_failure', 'risk_unresolved']);
+const PRODUCT_TRUTH_ERROR_CODES = new Set(['INVALID_INPUT', 'INVALID_EVIDENCE', 'INVALID_SOURCE_VERSION', 'INVALID_MODEL_OUTPUT', 'INSUFFICIENT_TRUTH', 'PROVIDER_FAILURE']);
+const PROVIDER_FAILURE_CODES = new Set(['CONFIGURATION', 'AUTHENTICATION', 'RATE_LIMIT', 'INVALID_REQUEST', 'INVALID_RESPONSE', 'UNAVAILABLE', 'UNKNOWN']);
+const PRODUCT_TRUTH_ISSUE_CATEGORIES = new Set(['DECISION_SHAPE', 'UNKNOWN_EXCLUSION', 'DUPLICATE_EXCLUSION', 'IDENTITY_EXCLUSION', 'INVALID_EXCLUSION_REASON', 'IDENTITY_INSUFFICIENT', 'COMPILED_TRUTH_INVALID']);
 
 function isSceneIndex(value: unknown): value is 1|2|3|4 { return value === 1 || value === 2 || value === 3 || value === 4; }
 function isActionId(value: unknown): value is ActionId { return typeof value === 'string' && ACTION_ID_SET.has(value as ActionId); }
@@ -103,6 +110,12 @@ function hasSafeReasons(value: unknown): value is readonly string[] { return Arr
 export function isProductionRuntimeDiagnostic(value: unknown): value is ProductionRuntimeDiagnostic {
   if (!value || typeof value !== 'object') return false;
   const diagnostic = value as Record<string, unknown>;
+  if (diagnostic.kind === 'R2_A_PRODUCT_TRUTH') return Object.keys(diagnostic).every(key => ['kind', 'productTruthErrorCode', 'providerFailureCode', 'issueCategories'].includes(key))
+    && typeof diagnostic.productTruthErrorCode === 'string' && PRODUCT_TRUTH_ERROR_CODES.has(diagnostic.productTruthErrorCode)
+    && (diagnostic.providerFailureCode === undefined || (typeof diagnostic.providerFailureCode === 'string' && PROVIDER_FAILURE_CODES.has(diagnostic.providerFailureCode)))
+    && (diagnostic.issueCategories === undefined || (Array.isArray(diagnostic.issueCategories) && diagnostic.issueCategories.length <= PRODUCT_TRUTH_ISSUE_CATEGORIES.size
+      && diagnostic.issueCategories.every(issue => typeof issue === 'string' && PRODUCT_TRUTH_ISSUE_CATEGORIES.has(issue))
+      && new Set(diagnostic.issueCategories).size === diagnostic.issueCategories.length));
   if (diagnostic.kind === 'R5_STATE_PLANNING') return Object.keys(diagnostic).length === 4
     && typeof diagnostic.code === 'string' && STATE_PLANNING_CODES.has(diagnostic.code)
     && isSceneIndex(diagnostic.sceneIndex) && isActionId(diagnostic.primaryAction);
@@ -123,6 +136,9 @@ function stateDiagnostic(error: unknown): ProductionRuntimeDiagnostic | undefine
 }
 
 function diagnosticFromError(error: unknown): ProductionRuntimeDiagnostic | undefined {
+  if (error instanceof ProductTruthError && isProductionRuntimeDiagnostic({ kind: 'R2_A_PRODUCT_TRUTH', ...error.diagnostic })) {
+    return { kind: 'R2_A_PRODUCT_TRUTH', ...error.diagnostic };
+  }
   return error instanceof RuntimeDiagnosticFailure ? error.diagnostic : stateDiagnostic(error);
 }
 

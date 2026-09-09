@@ -5,8 +5,11 @@ export {
   buildProductTruthDecisionSchema,
   ProductTruthError,
   type AnalyzeProductTruthRequest,
+  type ProductTruthDiagnostic,
   type ProductTruthDecision,
-  type ProductTruthDecisionExclusion
+  type ProductTruthDecisionExclusion,
+  type ProductTruthErrorCode,
+  type ProductTruthIssueCategory
 } from './truth.ts';
 export {
   analyzeReferenceAssessment,

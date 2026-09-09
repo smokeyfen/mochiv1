@@ -318,6 +318,29 @@ describe('App', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('"primaryAction":"ROTATE_SLOW"');
   });
 
+  it('shows the bounded R2_A diagnostic in Developer details without browser exposure of raw model or provider detail', async () => {
+    const fetchMock=vi.fn().mockImplementation((url:unknown) => {
+      if(String(url)==='/api/runtime/status') return Promise.resolve(statusResponse('GEMINI_READY'));
+      if(String(url)==='/api/product-evidence') return Promise.resolve(evidenceResponse());
+      if(String(url)==='/api/production/build') return Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:'PRODUCTION_BUILD_FAILED',stage:'R2_A_PRODUCT_TRUTH',diagnostic:{kind:'R2_A_PRODUCT_TRUTH',productTruthErrorCode:'PROVIDER_FAILURE',providerFailureCode:'INVALID_RESPONSE'},rawModelOutput:'data:image/png;base64,raw-secret',prompt:'/private/prompt',providerMessage:'Bearer credential'}}),{status:400,headers:{'content-type':'application/json'}}));
+      return Promise.resolve(new Response('{}'));
+    });
+    vi.stubGlobal('fetch',fetchMock);
+    render(<App />);
+    enterValidProjectInput();
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled());
+    fireEvent.click(screen.getByRole('button',{name:'Analyze Product'}));
+    await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'}));
+    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Product truth could not be prepared.'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/raw-secret|base64|\/private|Bearer|credential/i);
+    fireEvent.click(screen.getByText('Developer details'));
+    expect(screen.getByRole('alert')).toHaveTextContent('R2_A_PRODUCT_TRUTH');
+    expect(screen.getByRole('alert')).toHaveTextContent('"productTruthErrorCode":"PROVIDER_FAILURE"');
+    expect(screen.getByRole('alert')).toHaveTextContent('"providerFailureCode":"INVALID_RESPONSE"');
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/raw-secret|base64|\/private|Bearer|credential/i);
+  });
+
   it('clears a current plan and receipt for every factual or reference change', async () => {
     const fetchMock=vi.fn().mockImplementation((url:unknown)=>String(url)==='/api/runtime/status'?Promise.resolve(statusResponse('GEMINI_READY')):String(url)==='/api/product-evidence'?Promise.resolve(evidenceResponse()):String(url)==='/api/production/build'?Promise.resolve(planResponse()):Promise.resolve(new Response('{}'))); vi.stubGlobal('fetch',fetchMock);
     render(<App />); enterValidProjectInput(); await waitFor(()=>expect(screen.getByRole('button',{name:'Analyze Product'})).toBeEnabled()); fireEvent.click(screen.getByRole('button',{name:'Analyze Product'})); await waitFor(()=>expect(screen.getByText('Analysis locked to current product + references')).toBeInTheDocument()); fireEvent.click(screen.getByRole('button',{name:'Create 4-scene plan'})); await waitFor(()=>expect(screen.getByText('Scene 1 — HOOK')).toBeInTheDocument());
