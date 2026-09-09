@@ -1,18 +1,32 @@
 import {
+  compileSceneAnchorsV1,
   validateCreativeDirectionInput,
   validateProductInput,
   validateProductionSnapshotV1,
+  validateSceneAnchorAgainstSnapshot,
   PRE_F1_RUNTIME_STAGES,
   isPreF1RuntimeStage,
   type CreativeDirectionInput,
   type PreF1RuntimeStage,
   type ProductInput,
-  type ActionId, type ProductionSnapshotV1, type ProductEvidence, validateProductEvidence
+  type ActionId, type ProductionSnapshotV1, type ProductEvidence, type SceneAnchorV1, validateProductEvidence
 } from '@mochi/contracts';
+import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { isSimpleActionFastTrackPolicyV1, type ActionCapabilityMap, type SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import { analyzeProductEvidence } from '@mochi/evidence';
-import { type IntelligenceMediaInput, type IntelligenceProvider, type IntelligenceProviderErrorCode } from '@mochi/providers';
+import {
+  FLOW_OMNI_FLASH_1_1_V1,
+  FLOW_PRODUCTION_REQUEST_V1,
+  FLOW_SCENE_PROMPT_V1,
+  compileFlowProductionRequestV1,
+  countUnicodeCodePoints,
+  type FlowProductionRequestV1,
+  type FlowReferenceBindingV1,
+  type IntelligenceMediaInput,
+  type IntelligenceProvider,
+  type IntelligenceProviderErrorCode
+} from '@mochi/providers';
 import {
   analyzeProductTruth,
   analyzeReferenceAssessment,
@@ -33,15 +47,19 @@ import {
   type ProductFoundationV1,
   type SceneBlueprintV1,
   type FinalizedScriptV1,
+  type CompileProductionContractRequest,
   type ProductTruthErrorCode,
   type ProductTruthIssueCategory,
   validateFinalizedScriptV1
 } from '@mochi/reasoning';
 import {
   createProductReferenceBindingV1,
+  validateProductionReadyV1,
+  type ProductionReadySceneProofV1,
+  type ProductionReadyV1,
   type LayerArtifactStore
 } from './layer-artifact-store.ts';
-import { type ProductionSnapshotStore } from './production-snapshot.ts';
+import { canonicalJson, type ProductionSnapshotStore } from './production-snapshot.ts';
 
 /** Ordered safe evidence for the one controlled PRE-F1 runtime invocation. */
 export { PRE_F1_RUNTIME_STAGES, isPreF1RuntimeStage };
@@ -108,6 +126,54 @@ export interface ScriptFinalizationRuntimeResult {
   readonly script: FinalizedScriptV1;
 }
 
+export interface ProductionCompileRuntimeRequest {
+  readonly scriptId: string;
+}
+
+export interface ProductionCompileDeterministicCompilers {
+  readonly sceneAnchors: typeof compileSceneAnchorsV1;
+  readonly flowRequest: typeof compileFlowProductionRequestV1;
+}
+
+/** L4 is structurally deterministic: no IntelligenceProvider can be supplied here. */
+export interface ProductionCompileRuntimeDependencies {
+  readonly layerArtifactStore: LayerArtifactStore;
+  readonly productionSnapshotStore: ProductionSnapshotStore;
+  readonly compilers?: Partial<ProductionCompileDeterministicCompilers>;
+}
+
+export interface ProductionCompileRuntimeResult {
+  readonly foundation: ProductFoundationV1;
+  readonly blueprint: SceneBlueprintV1;
+  readonly script: FinalizedScriptV1;
+  /** Exact reloaded P0 authority. */
+  readonly snapshot: ProductionSnapshotV1;
+  readonly anchors: readonly [SceneAnchorV1, SceneAnchorV1, SceneAnchorV1, SceneAnchorV1];
+  /** Transient provider-edge compile view; never stored in L1-L4 or P0. */
+  readonly flowRequests: readonly [FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1];
+  readonly ready: ProductionReadyV1;
+}
+
+export type L4ProductionCompilePhase = 'INPUT' | 'LOAD' | 'ENGINE' | 'PERSIST' | 'VALIDATE' | 'COMPILE';
+export type L4ProductionCompileEngineStage = 'R8_PRODUCTION_CONTRACT';
+export type L4ProductionCompileStage = 'SCENE_ANCHOR' | 'FLOW_REQUEST';
+export interface L4ProductionCompileDiagnostic {
+  readonly layer: 'L4';
+  readonly phase: L4ProductionCompilePhase;
+  readonly engineStage?: L4ProductionCompileEngineStage;
+  readonly compileStage?: L4ProductionCompileStage;
+}
+
+/** Bounded L4 failure surface; underlying compiler, provider-edge, and storage detail never escapes. */
+export class ProductionCompileError extends Error {
+  readonly diagnostic: L4ProductionCompileDiagnostic;
+  constructor(phase: L4ProductionCompilePhase, detail?: { readonly engineStage: L4ProductionCompileEngineStage } | { readonly compileStage: L4ProductionCompileStage }) {
+    super(`L4_PRODUCTION_COMPILE_ERROR:${phase}`);
+    this.name = 'ProductionCompileError';
+    this.diagnostic = detail === undefined ? { layer: 'L4', phase } : { layer: 'L4', phase, ...detail };
+  }
+}
+
 export type L3ScriptFinalizationPhase = 'INPUT' | 'LOAD' | 'ENGINE' | 'VALIDATE' | 'PERSIST';
 export type L3ScriptFinalizationEngineStage = 'R4_1_KEY_POINTS' | 'R7_B_DIALOGUE';
 export interface L3ScriptFinalizationDiagnostic {
@@ -159,6 +225,7 @@ const CAPABILITY_LEVELS = new Set(['UNTESTED', 'SAFE', 'RISKY', 'AVOID']);
 const ACTION_ID_SET = new Set<ActionId>(ACTION_IDS);
 const FOUNDATION_ID_PATTERN = /^pf_[0-9a-f]{64}$/;
 const BLUEPRINT_ID_PATTERN = /^sb_[0-9a-f]{64}$/;
+const SCRIPT_ID_PATTERN = /^fs_[0-9a-f]{64}$/;
 const STATE_PLANNING_CODES = new Set(['ACTION_EFFECT_MISMATCH', 'UNSATISFIABLE_INITIAL_STATE', 'PICK_UP_PRECONDITION', 'HOLD_PRECONDITION', 'MOVE_PRECONDITION', 'ROTATE_PRECONDITION', 'PLACE_PRECONDITION', 'INTERACTION_PRECONDITION']);
 const RISK_REASONS = new Set(['action_avoid', 'action_untested', 'action_risky', 'unsupported_secondary_action', 'product_state_transformation', 'invalid_pick_up_transition', 'invalid_hold_transition', 'invalid_rotate_slow_transition', 'action_not_simple_fast_track', 'complexity_3']);
 const REPLAN_FAILURE_REASONS = new Set(['scene_missing', 'no_eligible_safer_action', 'provider_failure', 'risk_unresolved']);
@@ -442,6 +509,244 @@ export async function runScriptFinalization(
   } catch {
     throw new ScriptFinalizationError('PERSIST');
   }
+}
+
+function productionRequestFromLineage(
+  foundation: ProductFoundationV1,
+  blueprint: SceneBlueprintV1,
+  script: FinalizedScriptV1
+): CompileProductionContractRequest {
+  const policy = blueprint.eligibilityBinding.productionEligibilityPolicy;
+  // Durable canonical JSON sorts keys. R8 is locked and compares R5/R6 plus the
+  // realism constraints with order-sensitive JSON.stringify, so L4 rehydrates
+  // the exact committed values into those authorities' original key order.
+  // This is property-order normalization only; no lower-layer engine is rerun.
+  const statePlan: SceneBlueprintV1['statePlan'] = {
+    schemaVersion: blueprint.statePlan.schemaVersion,
+    productId: blueprint.statePlan.productId,
+    sourceEvidenceVersion: blueprint.statePlan.sourceEvidenceVersion,
+    canonicalAssetIds: blueprint.statePlan.canonicalAssetIds,
+    continuity: blueprint.statePlan.continuity,
+    referenceLimitations: blueprint.statePlan.referenceLimitations,
+    referenceReadiness: blueprint.statePlan.referenceReadiness,
+    scenes: blueprint.globalPlan.scenes.map((source, offset) => {
+      const committed = blueprint.statePlan.scenes[offset]!;
+      const state = (value: typeof committed.startState): typeof committed.startState => ({
+        heldBy: value.heldBy,
+        placement: value.placement,
+        orientation: value.orientation,
+        interactionState: value.interactionState
+      });
+      return { ...source, startState: state(committed.startState), endState: state(committed.endState) };
+    })
+  };
+  const riskAssessment: SceneBlueprintV1['riskAssessment'] = {
+    scenes: blueprint.riskAssessment.scenes.map(scene => ({
+      sceneId: scene.sceneId,
+      index: scene.index,
+      actionId: scene.actionId,
+      actionCapability: scene.actionCapability,
+      productionEligibility: scene.productionEligibility,
+      actionComplexity: scene.actionComplexity,
+      referenceQuality: scene.referenceQuality,
+      status: scene.status,
+      reasons: scene.reasons,
+      warnings: scene.warnings,
+      replanRecommended: scene.replanRecommended
+    }))
+  };
+  const constraints = blueprint.humanRealismPlan.globalConstraints;
+  const humanRealismPlan: SceneBlueprintV1['humanRealismPlan'] = {
+    schemaVersion: blueprint.humanRealismPlan.schemaVersion,
+    realismVersion: blueprint.humanRealismPlan.realismVersion,
+    productId: blueprint.humanRealismPlan.productId,
+    sourceEvidenceVersion: blueprint.humanRealismPlan.sourceEvidenceVersion,
+    canonicalAssetIds: blueprint.humanRealismPlan.canonicalAssetIds,
+    continuity: blueprint.humanRealismPlan.continuity,
+    referenceReadiness: blueprint.humanRealismPlan.referenceReadiness,
+    referenceLimitations: blueprint.humanRealismPlan.referenceLimitations,
+    globalConstraints: {
+      cameraFamily: constraints.cameraFamily,
+      reviewerFaceVisibility: constraints.reviewerFaceVisibility,
+      preserveHandIdentity: constraints.preserveHandIdentity,
+      preserveDominantHand: constraints.preserveDominantHand,
+      noUncontractedSecondHand: constraints.noUncontractedSecondHand,
+      onePrimaryPhysicalAction: constraints.onePrimaryPhysicalAction,
+      noUncontractedCutOrReset: constraints.noUncontractedCutOrReset,
+      noProductTeleportation: constraints.noProductTeleportation,
+      noHandProductPenetration: constraints.noHandProductPenetration,
+      noImpossibleGrip: constraints.noImpossibleGrip,
+      maintainContactContinuity: constraints.maintainContactContinuity,
+      noRoboticMotion: constraints.noRoboticMotion,
+      subtleHandheldCameraOnly: constraints.subtleHandheldCameraOnly,
+      actionCompletionPriority: constraints.actionCompletionPriority,
+      exactCanonicalStates: constraints.exactCanonicalStates
+    },
+    scenes: blueprint.humanRealismPlan.scenes
+  };
+  return {
+    context: foundation.committedContext,
+    creativeDirection: blueprint.creativeDirection,
+    globalPlan: blueprint.globalPlan,
+    keyPointPlan: script.keyPointPlan,
+    statePlan,
+    riskAssessment,
+    capabilityMap: blueprint.eligibilityBinding.capabilityMap,
+    ...(policy === null ? {} : { productionEligibilityPolicy: policy }),
+    humanRealismPlan,
+    dialoguePlan: script.dialoguePlan
+  };
+}
+
+function digest(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function transientBindings(anchor: SceneAnchorV1): readonly FlowReferenceBindingV1[] {
+  return anchor.referenceAssetIds.map((logicalAssetId, offset) => ({
+    sceneId: anchor.sceneId,
+    logicalAssetId,
+    flowReferenceId: `manual-l4-validation-${anchor.index}-${offset + 1}`
+  }));
+}
+
+function validFlowCompile(request: FlowProductionRequestV1, anchor: SceneAnchorV1): boolean {
+  return request.requestVersion === FLOW_PRODUCTION_REQUEST_V1
+    && request.promptVersion === FLOW_SCENE_PROMPT_V1
+    && request.modelTarget === FLOW_OMNI_FLASH_1_1_V1
+    && request.sceneId === anchor.sceneId
+    && request.durationSeconds === 8 && request.durationSeconds === anchor.durationSeconds
+    && request.aspectRatio === '9:16' && request.aspectRatio === anchor.aspectRatio
+    && request.dialogue === anchor.dialogue && request.prompt.includes(anchor.dialogue)
+    && request.nativeVoiceBinding.logicalVoiceIdentityId === anchor.voiceIdentityId
+    && request.effects.sfx === 'NONE' && request.effects.vfx === 'NONE'
+    && request.referenceBindings.length === anchor.referenceAssetIds.length
+    && request.referenceBindings.every((binding, offset) => binding.sceneId === anchor.sceneId
+      && binding.logicalAssetId === anchor.referenceAssetIds[offset]
+      && typeof binding.flowReferenceId === 'string' && binding.flowReferenceId.trim().length > 0)
+    && request.promptUnicodeCharacterCount === countUnicodeCodePoints(request.prompt)
+    && request.promptUnicodeCharacterCount > 0 && request.promptUnicodeCharacterCount <= 3200
+    && (request.promptBudgetStatus === 'HEADROOM'
+      ? request.promptUnicodeCharacterCount > 2800
+      : request.promptUnicodeCharacterCount <= 2800);
+}
+
+function compileProofFor(
+  anchors: readonly [SceneAnchorV1, SceneAnchorV1, SceneAnchorV1, SceneAnchorV1],
+  requests: readonly [FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1]
+): ProductionReadyV1['compileProof'] {
+  const scenes = anchors.map((anchor, offset): ProductionReadySceneProofV1 => {
+    const request = requests[offset]!;
+    return {
+      sceneId: anchor.sceneId,
+      index: anchor.index,
+      primaryAction: anchor.primaryAction,
+      sceneAnchorSha256: digest(canonicalJson(anchor)),
+      flowPromptSha256: digest(request.prompt),
+      dialogueSha256: digest(anchor.dialogue),
+      voiceIdentityId: anchor.voiceIdentityId,
+      referenceAssetIds: [...anchor.referenceAssetIds],
+      durationSeconds: 8,
+      aspectRatio: '9:16',
+      effects: { sfx: 'NONE', vfx: 'NONE' },
+      promptUnicodeCharacterCount: request.promptUnicodeCharacterCount,
+      promptBudgetStatus: request.promptBudgetStatus
+    };
+  }) as unknown as ProductionReadyV1['compileProof']['scenes'];
+  return { sceneCount: 4, scenes };
+}
+
+/**
+ * Loads the exact committed L1/L2/L3 lineage, then deterministically compiles
+ * R8 -> reloaded P0 -> four SceneAnchors -> four Flow requests -> durable READY_FOR_FLOW.
+ */
+export async function runProductionCompile(
+  dependencies: ProductionCompileRuntimeDependencies,
+  request: ProductionCompileRuntimeRequest
+): Promise<ProductionCompileRuntimeResult> {
+  if (!dependencies?.layerArtifactStore || !dependencies.productionSnapshotStore
+    || !request || !SCRIPT_ID_PATTERN.test(request.scriptId)) throw new ProductionCompileError('INPUT');
+
+  let script: FinalizedScriptV1;
+  let blueprint: SceneBlueprintV1;
+  let foundation: ProductFoundationV1;
+  try {
+    script = await dependencies.layerArtifactStore.loadFinalizedScript(request.scriptId);
+    blueprint = await dependencies.layerArtifactStore.loadSceneBlueprint(script.blueprintId);
+    foundation = await dependencies.layerArtifactStore.loadProductFoundation(blueprint.foundationId);
+    if (script.scriptId !== request.scriptId || script.blueprintId !== blueprint.blueprintId
+      || blueprint.foundationId !== foundation.foundationId
+      || validateFinalizedScriptV1(script, blueprint, foundation).length > 0) throw new Error('invalid_lineage');
+  } catch {
+    throw new ProductionCompileError('LOAD');
+  }
+
+  const productionRequest = productionRequestFromLineage(foundation, blueprint, script);
+  let productionContract;
+  try {
+    productionContract = compileProductionContract(productionRequest);
+  } catch {
+    throw new ProductionCompileError('ENGINE', { engineStage: 'R8_PRODUCTION_CONTRACT' });
+  }
+
+  let createdSnapshot: ProductionSnapshotV1;
+  let snapshot: ProductionSnapshotV1;
+  try {
+    createdSnapshot = await dependencies.productionSnapshotStore.create({ projectId: foundation.projectId, productionRequest });
+    snapshot = await dependencies.productionSnapshotStore.load(createdSnapshot.snapshotId);
+  } catch {
+    throw new ProductionCompileError('PERSIST');
+  }
+  if (!sameValue(snapshot, createdSnapshot) || !sameValue(snapshot.productionContract, productionContract)
+    || validateProductionSnapshotV1(snapshot).length > 0) throw new ProductionCompileError('VALIDATE');
+
+  const anchorCompiler = dependencies.compilers?.sceneAnchors ?? compileSceneAnchorsV1;
+  let anchors: readonly [SceneAnchorV1, SceneAnchorV1, SceneAnchorV1, SceneAnchorV1];
+  try {
+    const compiled = anchorCompiler(snapshot);
+    if (!Array.isArray(compiled) || compiled.length !== 4) throw new Error('scene_count');
+    for (let offset = 0; offset < 4; offset += 1) {
+      const anchor = compiled[offset];
+      const source = snapshot.productionContract.scenes[offset];
+      if (!anchor || !source || anchor.index !== offset + 1 || anchor.sceneId !== source.sceneId
+        || validateSceneAnchorAgainstSnapshot(anchor, snapshot).length > 0) throw new Error('invalid_anchor');
+    }
+    anchors = compiled;
+  } catch {
+    throw new ProductionCompileError('COMPILE', { compileStage: 'SCENE_ANCHOR' });
+  }
+
+  const flowCompiler = dependencies.compilers?.flowRequest ?? compileFlowProductionRequestV1;
+  let flowRequests: readonly [FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1, FlowProductionRequestV1];
+  try {
+    const compiled = anchors.map(anchor => flowCompiler(anchor, transientBindings(anchor)));
+    if (compiled.length !== 4 || compiled.some((flowRequest, offset) => !validFlowCompile(flowRequest, anchors[offset]!))) {
+      throw new Error('invalid_flow_compile');
+    }
+    flowRequests = compiled as unknown as typeof flowRequests;
+  } catch {
+    throw new ProductionCompileError('COMPILE', { compileStage: 'FLOW_REQUEST' });
+  }
+
+  const compileProof = compileProofFor(anchors, flowRequests);
+  let createdReady: ProductionReadyV1;
+  let ready: ProductionReadyV1;
+  try {
+    createdReady = await dependencies.layerArtifactStore.createProductionReady({
+      scriptId: script.scriptId,
+      snapshotId: snapshot.snapshotId,
+      status: 'READY_FOR_FLOW',
+      compileProof
+    });
+    ready = await dependencies.layerArtifactStore.loadProductionReady(createdReady.readyId);
+  } catch {
+    throw new ProductionCompileError('PERSIST');
+  }
+  if (!sameValue(ready, createdReady) || ready.scriptId !== script.scriptId || ready.snapshotId !== snapshot.snapshotId
+    || !sameValue(ready.compileProof, compileProof) || validateProductionReadyV1(ready).length > 0) {
+    throw new ProductionCompileError('VALIDATE');
+  }
+  return { foundation, blueprint, script, snapshot, anchors, flowRequests, ready };
 }
 
 /**

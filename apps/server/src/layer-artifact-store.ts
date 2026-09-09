@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { SCHEMA_VERSION, type ProductEvidence, type ProductInput, type R2CommittedProductContext } from '@mochi/contracts';
+import { SCHEMA_VERSION, type ActionId, type ProductEvidence, type ProductInput, type R2CommittedProductContext, type VoiceIdentityId } from '@mochi/contracts';
 import type { ActionCapabilityMap, SimpleActionFastTrackPolicyV1 } from '@mochi/core';
 import type { IntelligenceMediaInput } from '@mochi/providers';
 import {
@@ -22,6 +22,45 @@ import { canonicalJson } from './production-snapshot.ts';
 const FOUNDATION_ID = /^pf_[0-9a-f]{64}$/;
 const BLUEPRINT_ID = /^sb_[0-9a-f]{64}$/;
 const SCRIPT_ID = /^fs_[0-9a-f]{64}$/;
+const SNAPSHOT_ID = /^ps_[0-9a-f]{64}$/;
+const READY_ID = /^pr_[0-9a-f]{64}$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+
+export const PRODUCTION_READY_V1 = 'PRODUCTION_READY_V1' as const;
+
+export interface ProductionReadySceneProofV1 {
+  readonly sceneId: string;
+  readonly index: 1 | 2 | 3 | 4;
+  readonly primaryAction: ActionId;
+  readonly sceneAnchorSha256: string;
+  readonly flowPromptSha256: string;
+  readonly dialogueSha256: string;
+  readonly voiceIdentityId: VoiceIdentityId;
+  readonly referenceAssetIds: readonly string[];
+  readonly durationSeconds: 8;
+  readonly aspectRatio: '9:16';
+  readonly effects: { readonly sfx: 'NONE'; readonly vfx: 'NONE' };
+  readonly promptUnicodeCharacterCount: number;
+  readonly promptBudgetStatus: 'TARGET' | 'COMPACTED_TARGET' | 'HEADROOM';
+}
+
+export interface ProductionReadyV1 {
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly readyVersion: typeof PRODUCTION_READY_V1;
+  readonly readyId: string;
+  readonly scriptId: string;
+  readonly snapshotId: string;
+  readonly status: 'READY_FOR_FLOW';
+  readonly compileProof: {
+    readonly sceneCount: 4;
+    readonly scenes: readonly [
+      ProductionReadySceneProofV1,
+      ProductionReadySceneProofV1,
+      ProductionReadySceneProofV1,
+      ProductionReadySceneProofV1
+    ];
+  };
+}
 
 export type LayerArtifactErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'CORRUPT_ARTIFACT' | 'ARTIFACT_CONFLICT' | 'STORAGE_FAILURE';
 
@@ -43,6 +82,7 @@ export interface CreateProductFoundationRequest {
 
 export interface CreateSceneBlueprintRequest extends Omit<SceneBlueprintV1, 'schemaVersion' | 'blueprintVersion' | 'blueprintId'> {}
 export interface CreateFinalizedScriptRequest extends Omit<FinalizedScriptV1, 'schemaVersion' | 'scriptVersion' | 'scriptId'> {}
+export interface CreateProductionReadyRequest extends Omit<ProductionReadyV1, 'schemaVersion' | 'readyVersion' | 'readyId'> {}
 
 export interface LayerArtifactStore {
   createProductFoundation(request: CreateProductFoundationRequest): Promise<ProductFoundationV1>;
@@ -51,6 +91,8 @@ export interface LayerArtifactStore {
   loadSceneBlueprint(blueprintId: string): Promise<SceneBlueprintV1>;
   createFinalizedScript(request: CreateFinalizedScriptRequest): Promise<FinalizedScriptV1>;
   loadFinalizedScript(scriptId: string): Promise<FinalizedScriptV1>;
+  createProductionReady(request: CreateProductionReadyRequest): Promise<ProductionReadyV1>;
+  loadProductionReady(readyId: string): Promise<ProductionReadyV1>;
 }
 
 export interface LayerArtifactStoreOptions {
@@ -61,6 +103,7 @@ export interface LayerArtifactStoreOptions {
 type FoundationContent = Omit<ProductFoundationV1, 'foundationId'>;
 type BlueprintContent = Omit<SceneBlueprintV1, 'blueprintId'>;
 type ScriptContent = Omit<FinalizedScriptV1, 'scriptId'>;
+type ReadyContent = Omit<ProductionReadyV1, 'readyId'>;
 
 function nonBlank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -70,9 +113,62 @@ function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function contentId(prefix: 'pf' | 'sb' | 'fs', content: FoundationContent | BlueprintContent | ScriptContent): string {
+function contentId(prefix: 'pf' | 'sb' | 'fs' | 'pr', content: FoundationContent | BlueprintContent | ScriptContent | ReadyContent): string {
   try { return `${prefix}_${sha256(canonicalJson(content))}`; }
   catch { throw new LayerArtifactError('INVALID_INPUT'); }
+}
+
+const READY_KEYS = ['schemaVersion', 'readyVersion', 'readyId', 'scriptId', 'snapshotId', 'status', 'compileProof'] as const;
+const COMPILE_PROOF_KEYS = ['sceneCount', 'scenes'] as const;
+const READY_SCENE_KEYS = [
+  'sceneId', 'index', 'primaryAction', 'sceneAnchorSha256', 'flowPromptSha256', 'dialogueSha256',
+  'voiceIdentityId', 'referenceAssetIds', 'durationSeconds', 'aspectRatio', 'effects',
+  'promptUnicodeCharacterCount', 'promptBudgetStatus'
+] as const;
+const EFFECT_KEYS = ['sfx', 'vfx'] as const;
+const ACTION_SPINE = ['PICK_UP', 'HOLD', 'ROTATE_SLOW', 'HOLD'] as const;
+const VOICE_IDENTITIES = new Set(['VN_FEMALE_SOUTH_REVIEW_V1', 'VN_MALE_SOUTH_REVIEW_V1']);
+
+function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every(key => key in value);
+}
+
+/** Strict standalone shape validation; load additionally verifies the content-addressed readyId. */
+export function validateProductionReadyV1(value: unknown): string[] {
+  if (!exact(value, READY_KEYS)) return ['shape'];
+  const ready = value as unknown as ProductionReadyV1;
+  const issues: string[] = [];
+  if (ready.schemaVersion !== SCHEMA_VERSION || ready.readyVersion !== PRODUCTION_READY_V1) issues.push('version');
+  if (!READY_ID.test(ready.readyId) || !SCRIPT_ID.test(ready.scriptId) || !SNAPSHOT_ID.test(ready.snapshotId)) issues.push('lineage');
+  if (ready.status !== 'READY_FOR_FLOW') issues.push('status');
+  if (!exact(ready.compileProof, COMPILE_PROOF_KEYS)
+    || ready.compileProof.sceneCount !== 4 || !Array.isArray(ready.compileProof.scenes)
+    || ready.compileProof.scenes.length !== 4) return [...issues, 'compile_proof'];
+  const sceneIds = new Set<string>();
+  for (let offset = 0; offset < 4; offset += 1) {
+    const scene = ready.compileProof.scenes[offset];
+    if (!exact(scene, READY_SCENE_KEYS)) {
+      issues.push('scene_proof');
+      continue;
+    }
+    const proof = scene as unknown as ProductionReadySceneProofV1;
+    if (!nonBlank(proof.sceneId) || sceneIds.has(proof.sceneId) || proof.index !== offset + 1
+      || proof.primaryAction !== ACTION_SPINE[offset]) issues.push('scene_binding');
+    sceneIds.add(proof.sceneId);
+    if (!SHA256.test(proof.sceneAnchorSha256) || !SHA256.test(proof.flowPromptSha256)
+      || !SHA256.test(proof.dialogueSha256)) issues.push('hash');
+    if (!VOICE_IDENTITIES.has(proof.voiceIdentityId)) issues.push('voice');
+    if (!Array.isArray(proof.referenceAssetIds) || proof.referenceAssetIds.some(id => !nonBlank(id))) issues.push('references');
+    if (proof.durationSeconds !== 8 || proof.aspectRatio !== '9:16'
+      || !exact(proof.effects, EFFECT_KEYS) || proof.effects.sfx !== 'NONE' || proof.effects.vfx !== 'NONE') issues.push('format');
+    if (!Number.isInteger(proof.promptUnicodeCharacterCount) || proof.promptUnicodeCharacterCount <= 0
+      || proof.promptUnicodeCharacterCount > 3200
+      || !['TARGET', 'COMPACTED_TARGET', 'HEADROOM'].includes(proof.promptBudgetStatus)
+      || (proof.promptBudgetStatus === 'HEADROOM' && proof.promptUnicodeCharacterCount <= 2800)
+      || (proof.promptBudgetStatus !== 'HEADROOM' && proof.promptUnicodeCharacterCount > 2800)) issues.push('prompt_budget');
+  }
+  return [...new Set(issues)];
 }
 
 /** Creates the exact ordered product/reference binding while retaining only SHA-256 byte identity. */
@@ -223,6 +319,17 @@ export function createLayerArtifactStore(options: LayerArtifactStoreOptions): La
     return script;
   }
 
+  async function loadProductionReady(readyId: string): Promise<ProductionReadyV1> {
+    const parsed = await read('production-ready', readyId, READY_ID);
+    if (validateProductionReadyV1(parsed).length > 0) throw new LayerArtifactError('CORRUPT_ARTIFACT');
+    const ready = parsed as ProductionReadyV1;
+    const { readyId: _readyId, ...content } = ready;
+    if (ready.readyId !== readyId || contentId('pr', content) !== readyId) {
+      throw new LayerArtifactError('CORRUPT_ARTIFACT');
+    }
+    return ready;
+  }
+
   return {
     async createProductFoundation(request): Promise<ProductFoundationV1> {
       const content: FoundationContent = {
@@ -268,6 +375,19 @@ export function createLayerArtifactStore(options: LayerArtifactStoreOptions): La
       await loadFinalizedScript(script.scriptId);
       return script;
     },
-    loadFinalizedScript
+    loadFinalizedScript,
+    async createProductionReady(request): Promise<ProductionReadyV1> {
+      const content: ReadyContent = {
+        schemaVersion: SCHEMA_VERSION,
+        readyVersion: PRODUCTION_READY_V1,
+        ...request
+      };
+      const ready: ProductionReadyV1 = { ...content, readyId: contentId('pr', content) };
+      if (validateProductionReadyV1(ready).length > 0) throw new LayerArtifactError('INVALID_INPUT');
+      await publish('production-ready', ready.readyId, ready, READY_ID);
+      await loadProductionReady(ready.readyId);
+      return ready;
+    },
+    loadProductionReady
   };
 }

@@ -3,23 +3,39 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { SCHEMA_VERSION, type CreativeDirectionInput, type ProductInput } from '@mochi/contracts';
-import { createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1 } from '@mochi/core';
-import type { IntelligenceProvider, StructuredIntelligenceRequest } from '@mochi/providers';
-import { validateFinalizedScriptV1, validateProductFoundationV1, validateSceneBlueprintV1 } from '@mochi/reasoning';
+import {
+  SCHEMA_VERSION,
+  compileSceneAnchorsV1,
+  validateProductionSnapshotV1,
+  validateSceneAnchorAgainstSnapshot,
+  type CreativeDirectionInput,
+  type ProductInput
+} from '@mochi/contracts';
+import { countVietnameseSpokenUnits, createUntestedActionCapabilityMap, simpleActionFastTrackPolicyV1 } from '@mochi/core';
+import {
+  FlowProductionError,
+  compileFlowProductionRequestV1,
+  type IntelligenceProvider,
+  type StructuredIntelligenceRequest
+} from '@mochi/providers';
+import { compileProductionContract, validateFinalizedScriptV1, validateProductFoundationV1, validateSceneBlueprintV1 } from '@mochi/reasoning';
 import {
   createLayerArtifactStore,
   LayerArtifactError,
+  validateProductionReadyV1,
   validateSceneBlueprintBinding,
   validateProductFoundationBinding
 } from './layer-artifact-store.ts';
-import { canonicalJson } from './production-snapshot.ts';
+import { canonicalJson, createProductionSnapshotStore, type ProductionSnapshotStore } from './production-snapshot.ts';
 import {
+  ProductionCompileError,
   ProductionRuntimeError,
   runProductFoundation,
+  runProductionCompile,
   runSceneBlueprint,
   runScriptFinalization,
-  ScriptFinalizationError
+  ScriptFinalizationError,
+  type ProductionCompileRuntimeDependencies
 } from './production-runtime.ts';
 
 const product: ProductInput = {
@@ -335,6 +351,24 @@ async function createL3Inputs(root: string) {
   return { store, l1, l2, foundation, blueprint };
 }
 
+async function createL4Inputs(root: string) {
+  const lower = await createL3Inputs(root);
+  const l3 = createLayerIntelligence();
+  const script = (await runScriptFinalization(
+    { intelligence: l3.intelligence, layerArtifactStore: lower.store },
+    { blueprintId: lower.blueprint.blueprintId }
+  )).script;
+  return { ...lower, l3, script };
+}
+
+async function artifactBytes(root: string, directory: string, id: string): Promise<string> {
+  return readFile(join(root, directory, `${id}.json`), 'utf8');
+}
+
+const l4Error = (phase: string, detail?: Record<string, string>) => (error: unknown) => error instanceof ProductionCompileError
+  && JSON.stringify(error.diagnostic) === JSON.stringify({ layer: 'L4', phase, ...detail })
+  && !/path|prompt|credential|provider|response|stack|manual-/i.test(JSON.stringify(error.diagnostic));
+
 test('L3 A/B/C/I/J: clean script finalization persists one provider-neutral authority in exactly three calls', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l3-'));
   try {
@@ -419,5 +453,341 @@ test('L3 H: stale or tampered L2 lineage fails closed before L3 intelligence', a
         && JSON.stringify(error.diagnostic) === JSON.stringify({ layer: 'L3', phase: 'LOAD' }));
     assert.equal(l3.requests.length, 0);
     assert.equal(await artifactCount(root, 'finalized-scripts'), 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 A-H/O: scriptId alone deterministically commits exact P0, four anchors, four Flow compiles, and one safe ready authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-'));
+  try {
+    const { store, l1, l2, l3, foundation, blueprint, script } = await createL4Inputs(root);
+    const lowerBytes = await Promise.all([
+      artifactBytes(root, 'product-foundations', foundation.foundationId),
+      artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+      artifactBytes(root, 'finalized-scripts', script.scriptId)
+    ]);
+    const backingSnapshotStore = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+    let received: Parameters<ProductionSnapshotStore['create']>[0] | undefined;
+    let flowCompileCalls = 0;
+    const snapshotStore: ProductionSnapshotStore = {
+      async create(value) { received = value; return backingSnapshotStore.create(value); },
+      save: value => backingSnapshotStore.save(value),
+      load: id => backingSnapshotStore.load(id)
+    };
+    type L4HasIntelligence = 'intelligence' extends keyof ProductionCompileRuntimeDependencies ? true : false;
+    const structurallyHasNoIntelligence: L4HasIntelligence = false;
+    const dependencies: ProductionCompileRuntimeDependencies = {
+      layerArtifactStore: store,
+      productionSnapshotStore: snapshotStore,
+      compilers: {
+        flowRequest(anchor, bindings) {
+          flowCompileCalls += 1;
+          return compileFlowProductionRequestV1(anchor, bindings);
+        }
+      }
+    };
+    assert.equal(structurallyHasNoIntelligence, false);
+    assert.equal('intelligence' in dependencies, false);
+
+    const result = await runProductionCompile(dependencies, { scriptId: script.scriptId });
+    assert.ok(received);
+    assert.deepEqual(received.productionRequest, {
+      context: foundation.committedContext,
+      creativeDirection: blueprint.creativeDirection,
+      globalPlan: blueprint.globalPlan,
+      keyPointPlan: script.keyPointPlan,
+      statePlan: blueprint.statePlan,
+      riskAssessment: blueprint.riskAssessment,
+      capabilityMap: blueprint.eligibilityBinding.capabilityMap,
+      productionEligibilityPolicy: blueprint.eligibilityBinding.productionEligibilityPolicy,
+      humanRealismPlan: blueprint.humanRealismPlan,
+      dialoguePlan: script.dialoguePlan
+    });
+    assert.deepEqual(result.snapshot.productionContract, compileProductionContract(received.productionRequest));
+    assert.deepEqual(await backingSnapshotStore.load(result.snapshot.snapshotId), result.snapshot);
+    assert.deepEqual(validateProductionSnapshotV1(result.snapshot), []);
+    assert.equal(result.anchors.length, 4);
+    assert.deepEqual(result.anchors.map(anchor => anchor.index), [1, 2, 3, 4]);
+    assert.deepEqual(result.anchors.map(anchor => anchor.role), ['HOOK', 'FEATURE', 'PROOF', 'CTA']);
+    assert.deepEqual(result.anchors.map(anchor => anchor.primaryAction), ['PICK_UP', 'HOLD', 'ROTATE_SLOW', 'HOLD']);
+    assert.ok(result.anchors.every(anchor => validateSceneAnchorAgainstSnapshot(anchor, result.snapshot).length === 0));
+    assert.equal(flowCompileCalls, 4);
+    assert.equal(result.flowRequests.length, 4);
+
+    const dialogues = script.dialoguePlan.scenes.map(scene => scene.dialogue);
+    const voice = script.dialoguePlan.voiceIdentityId;
+    const references = blueprint.globalPlan.scenes.map(scene => scene.referenceAssetIds);
+    assert.deepEqual(result.snapshot.productionContract.scenes.map(scene => scene.dialogue), dialogues);
+    assert.deepEqual(result.anchors.map(anchor => anchor.dialogue), dialogues);
+    assert.deepEqual(result.flowRequests.map(request => request.dialogue), dialogues);
+    assert.ok(result.snapshot.productionContract.scenes.every(scene => scene.voiceIdentityId === voice));
+    assert.ok(result.anchors.every(anchor => anchor.voiceIdentityId === voice));
+    assert.ok(result.flowRequests.every(request => request.nativeVoiceBinding.logicalVoiceIdentityId === voice));
+    assert.deepEqual(result.snapshot.productionContract.scenes.map(scene => scene.referenceAssetIds), references);
+    assert.deepEqual(result.anchors.map(anchor => anchor.referenceAssetIds), references);
+    assert.deepEqual(result.flowRequests.map(request => request.referenceBindings.map(binding => binding.logicalAssetId)), references);
+    assert.ok(result.flowRequests.every(request => request.durationSeconds === 8 && request.aspectRatio === '9:16'
+      && request.effects.sfx === 'NONE' && request.effects.vfx === 'NONE'
+      && request.promptUnicodeCharacterCount > 0 && request.promptUnicodeCharacterCount <= 3200));
+
+    assert.equal(result.ready.status, 'READY_FOR_FLOW');
+    assert.equal(result.ready.scriptId, script.scriptId);
+    assert.equal(result.ready.snapshotId, result.snapshot.snapshotId);
+    assert.equal(result.ready.compileProof.sceneCount, 4);
+    assert.deepEqual(validateProductionReadyV1(result.ready), []);
+    assert.deepEqual(await store.loadProductionReady(result.ready.readyId), result.ready);
+    assert.equal(await artifactCount(root, 'production-ready'), 1);
+    const readyBytes = await artifactBytes(root, 'production-ready', result.ready.readyId);
+    assert.equal(readyBytes, canonicalJson(result.ready));
+    assert.doesNotMatch(readyBytes, /dataBase64|credentials|providerMetadata|providerOperation|flowReferenceId|manual-|rawResponse|"prompt":/i);
+    assert.deepEqual(await Promise.all([
+      artifactBytes(root, 'product-foundations', foundation.foundationId),
+      artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+      artifactBytes(root, 'finalized-scripts', script.scriptId)
+    ]), lowerBytes);
+    assert.deepEqual([l1.requests.length, l2.requests.length, l3.requests.length], [3, 3, 3]);
+    assert.doesNotMatch(runProductionCompile.toString(), /executeFlowProductionRequestV1|generateScene/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 I: invalid, missing, corrupt, or stale upstream lineage fails before R8/P0 and commits no ready authority', async () => {
+  const invalidRoot = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-invalid-'));
+  try {
+    const store = createLayerArtifactStore({ storageRoot: invalidRoot });
+    let creates = 0;
+    const snapshotStore: ProductionSnapshotStore = {
+      async create() { creates += 1; throw new Error('unreachable'); },
+      async save() { throw new Error('unreachable'); },
+      async load() { throw new Error('unreachable'); }
+    };
+    await assert.rejects(runProductionCompile({ layerArtifactStore: store, productionSnapshotStore: snapshotStore }, { scriptId: 'bad' }), l4Error('INPUT'));
+    await assert.rejects(runProductionCompile({ layerArtifactStore: store, productionSnapshotStore: snapshotStore }, { scriptId: `fs_${'0'.repeat(64)}` }), l4Error('LOAD'));
+    assert.equal(creates, 0);
+    assert.equal(await artifactCount(invalidRoot, 'production-ready'), 0);
+  } finally { await rm(invalidRoot, { recursive: true, force: true }); }
+
+  for (const target of ['script', 'foundation'] as const) {
+    const root = await mkdtemp(join(tmpdir(), `mochi-layer-l4-corrupt-${target}-`));
+    try {
+      const { store, foundation, script } = await createL4Inputs(root);
+      const directory = target === 'script' ? 'finalized-scripts' : 'product-foundations';
+      const id = target === 'script' ? script.scriptId : foundation.foundationId;
+      const value = JSON.parse(await artifactBytes(root, directory, id)) as any;
+      if (target === 'script') value.dialoguePlan.scenes[0].dialogue = 'tampered';
+      else value.projectId = 'tampered-project';
+      await writeFile(join(root, directory, `${id}.json`), canonicalJson(value), 'utf8');
+      let creates = 0;
+      const snapshotStore: ProductionSnapshotStore = {
+        async create() { creates += 1; throw new Error('unreachable'); },
+        async save() { throw new Error('unreachable'); },
+        async load() { throw new Error('unreachable'); }
+      };
+      await assert.rejects(runProductionCompile({ layerArtifactStore: store, productionSnapshotStore: snapshotStore }, { scriptId: script.scriptId }), l4Error('LOAD'));
+      assert.equal(creates, 0);
+      assert.equal(await artifactCount(root, 'production-ready'), 0);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
+test('L4 J: P0 create, load, or equality failure preserves L1/L2/L3 and commits no ready authority', async () => {
+  for (const failure of ['create', 'load', 'equality'] as const) {
+    const root = await mkdtemp(join(tmpdir(), `mochi-layer-l4-p0-${failure}-`));
+    try {
+      const { store, foundation, blueprint, script } = await createL4Inputs(root);
+      const lowerBefore = await Promise.all([
+        artifactBytes(root, 'product-foundations', foundation.foundationId),
+        artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+        artifactBytes(root, 'finalized-scripts', script.scriptId)
+      ]);
+      const backing = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+      let created: Awaited<ReturnType<ProductionSnapshotStore['create']>> | undefined;
+      const snapshotStore: ProductionSnapshotStore = {
+        async create(value) {
+          if (failure === 'create') throw new Error('private storage detail');
+          created = await backing.create(value);
+          return created;
+        },
+        save: value => backing.save(value),
+        async load(id) {
+          if (failure === 'load') throw new Error('private storage detail');
+          const loaded = await backing.load(id);
+          return failure === 'equality' ? { ...loaded, projectId: 'mismatch' } : loaded;
+        }
+      };
+      await assert.rejects(
+        runProductionCompile({ layerArtifactStore: store, productionSnapshotStore: snapshotStore }, { scriptId: script.scriptId }),
+        l4Error(failure === 'equality' ? 'VALIDATE' : 'PERSIST')
+      );
+      assert.equal(await artifactCount(root, 'production-ready'), 0);
+      assert.deepEqual(await Promise.all([
+        artifactBytes(root, 'product-foundations', foundation.foundationId),
+        artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+        artifactBytes(root, 'finalized-scripts', script.scriptId)
+      ]), lowerBefore);
+      if (failure !== 'create') assert.ok(created);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
+test('L4 K: a SceneAnchor compiler mutation fails validation and commits no ready authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-anchor-fail-'));
+  try {
+    const { store, script } = await createL4Inputs(root);
+    const snapshotStore = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+    await assert.rejects(runProductionCompile({
+      layerArtifactStore: store,
+      productionSnapshotStore: snapshotStore,
+      compilers: {
+        sceneAnchors(snapshot) {
+          const anchors = compileSceneAnchorsV1(snapshot);
+          return [{ ...anchors[0], dialogue: 'tampered' }, anchors[1], anchors[2], anchors[3]];
+        }
+      }
+    }, { scriptId: script.scriptId }), l4Error('COMPILE', { compileStage: 'SCENE_ANCHOR' }));
+    assert.equal(await artifactCount(root, 'production-ready'), 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 L: Flow request failure and the real prompt-budget gate commit no ready authority and cannot generate Flow', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-flow-fail-'));
+  try {
+    const { store, script } = await createL4Inputs(root);
+    const snapshotStore = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+    let compileCalls = 0;
+    await assert.rejects(runProductionCompile({
+      layerArtifactStore: store,
+      productionSnapshotStore: snapshotStore,
+      compilers: {
+        flowRequest() {
+          compileCalls += 1;
+          throw new FlowProductionError('REFERENCE_BINDING_INVALID');
+        }
+      }
+    }, { scriptId: script.scriptId }), l4Error('COMPILE', { compileStage: 'FLOW_REQUEST' }));
+    assert.equal(compileCalls, 1);
+    assert.equal(await artifactCount(root, 'production-ready'), 0);
+
+    const longDialogue = `Nói chính xác ${'ạ'.repeat(3300)}`;
+    const longScript = await store.createFinalizedScript({
+      blueprintId: script.blueprintId,
+      keyPointPlan: script.keyPointPlan,
+      dialoguePlan: {
+        ...script.dialoguePlan,
+        scenes: script.dialoguePlan.scenes.map((scene, offset) => offset === 0
+          ? { ...scene, dialogue: longDialogue, spokenUnitCount: countVietnameseSpokenUnits(longDialogue) }
+          : scene) as typeof script.dialoguePlan.scenes
+      }
+    });
+    await assert.rejects(runProductionCompile({ layerArtifactStore: store, productionSnapshotStore: snapshotStore }, { scriptId: longScript.scriptId }),
+      l4Error('COMPILE', { compileStage: 'FLOW_REQUEST' }));
+    assert.equal(await artifactCount(root, 'production-ready'), 0);
+    assert.doesNotMatch(runProductionCompile.toString(), /executeFlowProductionRequestV1|generateScene/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 M: retry from the same script after downstream failure reruns no lower layer and commits one idempotent ready authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-retry-'));
+  try {
+    const { store, l1, l2, l3, foundation, blueprint, script } = await createL4Inputs(root);
+    const lowerBefore = await Promise.all([
+      artifactBytes(root, 'product-foundations', foundation.foundationId),
+      artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+      artifactBytes(root, 'finalized-scripts', script.scriptId)
+    ]);
+    const snapshotStore = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+    let failOnce = true;
+    const dependencies: ProductionCompileRuntimeDependencies = {
+      layerArtifactStore: store,
+      productionSnapshotStore: snapshotStore,
+      compilers: {
+        flowRequest(anchor, bindings) {
+          if (failOnce) {
+            failOnce = false;
+            throw new FlowProductionError('PROMPT_BUDGET_EXCEEDED');
+          }
+          return compileFlowProductionRequestV1(anchor, bindings);
+        }
+      }
+    };
+    await assert.rejects(runProductionCompile(dependencies, { scriptId: script.scriptId }), l4Error('COMPILE', { compileStage: 'FLOW_REQUEST' }));
+    assert.equal(await artifactCount(root, 'production-ready'), 0);
+    const retry = await runProductionCompile(dependencies, { scriptId: script.scriptId });
+    const duplicate = await runProductionCompile(dependencies, { scriptId: script.scriptId });
+    assert.equal(retry.foundation.foundationId, foundation.foundationId);
+    assert.equal(retry.blueprint.blueprintId, blueprint.blueprintId);
+    assert.equal(retry.script.scriptId, script.scriptId);
+    assert.equal(duplicate.ready.readyId, retry.ready.readyId);
+    assert.equal(await artifactCount(root, 'production-ready'), 1);
+    assert.deepEqual(await Promise.all([
+      artifactBytes(root, 'product-foundations', foundation.foundationId),
+      artifactBytes(root, 'scene-blueprints', blueprint.blueprintId),
+      artifactBytes(root, 'finalized-scripts', script.scriptId)
+    ]), lowerBefore);
+    assert.deepEqual([l1.requests.length, l2.requests.length, l3.requests.length], [3, 3, 3]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 optional policy mapping omits null and ready persistence failure leaves no L4 artifact', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-optional-'));
+  try {
+    const store = createLayerArtifactStore({ storageRoot: root });
+    const l1 = createLayerIntelligence();
+    const foundation = (await runProductFoundation({ intelligence: l1.intelligence, layerArtifactStore: store }, {
+      projectId: 'layer-project', product, media, sourceEvidenceVersion: 'layer-evidence-v1'
+    })).foundation;
+    const capabilityMap = createUntestedActionCapabilityMap();
+    for (const action of Object.keys(capabilityMap) as (keyof typeof capabilityMap)[]) capabilityMap[action] = 'SAFE';
+    const l2 = createLayerIntelligence();
+    const blueprint = (await runSceneBlueprint({ intelligence: l2.intelligence, layerArtifactStore: store }, {
+      foundationId: foundation.foundationId, creativeDirection, capabilityMap
+    })).blueprint;
+    assert.equal(blueprint.eligibilityBinding.productionEligibilityPolicy, null);
+    const l3 = createLayerIntelligence();
+    const script = (await runScriptFinalization(
+      { intelligence: l3.intelligence, layerArtifactStore: store }, { blueprintId: blueprint.blueprintId }
+    )).script;
+    const backingSnapshotStore = createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') });
+    let received: Parameters<ProductionSnapshotStore['create']>[0] | undefined;
+    const snapshotStore: ProductionSnapshotStore = {
+      async create(value) { received = value; return backingSnapshotStore.create(value); },
+      save: value => backingSnapshotStore.save(value),
+      load: id => backingSnapshotStore.load(id)
+    };
+    const failingReadyStore = {
+      ...store,
+      async createProductionReady(): ReturnType<typeof store.createProductionReady> {
+        throw new Error('private persistence detail');
+      }
+    };
+    await assert.rejects(runProductionCompile({
+      layerArtifactStore: failingReadyStore,
+      productionSnapshotStore: snapshotStore
+    }, { scriptId: script.scriptId }), l4Error('PERSIST'));
+    assert.ok(received);
+    assert.equal('productionEligibilityPolicy' in received.productionRequest, false);
+    assert.equal(await artifactCount(root, 'production-ready'), 0);
+    assert.deepEqual([l1.requests.length, l2.requests.length, l3.requests.length], [3, 3, 3]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('L4 N: tampered ready content or readyId fails closed on load', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mochi-layer-l4-ready-tamper-'));
+  try {
+    const { store, script } = await createL4Inputs(root);
+    const result = await runProductionCompile({
+      layerArtifactStore: store,
+      productionSnapshotStore: createProductionSnapshotStore({ storageRoot: join(root, 'snapshots') })
+    }, { scriptId: script.scriptId });
+    const path = join(root, 'production-ready', `${result.ready.readyId}.json`);
+    const bytes = await readFile(path, 'utf8');
+    const changedProof = JSON.parse(bytes) as any;
+    changedProof.compileProof.scenes[0].flowPromptSha256 = '0'.repeat(64);
+    await writeFile(path, canonicalJson(changedProof), 'utf8');
+    await assert.rejects(store.loadProductionReady(result.ready.readyId),
+      (error: unknown) => error instanceof LayerArtifactError && error.code === 'CORRUPT_ARTIFACT');
+    const changedId = JSON.parse(bytes) as any;
+    changedId.readyId = `pr_${'0'.repeat(64)}`;
+    await writeFile(path, canonicalJson(changedId), 'utf8');
+    await assert.rejects(store.loadProductionReady(result.ready.readyId),
+      (error: unknown) => error instanceof LayerArtifactError && error.code === 'CORRUPT_ARTIFACT');
   } finally { await rm(root, { recursive: true, force: true }); }
 });
