@@ -113,6 +113,7 @@ export function App() {
   const [productEvidence, setProductEvidence] = useState<ProductEvidence | null>(null);
   const [analysisReceiptId, setAnalysisReceiptId] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<ProductEvidenceClientErrorCode | null>(null);
+  const [analysisIssueCodes, setAnalysisIssueCodes] = useState<readonly string[]>([]);
   const [runtime, setRuntime] = useState<RuntimeStatus>('GEMINI_NOT_CONFIGURED');
   const [productionInputRevision,setProductionInputRevision]=useState(0);
   const [productionWorkflow,setProductionWorkflow]=useState<ProductionWorkflowState>(emptyProductionWorkflow);
@@ -131,6 +132,7 @@ export function App() {
     setProductionInputRevision(current=>current+1);
     setProductionWorkflow(emptyProductionWorkflow);
     setAnalysisError(null);
+    setAnalysisIssueCodes([]);
     setAnalysisState(wasReady?'STALE':'IDLE');
   };
   const updateFactualValue = <T,>(setter: Dispatch<SetStateAction<T>>, value: T) => {
@@ -197,6 +199,7 @@ export function App() {
     analysisAbort.current = controller;
     setProductEvidence(null);
     setAnalysisError(null);
+    setAnalysisIssueCodes([]);
     setAnalysisState('ANALYZING');
     try {
       const result = await analyzeProductEvidence({ product: buildProductInput(), filesByAssetId: filesByAssetId.current, signal: controller.signal });
@@ -207,7 +210,9 @@ export function App() {
       }
     } catch (error) {
       if (analysisGeneration.current !== requestGeneration || controller.signal.aborted) return;
-      setAnalysisError(error instanceof ProductEvidenceClientError ? error.code : 'INVALID_RESPONSE');
+      const safeError = error instanceof ProductEvidenceClientError ? error : undefined;
+      setAnalysisError(safeError?.code ?? 'INVALID_RESPONSE');
+      setAnalysisIssueCodes(safeError?.issueCodes ?? []);
       setAnalysisState('ERROR');
     } finally {
       if (analysisGeneration.current === requestGeneration) analysisAbort.current = null;
@@ -229,7 +234,7 @@ export function App() {
           <button className="primary-button" type="button" onClick={() => void analyze()} disabled={analysisState === 'ANALYZING' || runtime !== 'GEMINI_READY'}>{analysisState === 'ANALYZING' ? 'Analyzing Product…' : 'Analyze Product'}</button>
           {runtime !== 'GEMINI_READY' && <p className="analysis-status">Connect Gemini to analyze the product.</p>}
           {analysisState === 'ANALYZING' && <p role="status" className="analysis-status">ANALYZING PRODUCT</p>}
-          {analysisState === 'ERROR' && analysisError !== null && <p role="alert" className="analysis-error">Product analysis could not be completed: {formatAnalysisError(analysisError)}.</p>}
+          {analysisState === 'ERROR' && analysisError !== null && <div role="alert" className="analysis-error"><p>Product analysis could not be completed: {formatAnalysisError(analysisError)}.</p><details><summary>Developer details</summary><p>{analysisError}</p>{analysisIssueCodes.length>0&&<p>{JSON.stringify(analysisIssueCodes)}</p>}</details></div>}
         </section>
         <section className="form-card" aria-labelledby="creative-title"><h2 id="creative-title">Creative Direction</h2><div className="field-grid"><label>Audience<select aria-label="Audience" value={audience} onChange={event => updateCreativeValue(setAudience, event.target.value)}><option value="AUTO_PRODUCT_FIT">Tự động theo sản phẩm</option><option value="PARENTS_FAMILY">Phụ huynh / Gia đình</option><option value="YOUNG_ADULTS_GEN_Z">Người trẻ / Gen Z</option><option value="PRACTICAL_BUYERS">Người mua thực dụng</option><option value="GIFT_BUYERS">Người mua quà tặng</option></select></label><label>Shooting Context<select aria-label="Shooting Context" value={shootingContext} onChange={event => updateCreativeValue(setShootingContext, event.target.value)}><option value="AUTO_PRODUCT_FIT">Tự động theo sản phẩm</option><option value="INDOOR_TABLE_REVIEW">Trong nhà / bàn review</option><option value="HOME_LIFESTYLE">Không gian gia đình</option><option value="OUTDOOR_CASUAL">Ngoài trời</option><option value="FESTIVE_CONTEXT">Không gian lễ hội</option></select></label></div><fieldset className="voice-gender-cards"><legend>Voice Gender</legend><button type="button" aria-pressed={voiceGender==='FEMALE'} className={voiceGender==='FEMALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(setVoiceGender,'FEMALE')}>NỮ</button><button type="button" aria-pressed={voiceGender==='MALE'} className={voiceGender==='MALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(setVoiceGender,'MALE')}>NAM</button></fieldset></section>
       </form>

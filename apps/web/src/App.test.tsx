@@ -219,6 +219,21 @@ describe('App', () => {
     expect(screen.getByRole('alert')).not.toHaveTextContent('Bearer');
   });
 
+  it('keeps Product Evidence diagnostics bounded in Developer details while preserving the friendly error', async () => {
+    mockReadyRuntime(() => new Response(JSON.stringify({ ok: false, error: { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'], detail: 'raw-server-secret' } }), { status: 502 }));
+    render(<App />);
+    enterValidProjectInput();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze Product' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze Product' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Product analysis could not be completed: INVALID ANALYSIS RESPONSE.'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('raw-server-secret');
+    fireEvent.click(screen.getByText('Developer details'));
+    expect(screen.getByRole('alert')).toHaveTextContent('PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT');
+    expect(screen.getByRole('alert')).toHaveTextContent('["unknown_canonical_asset"]');
+    fireEvent.change(screen.getByLabelText('Product Name'), { target: { value: 'Changed bottle' } });
+    expect(screen.queryByText('Developer details')).not.toBeInTheDocument();
+  });
+
   it('renders each claim allowed state directly without exposing supporting asset IDs', async () => {
     const fetchMock = mockReadyRuntime(() => evidenceResponse(assetIds => [
       { claimId: 'claim-allowed', text: 'Reference-supported bottle', source: 'REFERENCE_EVIDENCE', evidenceAssetIds: [...assetIds, ...assetIds], allowed: true },
