@@ -69,6 +69,8 @@ Read `docs/M0-ACCEPTANCE.md` and other M0 handoff artifacts only as historical c
 
 This is the frozen V1 architecture target. Do not begin a later stage without explicit authorization and its acceptance gate.
 
+The pipeline above and every unversioned rule derived from it remain the authority for V1 lineages only. MOCHI V1.2 is a side-by-side, fully versioned lineage; it does not mutate, reinterpret, or partially replace the frozen V1 pipeline. A lineage must remain V1 end-to-end or V1.2 end-to-end. Mixed V1/V1.2 artifacts must fail closed and may never become `READY_FOR_FLOW`.
+
 R2-A is a provider-neutral deterministic compiler. It may use a mocked intelligence decision to retain or exclude stable ProductEvidence fact IDs, but the model may never author ProductTruth facts. ProductTruth copies product name/category from ProductInput, preserves evidence risk, accepts no creative controls or media bytes, and remains validated fail-closed.
 
 R2-B assesses only canonical ProductEvidence assets through enum-only values; readiness and limitations are deterministic. The R2 Commit Gate validates both R2 branches against the same ordered source invariants and commits only READY or LIMITED references. It is pure and makes no provider calls.
@@ -95,6 +97,19 @@ Do not mark an action `SAFE` or `RISKY` from intuition, a single output, or non-
 - Generated output is always a Candidate until fail-closed QC and approval succeed. Critical QC failure cannot approve.
 - Production remains fail-closed. `UNTESTED` and `AVOID` actions fail feasibility preflight.
 - GitHub remains source of truth. Never commit secrets, tokens, `.env`, private media, generated videos, or `node_modules`.
+
+## Versioned MOCHI V1.2 authority
+
+These rules apply only to fully versioned V1.2 lineages. They do not change the frozen V1 contracts, pipeline, simple-action fast-track, validators, or runtime behavior.
+
+- The scene contract is `TWO_BEAT_ACTION_SEQUENCE_V1_2`: exactly four ordered scenes (`HOOK`, `FEATURE`, `PROOF`, `CTA`), each exactly 8 seconds, 9:16, `SMARTPHONE_POV`, with reviewer face `FORBIDDEN`.
+- Each scene has exactly two ordered Semantic Pairs and exactly two sequential Primary Actions. Action A targets the first ~4 seconds, Action B targets the last ~4 seconds, and the handoff must occur between 3.5s and 4.5s. There is no third Primary Action, hidden reset, teleportation, or state-hiding cut.
+- State authority is `START → Action A → MID → Action B → END`. Action B consumes the exact valid `MID` produced by Action A. Where continuity applies, Scene N `END` equals Scene N+1 `START`.
+- Semantic synchronization is exact: Semantic Pair 1 ↔ Action Beat A ↔ Dialogue Sentence 1 ↔ Key Point 1; Semantic Pair 2 ↔ Action Beat B ↔ Dialogue Sentence 2 ↔ Key Point 2. Scene 1 Sentence 1 contains the exact Product Name, Scene 1 Key Point 1 equals the exact Product Name, and the other seven Key Points target 5–7 Vietnamese spoken words.
+- Every individual Action Definition still has exactly one bounded semantic goal. Each action independently passes truth, affordance, state, hand, timing, camera, Human Realism, and risk eligibility; the ordered Action A + Action B pair additionally passes sequence compatibility. Failure of either action or the pair blocks the whole scene.
+- Empirical capability and production authorization are separate authorities. Expanded V1.2 actions may remain `capability=UNTESTED`; this never promotes them to `SAFE`. `productionEligibility=V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED` is permitted only when every bounded V1.2 action and pair gate passes. `AVOID` and unsupported affordances remain blocked.
+- Camera/Focus, Human Realism, and SFX are per beat: Beat A has Camera/Focus A, Human Realism A, and SFX A; Beat B has Camera/Focus B, Human Realism B, and SFX B. Prefer one continuous ordinary smartphone-style take with a natural transition. BGM and VFX remain `NONE`; SFX `NONE` remains valid when no physical sound is justified.
+- Scene Execution Contract V2 and the pre-Flow audit must preserve and validate both action beats, `START/MID/END`, timing and handoff evidence, per-beat Camera/Focus, per-beat Human Realism, per-beat SFX, semantic synchronization, and sequence compatibility losslessly through every V1.2 boundary.
 
 ## Development discipline
 

@@ -24,18 +24,19 @@ The following are unchanged and remain binding:
 - QC, Final Acceptance, and Delivery remain fail-closed. A generated output is a Candidate until every required gate passes; a critical failure cannot approve or deliver it.
 - Output is exactly four ordered scenes: `HOOK`, `FEATURE`, `PROOF`, `CTA`. Every scene is exactly 8 seconds, 9:16, and `SMARTPHONE_POV`.
 - Reviewer face visibility is `FORBIDDEN` in every scene.
-- Each scene has exactly one semantic Primary Action. Presentation beats may support that action but may not introduce a second semantic action or a second goal.
+- Each scene implements `TWO_BEAT_ACTION_SEQUENCE_V1_2` with exactly two ordered Semantic Pairs and exactly two sequential Primary Actions. Action A targets the first ~4 seconds, Action B targets the last ~4 seconds, and their handoff occurs between 3.5s and 4.5s while total scene duration remains exactly 8 seconds.
+- Each individual Action Definition has exactly one bounded semantic goal. No scene may introduce a third Primary Action, hidden reset, teleportation, or state-hiding cut.
 - BGM remains `NONE`. VFX remains `NONE`.
 - L4 is deterministic: zero `IntelligenceProvider` calls and zero generation calls.
 - No Flow generation may begin until all four final V1.2 Scene Cards pass the pre-Flow audit.
 
 ## 3. Explicit V1.2 supersessions
 
-V1.2 removes the fixed `PICK_UP → HOLD → ROTATE_SLOW → HOLD` scene spine. It replaces that choreography with evidence-backed Single Primary Action selection.
+V1.2 removes the fixed `PICK_UP → HOLD → ROTATE_SLOW → HOLD` scene spine. It replaces that choreography with evidence-backed selection of exactly two sequential Primary Actions per scene under `TWO_BEAT_ACTION_SEQUENCE_V1_2`.
 
-The eligible library may include broad, bounded, single-goal simple or functional actions such as open, close, remove cap, replace cap, press, switch, pour, dispense, apply, assemble, and other actions admitted by the versioned Action Library. Functional actions are eligible only when Product Truth and the Product Affordance Profile establish the required product parts, relationships, and state transitions. Unsupported affordances fail closed. Library support does not confer production authority: the current trusted capability state and V1 fast-track remain unchanged, so newly represented functional actions remain production-ineligible until separately gathered evidence satisfies the locked promotion policy or a separately approved V1.2 production policy admits them. Deterministic tests may use explicit fixture capability maps but may not publish them as production evidence.
+The eligible library may include broad, bounded, single-goal simple or functional actions such as open, close, remove cap, replace cap, press, switch, pour, dispense, apply, assemble, and other actions admitted by the versioned Action Library. Functional actions are eligible only when Product Truth and the Product Affordance Profile establish the required product parts, relationships, and state transitions. Unsupported affordances fail closed. Library support does not confer empirical capability or production authority. Expanded V1.2 actions may retain `capability=UNTESTED`, and no `UNTESTED` action may be promoted to `SAFE` without empirical evidence under the locked promotion policy. Production authorization is a separate authority: `productionEligibility=V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED` may be assigned only when all bounded V1.2 truth, affordance, state, hand, timing, camera, Human Realism, risk, and pair-sequence gates pass. `AVOID` remains blocked. Deterministic tests may exercise explicit capability and production-eligibility fixtures but may not publish them as empirical evidence or promotions.
 
-One or two hands may appear. Two hands are allowed only when the selected action explicitly supports or requires them, the hand count is declared in the action definition, State Engine V2 can resolve the contacts and transitions, and Human Realism V2 preserves them. No scene may add an undeclared hand.
+One or two hands may appear. Two hands are allowed only when the relevant action beat explicitly supports or requires them, the hand count is declared in that action definition, State Engine V2 can resolve its contacts and transition, and per-beat Human Realism V2 preserves them. No scene may add an undeclared hand.
 
 The V1 rules fixing SFX to `NONE`, generating Key Points before dialogue, limiting physical planning to the legacy state model, and treating all product references as one undifferentiated authority are superseded as described below. All other V1 locks remain in force.
 
@@ -71,7 +72,7 @@ Weighted constrained randomness applies to:
 - Product Insight allocation across scenes;
 - the Scene 1 Hook approach;
 - the Scene 4 CTA approach;
-- the eligible Single Primary Action;
+- the eligible ordered Action A + Action B sequence;
 - visual composition choices.
 
 Randomness operates only after deterministic eligibility. It cannot select an ungrounded insight, unsupported affordance, infeasible action, broken state chain, disallowed camera behavior, or duplicate composition that violates useful diversity. The plan records candidate sets, weights, selected IDs, and seed namespaces so replay is deterministic and auditable.
@@ -84,8 +85,8 @@ L3 finalizes Vietnamese dialogue first, then derives Key Points from the accepte
 
 Each scene contains exactly two Vietnamese dialogue sentences:
 
-- sentence 1 maps to Semantic Pair 1;
-- sentence 2 maps to Semantic Pair 2;
+- sentence 1 maps to Semantic Pair 1 and Action Beat A;
+- sentence 2 maps to Semantic Pair 2 and Action Beat B;
 - Scene 1 sentence 1 contains the exact canonical Product Name;
 - both sentences pass the existing logical voice identity and timing authority for an eight-second scene.
 
@@ -93,7 +94,8 @@ After dialogue passes semantic and timing validation, L3 generates exactly two K
 
 L3 also persists SFX Plan V2:
 
-- SFX is physically grounded in the selected action, affordance, state transition, and visible interaction;
+- Beat A has SFX A, physically grounded in Action A, its affordance, `START → MID` transition, and visible interaction;
+- Beat B has SFX B, physically grounded in Action B, its affordance, `MID → END` transition, and visible interaction;
 - `NONE` remains valid when no physical sound is justified;
 - BGM is always `NONE`;
 - VFX is always `NONE`.
@@ -118,7 +120,7 @@ The Product Insight Bank separates factual grounding from creative allocation. E
 
 The ranker is deterministic for a given bank and policy. Seeded allocation selects among the highest useful eligible choices using documented weights and constraints. Across four scenes, allocation should avoid redundant claims, cover distinct useful reasons to care, and reserve role-appropriate material for Hook and CTA.
 
-Every scene contains exactly two ordered Semantic Pairs. After seeded insight allocation, a deterministic Semantic Pair composer binds each selected insight/truth intent to sentence index 1 or 2 and Key Point index 1 or 2. It enforces two pairs per scene, ordered distinctness where grounded choices permit it, source bindings, and no new facts. A Semantic Pair is not a second action. Scene 1 Semantic Pair 1 is locked to the exact Product Name identity requirement.
+Every scene contains exactly two ordered Semantic Pairs. After seeded insight allocation, a deterministic Semantic Pair composer binds each selected insight/truth intent to the corresponding action beat, sentence, and Key Point. It enforces the exact synchronization `Semantic Pair 1 ↔ Action Beat A ↔ Dialogue Sentence 1 ↔ Key Point 1` and `Semantic Pair 2 ↔ Action Beat B ↔ Dialogue Sentence 2 ↔ Key Point 2`, ordered distinctness where grounded choices permit it, source bindings, and no new facts. Scene 1 Semantic Pair 1 is locked to the exact Product Name identity requirement; therefore Scene 1 Sentence 1 must contain the exact Product Name and Scene 1 Key Point 1 must equal it exactly.
 
 ## 6. Action Library and State Engine V2
 
@@ -133,9 +135,11 @@ The V1.2 Action Library defines each action as data with:
 - allowed presentation beats and grounded sound events;
 - empirical capability/production eligibility requirements.
 
-Broad support does not mean automatic eligibility. Each selected action must pass Product Truth grounding, affordance matching, Action Library validation, capability/production eligibility, State Engine V2 resolution, Scene Risk V2 evaluation, and four-scene continuity. Scene Risk V2 consumes the expanded action/state/affordance contract and preserves the existing capability precedence and fail-closed semantics. `PRODUCTION_ELIGIBILITY_POLICY_V1_2` denies every `UNTESTED` or `AVOID` action and cannot infer trust from library membership; newly represented actions default to `UNTESTED`. A bounded V1.2 replan may select only from already eligible grounded actions, preserves the seed and every locked scene field, recomputes State Engine V2 and risk after each attempt, and stops at `MAX_SCENE_REPLAN_ATTEMPTS_V1_2 = 2`.
+Broad support does not mean automatic eligibility. Each selected action independently passes Product Truth grounding, affordance matching, Action Library validation, state, hand, timing, camera, Human Realism, Scene Risk V2, and production-eligibility gates. The ordered Action A + Action B pair additionally passes sequence compatibility: Action B must consume the exact valid `MID` produced by Action A, both actions must complete within their bounded timing windows, and their combined effects must preserve scene and adjacent-scene continuity. Failure of either action or the pair blocks the whole scene.
 
-State Engine V2 carries both physical state and bounded functional state. Physical state includes placement, orientation, grip/contact, active hands, visible components, and relevant contained material. Functional state includes only facts needed by admitted actions, such as open/closed, cap attached/removed, switch off/on, actuator idle/pressed, assembled/disassembled, or content retained/dispensed. Unknown state is not silently coerced into a usable precondition.
+Empirical capability and production authorization are separate V1.2 authorities. Newly represented actions default to `capability=UNTESTED` and remain `UNTESTED` until empirical evidence satisfies the unchanged promotion policy; production authorization must never rewrite or imply a `SAFE` capability. `PRODUCTION_ELIGIBILITY_POLICY_V1_2` blocks `AVOID` and unsupported affordances, but may record `productionEligibility=V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED` for an `UNTESTED` expanded action only after every bounded action gate and the sequence-compatibility gate pass. A bounded V1.2 replan may select only actions and ordered pairs capable of passing those gates, preserves the seed and every locked scene field, recomputes State Engine V2 and risk after each attempt, and stops at `MAX_SCENE_REPLAN_ATTEMPTS_V1_2 = 2`.
+
+State Engine V2 carries both physical state and bounded functional state through the authoritative chain `START → Action A → MID → Action B → END`. Physical state includes placement, orientation, grip/contact, active hands, visible components, and relevant contained material. Functional state includes only facts needed by admitted actions, such as open/closed, cap attached/removed, switch off/on, actuator idle/pressed, assembled/disassembled, or content retained/dispensed. Unknown state is not silently coerced into a usable precondition. The `MID` value is a first-class validated state: it is the exact output of Action A and the exact input to Action B.
 
 For every adjacent scene, continuity applies to all declared physical and functional product state: `END` of scene N must exactly match `START` of scene N+1. Framing may change through the camera/focus contract, but V1.2 defines no product-state discontinuity or reset mechanism. Teleportation, refill, reassembly, undeclared hand swap, and variant change are forbidden.
 
@@ -145,20 +149,20 @@ One global composer plans all four scenes together. Composition considers:
 
 - scene role;
 - allocated insight;
-- selected Primary Action;
-- start, action, and end state.
+- selected Action A and Action B;
+- `START`, `MID`, and `END` state plus the Action A/Action B timing handoff.
 
 The composer must produce useful diversity across distance, angle, focus target, and camera/hand behavior while preserving ordinary smartphone realism. It may use subtle handheld movement and feasible reframing. Cinematic orbit, drone, gimbal, impossible tracking, and camera motion that competes with action completion are forbidden.
 
-The global composer records its chosen composition and diversity proof in L2. Seeded variation is constrained by continuity, product legibility, action visibility, reference support, and `SMARTPHONE_POV`.
+Each scene has Camera/Focus A for Beat A and Camera/Focus B for Beat B. The global composer records both per-beat compositions and its diversity proof in L2. It prefers one continuous ordinary smartphone-style take with a natural transition at the action handoff. Seeded variation is constrained by continuity, product legibility, action visibility, reference support, and `SMARTPHONE_POV`.
 
 ## 8. Human Realism V2 and SFX Plan V2
 
-Human Realism V2 covers one-hand and admitted two-hand execution, approach, grip/contact, force, timing, micro-adjustment, action completion, settling, and ordinary phone-camera behavior. It may not alter Product Truth, insight intent, action, state, dialogue, reference scope, or camera composition.
+Human Realism V2 is per beat. Human Realism A covers Action A approach, grip/contact, force, timing, micro-adjustment, completion into `MID`, and Camera/Focus A behavior. Human Realism B covers Action B consumption of `MID`, grip/contact, force, timing, micro-adjustment, completion into `END`, settling, and Camera/Focus B behavior. Both support one-hand and admitted two-hand execution and ordinary phone-camera behavior. They may not alter Product Truth, insight intent, actions, state, dialogue, reference scope, or camera composition.
 
 Every Human Realism V2 field is production-relevant and must survive losslessly into the Flow prompt. No generic summary may replace or drop the structured behavior.
 
-SFX Plan V2 records zero or more bounded physically justified sound events for the one Primary Action. Events bind to an action phase and visible cause. It forbids music, invented off-screen activity, exaggerated cinematic sound design, and sounds unsupported by the action. `NONE` is canonical when no event is justified.
+SFX Plan V2 is per beat: SFX A binds only to Action A and its visible cause; SFX B binds only to Action B and its visible cause. Each beat records zero or more bounded physically justified sound events and may independently use canonical `NONE` when no physical sound is justified. It forbids music, invented off-screen activity, exaggerated cinematic sound design, and sounds unsupported by the corresponding action.
 
 ## 9. Lossless Scene Execution Contract V2
 
@@ -167,12 +171,13 @@ SFX Plan V2 records zero or more bounded physically justified sound events for t
 - source lineage, version, project/product identity, scene index and role;
 - `creativeSeed` and recorded seeded decision IDs;
 - exact canonical and supporting logical reference roles;
-- both Semantic Pairs, both dialogue sentences, both Key Points, timing evidence, and logical voice identity;
-- exactly one Primary Action, hand count, affordance bindings, and action eligibility evidence;
-- physical and functional start/action/end state;
-- global camera/focus composition;
-- complete Human Realism V2 behavior;
-- SFX Plan V2, `bgm: NONE`, and `vfx: NONE`;
+- `TWO_BEAT_ACTION_SEQUENCE_V1_2` and exactly two sequential Primary Actions, with each action's one bounded semantic goal, hand count, affordance bindings, capability evidence, and production-eligibility evidence;
+- both Semantic Pairs, both dialogue sentences, both Key Points, their exact Pair↔Beat↔Sentence↔Key Point bindings, timing evidence, and logical voice identity;
+- Action A targeting the first ~4 seconds, Action B targeting the last ~4 seconds, and evidence that the handoff occurs between 3.5s and 4.5s;
+- complete physical and functional `START`, `MID`, and `END` state, including exact Action A output/Action B input equality;
+- Camera/Focus A and Camera/Focus B;
+- Human Realism A and Human Realism B;
+- SFX A and SFX B, `bgm: NONE`, and `vfx: NONE`;
 - duration 8 seconds, aspect ratio 9:16, `SMARTPHONE_POV`, and reviewer face forbidden.
 
 No production-relevant field may disappear, be summarized, or be re-authored through `R8 → P0 → SceneAnchor → Flow request/prompt`. Every boundary has exact-shape validation and an explicit lossless comparison/binding test. Provider resolution may add provider-only identifiers at the edge but cannot change the contract meaning.
@@ -184,10 +189,15 @@ The pre-Flow gate evaluates the four final Scene Cards as a set. It requires:
 - one coherent V1.2 lineage and one persisted `creativeSeed`;
 - exactly four ordered 8-second 9:16 `SMARTPHONE_POV` scenes;
 - reviewer face forbidden and valid one/two-hand declarations;
-- exactly one eligible Primary Action per scene;
+- `TWO_BEAT_ACTION_SEQUENCE_V1_2` with exactly two eligible sequential Primary Actions per scene, no third action, and one bounded semantic goal per action definition;
+- Action A in the first ~4 seconds, Action B in the last ~4 seconds, and a validated 3.5s–4.5s handoff;
+- exact `START → Action A → MID → Action B → END` state resolution, with Action B consuming the exact valid `MID` from Action A;
+- independent truth, affordance, state, hand, timing, camera, Human Realism, and risk eligibility for both actions plus pair sequence compatibility;
+- empirical capability preserved without false promotion and `V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED` present only when every bounded gate passes;
 - grounded insights, affordances, references, dialogue, Key Points, and SFX;
+- exact Pair 1↔Beat A↔Sentence 1↔Key Point 1 and Pair 2↔Beat B↔Sentence 2↔Key Point 2 synchronization;
 - exact applicable state continuity;
-- useful camera/focus diversity without cinematic behavior;
+- complete per-beat Camera/Focus, Human Realism, and SFX, with useful diversity and no cinematic behavior;
 - complete lossless Scene Execution Contract V2 bindings;
 - unchanged voice authority;
 - no critical validation issue.
@@ -212,7 +222,7 @@ The browser V1.2 path is added only after the reusable four-scene audit authorit
 
 ## 12. Acceptance criteria
 
-The companion plan's pre-Flow tranche is complete only when all eleven review gates independently pass, V1 remains operational, the qualification matrix covers representative simple and functional products/actions, and the final pre-Flow gate proves that no generation can occur before all four Scene Cards pass audit. Positive functional fixtures use explicit test-only capability maps; the production path remains blocked for any action lacking trusted authority.
+The companion plan's pre-Flow tranche is complete only when all eleven review gates independently pass, V1 remains operational, the qualification matrix covers representative simple and functional two-action sequences, and the final pre-Flow gate proves that no generation can occur before all four Scene Cards pass audit. Positive expanded-action fixtures preserve `capability=UNTESTED` while proving that the separate `V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED` result is available only after every per-action and pair gate passes; `AVOID`, unsupported affordances, and any incomplete or incompatible pair remain blocked.
 
 Active V1.2 runtime cutover additionally requires a separately authorized post-Flow compatibility tranche for versioned Candidate mapping, V1.2-aware QC input binding, selective repair, Final Acceptance, and Delivery. That tranche must reuse or strengthen the current fail-closed decisions, retain exact approved four-MP4/eight-Key-Point delivery, and prove that the new action/state/reference/camera/realism/SFX fields cannot bypass approval. Until that work passes, V1.2 `READY_FOR_FLOW` is a pre-Flow architecture authority only and V1 remains the active end-to-end runtime.
 
