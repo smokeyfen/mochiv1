@@ -202,6 +202,22 @@ test('authoritative rules support arbitrary and ambiguous product references con
   assert.match(instruction, /Do not borrow geometry, colors, packaging, labels, or claims/);
 });
 
+test('producer instruction preserves material provenance and rejects visual material inference', () => {
+  const vietnameseRegression = {
+    ...product(),
+    details: 'Chất liệu nhựa ABS cao cấp, an toàn cho trẻ'
+  };
+  const instruction = buildProductEvidenceInstruction();
+
+  assert.match(buildProductEvidenceInputText(vietnameseRegression), /Chất liệu nhựa ABS cao cấp, an toàn cho trẻ/u);
+  assert.match(instruction, /ProductInput.*material.*USER_INPUT.*evidenceAssetIds.*empty/u);
+  assert.match(instruction, /not.*REFERENCE_EVIDENCE.*independently prove.*material/u);
+  assert.match(instruction, /lack of visual confirmation is not material uncertainty and not a contradiction/iu);
+  assert.match(instruction, /never infer.*plastic.*metal.*fabric.*rubber.*appearance/iu);
+  assert.match(instruction, /REFERENCE_EVIDENCE.*material.*only.*readable.*target.*label/u);
+  assert.match(instruction, /actual conflict.*ProductInput.*readable target label.*explicitly/u);
+});
+
 test('changing factual ProductInput values changes inputText but not authoritative rules', () => {
   const original = product();
   const changed = { ...original, name: 'Updated bottle', details: 'Updated factual details.', category: 'Home' };
@@ -349,6 +365,58 @@ test('uncertain composition is retained as uncertainty instead of a false visual
   const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
   assert.deepEqual(result.geometryNotes, ['A ribbed or folded body structure is visible.']);
   assert.deepEqual(result.uncertainties, output.uncertainties);
+});
+
+test('material validation retains its fail-closed provenance semantics', async () => {
+  const unsupportedVisual = stubProvider({ ...evidenceFor(product()), geometryNotes: ['A plastic body is visible.'] });
+  await assert.rejects(
+    analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: unsupportedVisual.provider }),
+    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
+      && error.issueCodes.includes('unsupported_visual_material')
+  );
+
+  const plasticInput = { ...product(), details: 'The body is made of plastic.' };
+  const overlap = stubProvider({
+    ...evidenceFor(plasticInput),
+    geometryNotes: ['A plastic body is visible.'],
+    uncertainties: [{ subject: 'Plastic composition', assetIds: ['asset-1'], reason: 'Visual appearance cannot establish plastic.' }]
+  });
+  await assert.rejects(
+    analyzeProductEvidence({ product: plasticInput, media: mediaFor(plasticInput), intelligence: overlap.provider }),
+    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
+      && error.issueCodes.includes('material_certainty_uncertainty_overlap')
+  );
+
+  const uncertaintyOnly = stubProvider({
+    ...evidenceFor(product()),
+    uncertainties: [{ subject: 'Plastic composition', assetIds: ['asset-1'], reason: 'Visual appearance cannot establish plastic.' }]
+  });
+  await analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: uncertaintyOnly.provider });
+
+  const userInputBinding = stubProvider({
+    ...evidenceFor(plasticInput),
+    claims: [{ claimId: 'plastic', text: plasticInput.details, source: 'USER_INPUT' as const, evidenceAssetIds: ['asset-1'], allowed: true }]
+  });
+  await assert.rejects(
+    analyzeProductEvidence({ product: plasticInput, media: mediaFor(plasticInput), intelligence: userInputBinding.provider }),
+    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
+      && error.issueCodes.includes('user_input_claim_must_not_bind_reference')
+  );
+
+  const labelEstablished = {
+    ...evidenceFor(product()),
+    labelNotes: ['A readable target label states plastic.'],
+    claims: [{ claimId: 'plastic-label', text: 'The readable label states plastic.', source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }]
+  };
+  const readableLabel = stubProvider(labelEstablished);
+  await analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: readableLabel.provider });
+
+  const noReadableLabel = stubProvider({ ...labelEstablished, labelNotes: ['A label is visible.'] });
+  await assert.rejects(
+    analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: noReadableLabel.provider }),
+    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
+      && error.issueCodes.includes('unsupported_visual_material_claim')
+  );
 });
 
 test('Product Details claims retain USER_INPUT provenance and nonvisual claims cannot be image-proven', async () => {
