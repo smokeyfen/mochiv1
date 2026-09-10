@@ -1,11 +1,13 @@
 # MochiV1 — Codex Handoff
 
-**Date:** 2026-09-09
+**Date:** 2026-09-10
 **Repository:** `smokeyfen/mochiv1`
 **Source of truth:** GitHub repository and its `STATUS.md`
 **Current branch for autonomous milestone work:** `codex/feasibility-lock-candidate`
 
 ## Current verified state
+
+MOCHI V1.2 Scene Output Architecture is **APPROVED / ARCHITECTURE AUTHORITY / IMPLEMENTATION NOT STARTED**. Read `docs/superpowers/specs/2026-09-10-mochi-v1-2-scene-output-architecture-design.md` and `docs/superpowers/plans/2026-09-10-mochi-v1-2-implementation-plan.md` before any V1.2 work. The new authority preserves R1/R2 factual truth, persisted L1→L4, provider-neutral Core, Flow-only video, existing voice mapping, fail-closed QC/Final Acceptance/Delivery, and four 8-second 9:16 `SMARTPHONE_POV` scenes. It replaces only the documented V1 constraints: fixed scene actions become evidence/affordance-backed Single Primary Actions; new versioned authorities add Plannable Truth, commercial Insight Bank ranking, persisted constrained-random seed decisions, Product Affordance Profile, State Engine V2 with scene risk/bounded replan, global camera/focus, Human Realism V2, dialogue-first exact two-sentence/two-Key-Point semantics, grounded SFX V2, canonical/supporting reference purposes, and lossless Scene Execution Contract V2. Implement side-by-side and keep V1 working. Never create mixed-version `READY_FOR_FLOW`; L4 has zero IntelligenceProvider and zero generation; all four final V1.2 Scene Cards must pass audit before any Flow generation. The eleven gates establish the pre-Flow authority only; active V1.2 cutover still requires separately authorized Candidate/QC/repair/Final Acceptance/Delivery compatibility work. Next V1.2 action is Gate 1, only when explicitly authorized; older manual-E2E next-action statements remain the separate unchanged V1 track. This documentation checkpoint changes no runtime behavior and makes no provider call.
 
 Task 3 V1 Voice UI contract correction is **PASS / LOCKED at this checkpoint**. The browser has only the NỮ/NAM Voice Gender selected-card control. It builds the existing fixed V1 policy values `voiceRegion: 'SOUTH'` and `voiceStyle: 'review'` internally for either selection; neither is mutable or visible as a browser control. Therefore the locked existing paths remain unmodified: `FEMALE → VN_FEMALE_SOUTH_REVIEW_V1 → Leda Custom`, and `MALE → VN_MALE_SOUTH_REVIEW_V1 → Achird` using the current default Customize Character. UI tests prove exact L2 payloads for both genders, absence of Voice Region/Style controls, gender invalidation/no-op behavior, and retained stale-operation coverage. Final checkpoint verification: typecheck; 368 tests/0 failures; web build; diff check. No Core/provider/backend/QC/Delivery authority changed; no live Gemini or Flow call occurred.
 
