@@ -27,17 +27,15 @@ const PRODUCT_EVIDENCE_ISSUE_CODES = new Set([
   'duplicate_canonical_asset', 'unknown_canonical_asset', 'blank_geometry_note', 'blank_color_note', 'blank_packaging_note', 'blank_label_note',
   'blank_prohibited_inference_note', 'unsupported_visual_material', 'claim_id', 'claim_text', 'duplicate_claim', 'reference_claim_requires_evidence',
   'user_input_claim_must_not_bind_reference', 'nonvisual_reference_claim', 'product_details_claim_mislabeled', 'unsupported_visual_material_claim',
-  'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset', 'material_certainty_uncertainty_overlap',
+  'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset',
   'contradiction_statements', 'contradiction_reason', 'unknown_contradiction_asset', 'logical_asset_id_in_prose'
 ]);
 /** Exact fixed material-group IDs emitted by the validator; no user/model values are allowed here. */
 const MATERIAL_DIAGNOSTIC_GROUPS = new Set([
-  'faux_fur', 'paper_cardboard', 'bamboo', 'wood', 'plastic', 'metal', 'fabric', 'leather',
-  'glass', 'ceramic', 'rubber', 'battery', 'internal_electrical'
+  'battery', 'internal_electrical'
 ]);
 const MATERIAL_DIAGNOSTIC_PREFIXES = new Map([
-  ['unsupported_visual_material', 'unsupported_visual_material_group'],
-  ['material_certainty_uncertainty_overlap', 'material_certainty_uncertainty_overlap_group']
+  ['unsupported_visual_material', 'unsupported_visual_material_group']
 ]);
 
 export class ProductEvidenceError extends Error {
@@ -48,8 +46,9 @@ export class ProductEvidenceError extends Error {
     super(`PRODUCT_EVIDENCE_ERROR:${code}`);
     this.name = 'ProductEvidenceError';
     this.code = code;
+    const safeIssueCodes = safeProductEvidenceIssueCodes(issueCodes);
     this.issueCodes = code === 'INVALID_MODEL_OUTPUT'
-      ? (safeProductEvidenceIssueCodes(issueCodes).length > 0 ? safeProductEvidenceIssueCodes(issueCodes) : [PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE])
+      ? (safeIssueCodes.length > 0 ? safeIssueCodes : [PRODUCT_EVIDENCE_MODEL_OUTPUT_SHAPE])
       : [];
   }
 }
@@ -154,12 +153,11 @@ const PRODUCT_EVIDENCE_RULES = [
   'Extract only observable image details or explicitly user-supported information.',
   'Keep user assertions distinct from visual observations.',
   'Reference images establish only directly visible appearance: shape, approximate geometry, colors, patterns, visible parts, illumination, control strings or sticks, and assembled state.',
-  'MATERIAL PROVENANCE: For a ProductInput material assertion, preserve it as source USER_INPUT with evidenceAssetIds empty. Do not relabel it as REFERENCE_EVIDENCE because an image resembles that material, and do not claim that an image independently proves the material.',
-  'Lack of visual confirmation is not material uncertainty and not a contradiction when ProductInput explicitly states the material. Record material uncertainty or contradiction only for actual ambiguous or conflicting evidence.',
-  'Never infer plastic, metal, fabric, cotton, polyester, silk, leather, glass, ceramic, rubber, faux fur, paper, cardboard, bamboo, wood, battery, or internal electrical construction from appearance. Do not use composition-implying qualifiers such as plastic-looking, appears plastic, rubber-looking, seemingly metal, fabric-like, or likely cardboard when composition is unsupported.',
-  'Describe observable appearance instead: smooth, glossy, or matte surface; dark wheel surface; rigid-looking or rounded body; molded-looking shape; visible seams; ribbed or folded structure; and visible color, pattern, or geometry. Do not imply composition from those descriptions.',
-  'A REFERENCE_EVIDENCE material claim is allowed only when readable target-product labeling explicitly establishes that material. A claim from ProductInput details keeps source USER_INPUT and no reference asset binding. REFERENCE_EVIDENCE otherwise means direct visible target evidence only; do not use it for suitability, gifts, occasions, use cases, interaction, durability, safety, age suitability, efficacy, or performance.',
-  'Never represent the same material group as both a certain fact or claim and an uncertainty. When an actual conflict exists between ProductInput material and readable target label material, preserve the conflict explicitly; do not silently choose either source.',
+  'MATERIAL PROVENANCE: For a ProductInput material assertion, preserve it as source USER_INPUT with evidenceAssetIds empty. Do not relabel it as REFERENCE_EVIDENCE because an image resembles that material.',
+  'Reasonable appearance-based material descriptions are allowed as descriptive observations in identityDescription, geometryNotes, colorNotes, and packagingNotes. This includes visible/common groups such as faux fur, paper or cardboard, bamboo, wood, plastic, metal, fabric, leather, glass, ceramic, and rubber. Phrase uncertain composition conservatively when appropriate.',
+  'Do not elevate appearance inference into USER_INPUT or strong REFERENCE_EVIDENCE claims. A REFERENCE_EVIDENCE material claim is allowed only when readable target-product labeling explicitly establishes that material.',
+  'Do not infer hidden electrical or battery construction from appearance. Treat hidden construction as unsupported unless ProductInput details or readable target-product labeling explicitly supports it.',
+  'A claim from ProductInput details keeps source USER_INPUT and no reference asset binding. REFERENCE_EVIDENCE otherwise means direct visible target evidence only; do not use it for safety, durability, age suitability, gifts, occasions, use cases, interaction, efficacy, performance, or mechanism solely from images.',
   'Do not include logical asset IDs in any natural-language description, note, claim, uncertainty, or contradiction. Asset IDs belong only in structured binding fields.',
   'Do not invent features, efficacy, safety, medical benefits, or performance.',
   'Preserve product identity and describe geometry, dominant colors, packaging, and labels conservatively.',
@@ -230,7 +228,7 @@ export async function analyzeProductEvidence(
   }
   const issues = validateProductEvidence(result.data, request.product);
   if (issues.length > 0) {
-    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT', safeProductEvidenceIssueCodes(issues));
+    throw new ProductEvidenceError('INVALID_MODEL_OUTPUT', issues);
   }
   return result.data;
 }

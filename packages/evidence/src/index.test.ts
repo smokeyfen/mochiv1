@@ -203,7 +203,7 @@ test('authoritative rules support arbitrary and ambiguous product references con
   assert.match(instruction, /Do not borrow geometry, colors, packaging, labels, or claims/);
 });
 
-test('producer instruction preserves material provenance and rejects visual material inference', () => {
+test('producer instruction permits conservative visual material observations while preserving claim provenance', () => {
   const vietnameseRegression = {
     ...product(),
     details: 'Chất liệu nhựa ABS cao cấp, an toàn cho trẻ'
@@ -212,11 +212,12 @@ test('producer instruction preserves material provenance and rejects visual mate
 
   assert.match(buildProductEvidenceInputText(vietnameseRegression), /Chất liệu nhựa ABS cao cấp, an toàn cho trẻ/u);
   assert.match(instruction, /ProductInput.*material.*USER_INPUT.*evidenceAssetIds.*empty/u);
-  assert.match(instruction, /not.*REFERENCE_EVIDENCE.*independently prove.*material/u);
-  assert.match(instruction, /lack of visual confirmation is not material uncertainty and not a contradiction/iu);
-  assert.match(instruction, /never infer.*plastic.*metal.*fabric.*rubber.*appearance/iu);
+  assert.match(instruction, /reasonable appearance-based material descriptions are allowed/i);
+  assert.match(instruction, /uncertain composition conservatively/i);
+  assert.match(instruction, /do not elevate appearance inference into USER_INPUT or strong REFERENCE_EVIDENCE claims/i);
+  assert.match(instruction, /do not infer hidden electrical or battery construction/i);
   assert.match(instruction, /REFERENCE_EVIDENCE.*material.*only.*readable.*target.*label/u);
-  assert.match(instruction, /actual conflict.*ProductInput.*readable target label.*explicitly/u);
+  assert.match(instruction, /safety.*durability.*age suitability.*efficacy.*performance.*solely from images/i);
 });
 
 test('changing factual ProductInput values changes inputText but not authoritative rules', () => {
@@ -295,32 +296,20 @@ test('invalid model output retains only stable validator issue categories', asyn
   });
 });
 
-test('safe material diagnostic codes preserve base categories and the exact validator group vocabulary', () => {
+test('safe hidden-construction diagnostic codes preserve only fixed validator group detail', () => {
   assert.deepEqual(
-    safeProductEvidenceIssueCodes(['unsupported_visual_material:rubber']),
-    ['unsupported_visual_material', 'unsupported_visual_material_group_rubber']
-  );
-  assert.deepEqual(
-    safeProductEvidenceIssueCodes(['material_certainty_uncertainty_overlap:plastic']),
-    ['material_certainty_uncertainty_overlap', 'material_certainty_uncertainty_overlap_group_plastic']
+    safeProductEvidenceIssueCodes(['unsupported_visual_material:battery']),
+    ['unsupported_visual_material', 'unsupported_visual_material_group_battery']
   );
 
-  const validatorMaterialGroups = [
-    'faux_fur', 'paper_cardboard', 'bamboo', 'wood', 'plastic', 'metal', 'fabric', 'leather',
-    'glass', 'ceramic', 'rubber', 'battery', 'internal_electrical'
-  ];
-  assert.deepEqual(
-    safeProductEvidenceIssueCodes(validatorMaterialGroups.map(group => `unsupported_visual_material:${group}`)),
-    ['unsupported_visual_material', ...validatorMaterialGroups.map(group => `unsupported_visual_material_group_${group}`)]
-  );
   assert.deepEqual(
     safeProductEvidenceIssueCodes([
-      ...validatorMaterialGroups.map(group => `unsupported_visual_material:${group}`),
-      'schema_version', 'product_id', 'product_id_mismatch', 'unsupported_visual_material:rubber'
+      'unsupported_visual_material:battery', 'schema_version', 'product_id', 'product_id_mismatch',
+      'unsupported_visual_material:battery'
     ]),
     [
-      'unsupported_visual_material', ...validatorMaterialGroups.map(group => `unsupported_visual_material_group_${group}`),
-      'schema_version', 'product_id'
+      'unsupported_visual_material', 'unsupported_visual_material_group_battery',
+      'schema_version', 'product_id', 'product_id_mismatch'
     ]
   );
 });
@@ -328,13 +317,12 @@ test('safe material diagnostic codes preserve base categories and the exact vali
 test('safe material diagnostic codes never expose unsafe, malformed, or unknown suffixes', () => {
   assert.deepEqual(
     safeProductEvidenceIssueCodes([
-      'unsupported_visual_material:rubber:asset-private-7b4b3d',
+      'unsupported_visual_material:battery:asset-private-7b4b3d',
       'unsupported_visual_material:asset-private-7b4b3d',
       'unsupported_visual_material:unknown_material',
-      'material_certainty_uncertainty_overlap:plastic:claim-private-7b4b3d',
-      'material_certainty_uncertainty_overlap:unknown_material'
+      'unsupported_visual_material_group_battery'
     ]),
-    ['unsupported_visual_material', 'material_certainty_uncertainty_overlap']
+    ['unsupported_visual_material']
   );
 });
 
@@ -375,68 +363,54 @@ test('unsupported claims are preserved rather than promoted', async () => {
   assert.equal(result.claims[0]?.allowed, false);
 });
 
-test('fluffy trim does not establish faux-fur material from visual appearance', async () => {
-  const input = product();
-  const output = { ...evidenceFor(input), geometryNotes: ['A faux-fur trim is visible.'] };
+test('Vietnamese ABS details and visible material notes validate together', async () => {
+  const input = { ...product(), details: 'Chất liệu nhựa ABS.' };
+  const output = {
+    ...evidenceFor(input),
+    geometryNotes: ['Rubber-like wheels are visible.', 'A plastic body is visible.'],
+    packagingNotes: ['Cardboard-style packaging is visible.']
+  };
   const { provider } = stubProvider(output);
-  await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
+  assert.deepEqual(await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), output);
 });
 
-test('a visible thin stick does not establish bamboo or wood from appearance', async () => {
-  const input = product();
-  for (const note of ['A bamboo control stick is visible.', 'A wooden control stick is visible.']) {
-    const { provider } = stubProvider({ ...evidenceFor(input), geometryNotes: [note] });
-    await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
-  }
-});
-
-test('a folded or ribbed body appearance does not establish paper or cardboard', async () => {
-  const input = product();
-  for (const note of ['A paper body is visible.', 'A ribbed cardboard body is visible.']) {
-    const { provider } = stubProvider({ ...evidenceFor(input), geometryNotes: [note] });
-    await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), 'INVALID_MODEL_OUTPUT');
-  }
-});
-
-test('uncertain composition is retained as uncertainty instead of a false visual fact', async () => {
+test('reasonable visible material notes without ProductInput support do not emit unsupported_visual_material', async () => {
   const input = product();
   const output = {
     ...evidenceFor(input),
-    geometryNotes: ['A ribbed or folded body structure is visible.'],
-    uncertainties: [{ subject: 'Material composition', assetIds: ['asset-1'], reason: 'The reference appearance does not establish the material.' }]
+    geometryNotes: ['A bamboo handle and rubber-like wheels are visible.'],
+    colorNotes: ['A metal-colored accent is visible.'],
+    packagingNotes: ['Paper-cardboard packaging is visible.']
   };
   const { provider } = stubProvider(output);
-  const result = await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider });
-  assert.deepEqual(result.geometryNotes, ['A ribbed or folded body structure is visible.']);
-  assert.deepEqual(result.uncertainties, output.uncertainties);
+  assert.deepEqual(await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), output);
 });
 
-test('material validation retains its fail-closed provenance semantics', async () => {
-  const unsupportedVisual = stubProvider({ ...evidenceFor(product()), geometryNotes: ['A plastic body is visible.'] });
-  await assert.rejects(
-    analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: unsupportedVisual.provider }),
-    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
-      && error.issueCodes.includes('unsupported_visual_material')
-  );
-
-  const plasticInput = { ...product(), details: 'The body is made of plastic.' };
-  const overlap = stubProvider({
-    ...evidenceFor(plasticInput),
+test('visual material descriptions may coexist with uncertainty about exact composition', async () => {
+  const input = product();
+  const output = {
+    ...evidenceFor(input),
     geometryNotes: ['A plastic body is visible.'],
-    uncertainties: [{ subject: 'Plastic composition', assetIds: ['asset-1'], reason: 'Visual appearance cannot establish plastic.' }]
-  });
-  await assert.rejects(
-    analyzeProductEvidence({ product: plasticInput, media: mediaFor(plasticInput), intelligence: overlap.provider }),
-    (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
-      && error.issueCodes.includes('material_certainty_uncertainty_overlap')
-  );
+    uncertainties: [{ subject: 'Plastic composition', assetIds: ['asset-1'], reason: 'The exact composition cannot be confirmed from the image.' }]
+  };
+  const { provider } = stubProvider(output);
+  assert.deepEqual(await analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }), output);
+});
 
-  const uncertaintyOnly = stubProvider({
-    ...evidenceFor(product()),
-    uncertainties: [{ subject: 'Plastic composition', assetIds: ['asset-1'], reason: 'Visual appearance cannot establish plastic.' }]
-  });
-  await analyzeProductEvidence({ product: product(), media: mediaFor(product()), intelligence: uncertaintyOnly.provider });
+test('unsupported battery and internal electrical construction remain fail-closed with one sanitized static diagnostic', async () => {
+  const input = product();
+  for (const note of ['A battery is inside the product.', 'Internal electrical construction is visible.']) {
+    const { provider } = stubProvider({ ...evidenceFor(input), geometryNotes: [note] });
+    await assert.rejects(
+      analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: provider }),
+      (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
+        && error.issueCodes.join(',') === `unsupported_visual_material,unsupported_visual_material_group_${note.includes('battery') ? 'battery' : 'internal_electrical'}`
+    );
+  }
+});
 
+test('claim-level material provenance remains fail-closed and USER_INPUT material claims remain unbound', async () => {
+  const plasticInput = { ...product(), details: 'The body is made of plastic.' };
   const userInputBinding = stubProvider({
     ...evidenceFor(plasticInput),
     claims: [{ claimId: 'plastic', text: plasticInput.details, source: 'USER_INPUT' as const, evidenceAssetIds: ['asset-1'], allowed: true }]
@@ -461,6 +435,12 @@ test('material validation retains its fail-closed provenance semantics', async (
     (error: unknown) => error instanceof ProductEvidenceError && error.code === 'INVALID_MODEL_OUTPUT'
       && error.issueCodes.includes('unsupported_visual_material_claim')
   );
+
+  const validUserInput = stubProvider({
+    ...evidenceFor(plasticInput),
+    claims: [{ claimId: 'plastic-user-input', text: plasticInput.details, source: 'USER_INPUT' as const, evidenceAssetIds: [], allowed: true }]
+  });
+  await analyzeProductEvidence({ product: plasticInput, media: mediaFor(plasticInput), intelligence: validUserInput.provider });
 });
 
 test('Product Details claims retain USER_INPUT provenance and nonvisual claims cannot be image-proven', async () => {
@@ -478,7 +458,7 @@ test('Product Details claims retain USER_INPUT provenance and nonvisual claims c
   const { provider: materialProvider } = stubProvider({ ...evidenceFor(materialInput), claims: [{ claimId: 'wood', text: 'A wooden body is visible.', source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }] });
   await expectError(analyzeProductEvidence({ product: materialInput, media: mediaFor(materialInput), intelligence: materialProvider }), 'INVALID_MODEL_OUTPUT');
 
-  for (const text of ['Phù hợp nhiều dịp.', 'Có thể dùng làm quà tặng.', 'Tăng tính tương tác.']) {
+  for (const text of ['An toàn cho trẻ.', 'Durable construction.', 'Phù hợp từ 3 tuổi.', 'Có thể dùng làm quà tặng.', 'Hiệu năng cao.', 'Hiệu quả rõ rệt.']) {
     const { provider: nonvisualProvider } = stubProvider({ ...evidenceFor(input), claims: [{ claimId: text, text, source: 'REFERENCE_EVIDENCE' as const, evidenceAssetIds: ['asset-1'], allowed: true }] });
     await expectError(analyzeProductEvidence({ product: input, media: mediaFor(input), intelligence: nonvisualProvider }), 'INVALID_MODEL_OUTPUT');
   }

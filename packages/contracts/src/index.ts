@@ -1185,10 +1185,12 @@ const VISUAL_MATERIAL_GROUPS = [
   { id: 'battery', terms: ['battery', 'pin'] },
   { id: 'internal_electrical', terms: ['internal electrical', 'electrical construction', 'cau tao dien'] }
 ] as const;
+const HIDDEN_CONSTRUCTION_MATERIAL_GROUPS = new Set(['battery', 'internal_electrical']);
 const NON_VISUAL_REFERENCE_CLAIM_TERMS = [
   'durable', 'durability', 'safe', 'safety', 'age suitable', 'suitable', 'suitability',
   'gift', 'occasion', 'can be used', 'use as', 'engagement', 'interaction',
-  'phu hop', 'qua tang', 'nhieu dip', 'dung lam', 'tang tinh tuong tac', 'do ben', 'an toan', 'do tuoi'
+  'efficacy', 'effective', 'effectiveness', 'performance', 'performs',
+  'phu hop', 'qua tang', 'nhieu dip', 'dung lam', 'tang tinh tuong tac', 'do ben', 'an toan', 'do tuoi', 'hieu qua', 'hieu nang'
 ] as const;
 
 function normalizedGroundingText(value: string): string {
@@ -1250,12 +1252,12 @@ export function validateProductEvidence(
 
   const visualProse = [evidence.identityDescription, ...evidence.geometryNotes, ...evidence.colorNotes, ...evidence.packagingNotes];
   const productDetails = normalizedGroundingText(product.details);
-  const assertedMaterialGroups = new Set<string>();
   for (const prose of visualProse) {
     for (const group of matchingVisualMaterialGroups(prose)) {
-      assertedMaterialGroups.add(group);
       const groupTerms = VISUAL_MATERIAL_GROUPS.find(candidate => candidate.id === group)!.terms;
-      if (!groupTerms.some(term => hasGroundingTerm(productDetails, term)) && !hasReadableLabelMaterialSupport(evidence.labelNotes, group)) {
+      if (HIDDEN_CONSTRUCTION_MATERIAL_GROUPS.has(group)
+        && !groupTerms.some(term => hasGroundingTerm(productDetails, term))
+        && !hasReadableLabelMaterialSupport(evidence.labelNotes, group)) {
         issues.push(`unsupported_visual_material:${group}`);
       }
     }
@@ -1294,9 +1296,6 @@ export function validateProductEvidence(
     if (!nonBlank(uncertainty.reason)) issues.push('uncertainty_reason');
     for (const assetId of uncertainty.assetIds) {
       if (!productAssetIds.has(assetId)) issues.push(`unknown_uncertainty_asset:${assetId}`);
-    }
-    for (const group of matchingVisualMaterialGroups(`${uncertainty.subject} ${uncertainty.reason}`)) {
-      if (assertedMaterialGroups.has(group)) issues.push(`material_certainty_uncertainty_overlap:${group}`);
     }
   }
   for (const contradiction of evidence.contradictions) {
