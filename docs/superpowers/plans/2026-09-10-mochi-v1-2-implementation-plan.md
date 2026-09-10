@@ -136,7 +136,7 @@ git commit -m "feat(contracts): add MOCHI V1.2 namespace"
 
 - [ ] **Step 1: Write failing grounding tests**
 
-Cover exact Product Name, five commercial rank dimensions, deterministic tie-breaking, exactly-once enum-only reference assessment, canonical identity versus supporting reference purpose, contradictory/unknown variant rejection, missing/duplicate media rejection, wrong bytes, wrong MIME, reordered fingerprints/media, stale receipt binding, logical-ID relabeling before intelligence, functional affordance truth bindings, absent-affordance exclusion, and zero model-authored factual prose.
+Cover exact Product Name, five bounded commercial rank dimensions, the fixed 35/25/20/10/10 integer weighted utility, descending `utilityScore` ranking, stable-`insightId` final tie-breaking, exactly-once enum-only reference assessment, canonical identity versus supporting reference purpose, contradictory/unknown variant rejection, missing/duplicate media rejection, wrong bytes, wrong MIME, reordered fingerprints/media, stale receipt binding, logical-ID relabeling before intelligence, functional affordance truth bindings, absent-affordance exclusion, and zero model-authored factual prose.
 
 - [ ] **Step 2: Confirm RED**
 
@@ -145,7 +145,7 @@ Expected: FAIL because the compilers do not exist.
 
 - [ ] **Step 3: Implement deterministic compilers and fail-closed gate**
 
-Reuse `R2CommittedProductContext` and existing R2 validators. Rank primarily in this order: purchase trigger, product appeal, visual demonstrability, relevance/usefulness, distinctiveness; use stable insight ID only as the final tie-breaker.
+Reuse `R2CommittedProductContext` and existing R2 validators. Model judgments may supply bounded integer component scores in `0..100`, but cannot author or strengthen facts. Compute the deterministic integer utility in `0..10000` as `purchaseTrigger * 35 + productAppeal * 25 + visualDemonstrability * 20 + relevanceUsefulness * 10 + distinctiveness * 10`. Rank primarily by `utilityScore` descending and use stable `insightId` as the deterministic final tie-breaker. Do not use lexicographic dimension priority as ranking authority.
 
 ```ts
 export function evaluatePlannableTruthV1_2(context: R2CommittedProductContext, purposes: ReferencePurposesV1_2): PlannableTruthResultV1_2;

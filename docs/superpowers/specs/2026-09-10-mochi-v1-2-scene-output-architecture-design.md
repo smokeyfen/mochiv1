@@ -47,7 +47,7 @@ The V1 rules fixing SFX to `NONE`, generating Key Points before dialogue, limiti
 L1 persists the existing validated R1 Product Evidence and committed R2 Product Truth/Reference Assessment authority without changing their behavior. It adds three derived, provider-neutral artifacts:
 
 1. **Plannable Truth Gate** — proves there is enough grounded identity, commercial, reference, and action-affordance information to plan. It returns a bounded PASS or fail-closed result with stable reason codes. It cannot invent facts or weaken R1/R2 validation.
-2. **Product Insight Bank** — a grounded catalog of candidate commercial insights. Every insight binds to one or more Product Truth fact IDs or the exact Product Name. It stores ranking dimensions for purchase trigger, product appeal, visual demonstrability, relevance/usefulness, and distinctiveness. Those dimensions are the primary ranking authority.
+2. **Product Insight Bank** — a grounded catalog of candidate commercial insights. Every insight binds to one or more Product Truth fact IDs or the exact Product Name. It stores bounded ranking dimensions for purchase trigger, product appeal, visual demonstrability, relevance/usefulness, and distinctiveness. Their fixed weighted utility is the primary ranking authority.
 3. **Product Affordance Profile** — an evidence-backed catalog of product parts, controls, openings, closures, dispensers, contents, compatible hand counts, preconditions, state changes, and supporting reference IDs. Every functional affordance traces to Product Truth; absence or contradiction is ineligible, never guessed.
 
 L1 also distinguishes reference purposes without changing factual authority:
@@ -112,13 +112,24 @@ Only after all four cards pass as one coherent set may the browser expose `READY
 
 The Product Insight Bank separates factual grounding from creative allocation. Each entry has a stable insight ID, supporting truth IDs, optional supporting reference IDs, eligibility limitations, and five primary commercial scores:
 
-1. purchase trigger;
-2. product appeal;
-3. visual demonstrability;
-4. relevance/usefulness;
-5. distinctiveness.
+1. purchase trigger, weight 35;
+2. product appeal, weight 25;
+3. visual demonstrability, weight 20;
+4. relevance/usefulness, weight 10;
+5. distinctiveness, weight 10.
 
-The ranker is deterministic for a given bank and policy. Seeded allocation selects among the highest useful eligible choices using documented weights and constraints. Across four scenes, allocation should avoid redundant claims, cover distinct useful reasons to care, and reserve role-appropriate material for Hook and CTA.
+Each component is an integer in `0..100`. The deterministic compiler computes an integer `utilityScore` in `0..10000`:
+
+```text
+utilityScore =
+  purchaseTrigger * 35
+  + productAppeal * 25
+  + visualDemonstrability * 20
+  + relevanceUsefulness * 10
+  + distinctiveness * 10
+```
+
+The ranker orders eligible insights primarily by `utilityScore` descending and uses stable `insightId` as the deterministic final tie-breaker. Lexicographic dimension priority is not a ranking authority. Model judgments may supply only the bounded component scores; they cannot author or strengthen Product Truth facts or allowed claims. Seeded allocation selects among the highest useful eligible choices using documented weights and constraints. Across four scenes, allocation should avoid redundant claims, cover distinct useful reasons to care, and reserve role-appropriate material for Hook and CTA.
 
 Every scene contains exactly two ordered Semantic Pairs. After seeded insight allocation, a deterministic Semantic Pair composer binds each selected insight/truth intent to the corresponding action beat, sentence, and Key Point. It enforces the exact synchronization `Semantic Pair 1 ↔ Action Beat A ↔ Dialogue Sentence 1 ↔ Key Point 1` and `Semantic Pair 2 ↔ Action Beat B ↔ Dialogue Sentence 2 ↔ Key Point 2`, ordered distinctness where grounded choices permit it, source bindings, and no new facts. Scene 1 Semantic Pair 1 is locked to the exact Product Name identity requirement; therefore Scene 1 Sentence 1 must contain the exact Product Name and Scene 1 Key Point 1 must equal it exactly.
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  ACTION_FAMILY_BY_ID_V1_2,
   ACTION_IDS_V1_2,
   FINALIZED_SCRIPT_V1_2,
   FOUR_SCENE_EXECUTION_SET_V2,
@@ -304,6 +305,55 @@ test('V1.2 exposes only the canonical expanded Primary Action IDs', () => {
   ]);
 });
 
+test('every V1.2 Action ID has exactly one deterministic canonical Action Family', () => {
+  assert.deepEqual(Object.keys(ACTION_FAMILY_BY_ID_V1_2), ACTION_IDS_V1_2);
+
+  const presentationIds = new Set([
+    'PICK_UP', 'HOLD_STEADY', 'MOVE_CLOSER', 'MOVE_AWAY', 'RAISE_SLIGHTLY',
+    'LOWER_SLIGHTLY', 'TILT_LEFT_RIGHT', 'TILT_UP_DOWN', 'ROTATE_SLOW',
+    'FLIP_FRONT_BACK', 'PLACE_DOWN', 'SET_UPRIGHT'
+  ]);
+  for (const actionId of ACTION_IDS_V1_2) {
+    assert.equal(ACTION_FAMILY_BY_ID_V1_2[actionId], presentationIds.has(actionId) ? 'SIMPLE_PRESENTATION' : 'FUNCTIONAL', actionId);
+  }
+});
+
+test('canonical Action Family rejects family spoofing before affordance validation can be bypassed', () => {
+  for (const actionId of ['REMOVE_CAP', 'POUR_SIMPLE']) {
+    const beat = clone(scene(4).actionBeats[1]!);
+    beat.actionId = actionId;
+    beat.actionFamily = 'SIMPLE_PRESENTATION';
+    beat.affordanceBindings = [];
+    const issues = validateActionBeatV1_2(beat);
+    assert.ok(issues.includes('action_family'), `${actionId} family`);
+    assert.ok(issues.includes('affordances'), `${actionId} affordances`);
+  }
+
+  const hold = clone(scene(1).actionBeats[0]!);
+  hold.actionId = 'HOLD_STEADY';
+  hold.actionFamily = 'FUNCTIONAL';
+  hold.affordanceBindings = [{
+    affordanceId: 'not-required-for-presentation',
+    authorityReferences: [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }]
+  }];
+  assert.ok(validateActionBeatV1_2(hold).includes('action_family'));
+});
+
+test('all canonical Action ID and Action Family combinations validate', () => {
+  const presentationIds = new Set([
+    'PICK_UP', 'HOLD_STEADY', 'MOVE_CLOSER', 'MOVE_AWAY', 'RAISE_SLIGHTLY',
+    'LOWER_SLIGHTLY', 'TILT_LEFT_RIGHT', 'TILT_UP_DOWN', 'ROTATE_SLOW',
+    'FLIP_FRONT_BACK', 'PLACE_DOWN', 'SET_UPRIGHT'
+  ]);
+  for (const actionId of ACTION_IDS_V1_2) {
+    const presentation = presentationIds.has(actionId);
+    const beat = clone(presentation ? scene(1).actionBeats[0]! : scene(4).actionBeats[1]!);
+    beat.actionId = actionId;
+    beat.actionFamily = presentation ? 'SIMPLE_PRESENTATION' : 'FUNCTIONAL';
+    assert.deepEqual(validateActionBeatV1_2(beat), [], actionId);
+  }
+});
+
 test('factual authority references distinguish exact Product Name from Product Truth facts and fail closed', () => {
   assert.deepEqual(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_NAME', exactProductName: productName }), []);
   assert.deepEqual(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }), []);
@@ -314,6 +364,17 @@ test('factual authority references distinguish exact Product Name from Product T
   assert.deepEqual(validateSceneExecutionContractV2(value), []);
   value.semanticPairs[0]!.authorityReferences = [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }];
   assert.ok(validateSceneExecutionContractV2(value).includes('scene1_product_name_authority'));
+});
+
+test('PRODUCT_TRUTH_CLAIM is exact-shape factual authority distinct from Product Name and facts', () => {
+  assert.deepEqual(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-1' }), []);
+  assert.ok(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_CLAIM', factId: 'geometry:0' }).length > 0);
+  assert.ok(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_FACT', claimId: 'claim-1' }).length > 0);
+  assert.ok(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-1', text: 'forbidden' }).length > 0);
+
+  const value = scene(2);
+  value.semanticPairs[0]!.authorityReferences = [{ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-1' }];
+  assert.deepEqual(validateSceneExecutionContractV2(value), []);
 });
 
 test('State Engine V2 represents the bounded functional states required by the expanded action vocabulary', () => {
@@ -366,6 +427,21 @@ test('presentation actions need no pseudo-affordance while functional actions re
   assert.ok(validateAffordanceBindingV1_2(functional.affordanceBindings[0]!).includes('product_truth_authority'));
 });
 
+test('functional affordances accept Product Truth facts or allowed claims but never Product Name alone', () => {
+  assert.deepEqual(validateAffordanceBindingV1_2({
+    affordanceId: 'cap-removal',
+    authorityReferences: [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'packaging:0' }]
+  }), []);
+  assert.deepEqual(validateAffordanceBindingV1_2({
+    affordanceId: 'cap-removal',
+    authorityReferences: [{ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-1' }]
+  }), []);
+  assert.ok(validateAffordanceBindingV1_2({
+    affordanceId: 'cap-removal',
+    authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: productName }]
+  }).includes('product_truth_authority'));
+});
+
 test('dialogue timing windows may be smaller than their corresponding beats but may not escape them', () => {
   const value = scene(1);
   assert.notEqual(value.dialogueSentences[0]!.timing.startSeconds, value.actionBeats[0]!.timing.startSeconds);
@@ -384,6 +460,38 @@ test('a supporting variant may differ without mutating the canonical reviewed pr
   });
   assert.deepEqual(validateReferenceBindingV1_2(value.referenceBindings[1]), []);
   assert.deepEqual(validateSceneExecutionContractV2(value), []);
+});
+
+test('functional-state references are exact-shape support and cannot replace or mutate canonical identity', () => {
+  const functionalStateReference = {
+    assetId: 'asset-open-state',
+    purpose: 'FUNCTIONAL_STATE_REFERENCE',
+    productVariantId: 'variant-reviewed',
+    authorityReferences: [{ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-openable' }]
+  };
+  assert.deepEqual(validateReferenceBindingV1_2(functionalStateReference), []);
+  assert.ok(validateReferenceBindingV1_2({ ...functionalStateReference, state: 'OPEN' }).length > 0);
+  assert.ok(validateReferenceBindingV1_2({
+    ...functionalStateReference,
+    authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: productName }]
+  }).includes('product_truth_authority'));
+
+  const valid = scene(1);
+  valid.referenceBindings.push(clone(functionalStateReference));
+  assert.deepEqual(validateSceneExecutionContractV2(valid), []);
+
+  const noCanonical = scene(1);
+  noCanonical.referenceBindings = [clone(functionalStateReference)];
+  assert.ok(validateSceneExecutionContractV2(noCanonical).includes('canonical_reference_required'));
+
+  const wrongVariant = scene(1);
+  wrongVariant.referenceBindings.push({ ...clone(functionalStateReference), productVariantId: 'variant-other' });
+  assert.ok(validateSceneExecutionContractV2(wrongVariant).includes('reference_variant'));
+
+  const noAffordance = scene(4);
+  noAffordance.referenceBindings.push(clone(functionalStateReference));
+  noAffordance.actionBeats[1]!.affordanceBindings = [];
+  assert.ok(validateSceneExecutionContractV2(noAffordance).includes('beat_B.affordances'));
 });
 
 test('Scene Execution Contract V2 accepts an exact two-beat START/MID/END representation', () => {

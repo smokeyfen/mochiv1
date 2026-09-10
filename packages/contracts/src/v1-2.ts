@@ -23,6 +23,7 @@ export const REFERENCE_PURPOSES_V1_2 = [
   'CANONICAL_REVIEWED_PRODUCT_IDENTITY',
   'SUPPORTING_FEATURE',
   'SUPPORTING_FUNCTION',
+  'FUNCTIONAL_STATE_REFERENCE',
   'SUPPORTING_VARIANT'
 ] as const;
 export type ReferencePurposeV1_2 = typeof REFERENCE_PURPOSES_V1_2[number];
@@ -37,9 +38,18 @@ export interface ProductTruthFactAuthorityReferenceV1_2 {
   readonly factId: string;
 }
 
+export interface ProductTruthClaimAuthorityReferenceV1_2 {
+  readonly authority: 'PRODUCT_TRUTH_CLAIM';
+  readonly claimId: string;
+}
+
+export type GroundedProductTruthAuthorityReferenceV1_2 =
+  | ProductTruthFactAuthorityReferenceV1_2
+  | ProductTruthClaimAuthorityReferenceV1_2;
+
 export type FactualAuthorityReferenceV1_2 =
   | ProductNameAuthorityReferenceV1_2
-  | ProductTruthFactAuthorityReferenceV1_2;
+  | GroundedProductTruthAuthorityReferenceV1_2;
 
 export interface ReferenceBindingV1_2 {
   readonly assetId: string;
@@ -122,6 +132,50 @@ export const ACTION_IDS_V1_2 = [
 ] as const;
 export type ActionIdV1_2 = typeof ACTION_IDS_V1_2[number];
 export type ActionFamilyV1_2 = 'SIMPLE_PRESENTATION' | 'FUNCTIONAL';
+export const ACTION_FAMILY_BY_ID_V1_2 = {
+  PICK_UP: 'SIMPLE_PRESENTATION',
+  HOLD_STEADY: 'SIMPLE_PRESENTATION',
+  MOVE_CLOSER: 'SIMPLE_PRESENTATION',
+  MOVE_AWAY: 'SIMPLE_PRESENTATION',
+  RAISE_SLIGHTLY: 'SIMPLE_PRESENTATION',
+  LOWER_SLIGHTLY: 'SIMPLE_PRESENTATION',
+  TILT_LEFT_RIGHT: 'SIMPLE_PRESENTATION',
+  TILT_UP_DOWN: 'SIMPLE_PRESENTATION',
+  ROTATE_SLOW: 'SIMPLE_PRESENTATION',
+  FLIP_FRONT_BACK: 'SIMPLE_PRESENTATION',
+  PLACE_DOWN: 'SIMPLE_PRESENTATION',
+  SET_UPRIGHT: 'SIMPLE_PRESENTATION',
+  OPEN_SIMPLE: 'FUNCTIONAL',
+  CLOSE_SIMPLE: 'FUNCTIONAL',
+  REMOVE_CAP: 'FUNCTIONAL',
+  REPLACE_CAP: 'FUNCTIONAL',
+  PRESS_BUTTON: 'FUNCTIONAL',
+  TOGGLE_SWITCH: 'FUNCTIONAL',
+  SLIDE_CONTROL: 'FUNCTIONAL',
+  TWIST_CONTROL: 'FUNCTIONAL',
+  PULL_TAB: 'FUNCTIONAL',
+  PUSH_PART: 'FUNCTIONAL',
+  PULL_PART: 'FUNCTIONAL',
+  EXTEND_SIMPLE: 'FUNCTIONAL',
+  RETRACT_SIMPLE: 'FUNCTIONAL',
+  FOLD_SIMPLE: 'FUNCTIONAL',
+  UNFOLD_SIMPLE: 'FUNCTIONAL',
+  INSERT_SIMPLE: 'FUNCTIONAL',
+  REMOVE_PART_SIMPLE: 'FUNCTIONAL',
+  ATTACH_SIMPLE: 'FUNCTIONAL',
+  DETACH_SIMPLE: 'FUNCTIONAL',
+  POUR_SIMPLE: 'FUNCTIONAL',
+  DISPENSE_SIMPLE: 'FUNCTIONAL',
+  APPLY_SIMPLE: 'FUNCTIONAL',
+  SCOOP_SIMPLE: 'FUNCTIONAL',
+  WIPE_SIMPLE: 'FUNCTIONAL',
+  ROLL_SIMPLE: 'FUNCTIONAL',
+  SPIN_SIMPLE: 'FUNCTIONAL',
+  ASSEMBLE_SIMPLE: 'FUNCTIONAL',
+  SEPARATE_SIMPLE: 'FUNCTIONAL',
+  LOAD_SIMPLE: 'FUNCTIONAL',
+  UNLOAD_SIMPLE: 'FUNCTIONAL'
+} as const satisfies Readonly<Record<ActionIdV1_2, ActionFamilyV1_2>>;
 export type ActionCapabilityV1_2 = 'UNTESTED' | 'SAFE' | 'RISKY' | 'AVOID';
 export type ActionCapabilityMapV1_2 = Readonly<Record<ActionIdV1_2, ActionCapabilityV1_2>>;
 export type ProductionEligibilityV1_2 = 'NOT_AUTHORIZED' | 'V1_2_BOUNDED_TWO_BEAT_ACTION_AUTHORIZED';
@@ -161,7 +215,7 @@ export interface HandRequirementV1_2 {
 
 export interface AffordanceBindingV1_2 {
   readonly affordanceId: string;
-  readonly authorityReferences: readonly ProductTruthFactAuthorityReferenceV1_2[];
+  readonly authorityReferences: readonly GroundedProductTruthAuthorityReferenceV1_2[];
 }
 
 export type FunctionalClosureStateV2 = 'UNKNOWN' | 'OPEN' | 'CLOSED' | 'NOT_APPLICABLE';
@@ -411,6 +465,7 @@ export interface FourSceneAuditResultV1_2 {
 const commercialScoreKeys = ['purchaseTrigger', 'productAppeal', 'visualDemonstrability', 'relevanceUsefulness', 'distinctiveness'] as const;
 const productNameAuthorityReferenceKeys = ['authority', 'exactProductName'] as const;
 const productTruthFactAuthorityReferenceKeys = ['authority', 'factId'] as const;
+const productTruthClaimAuthorityReferenceKeys = ['authority', 'claimId'] as const;
 const referenceBindingKeys = ['assetId', 'purpose', 'productVariantId', 'authorityReferences'] as const;
 const semanticPairKeys = ['pairId', 'order', 'insightId', 'authorityReferences', 'semanticGoal', 'actionBeat', 'dialogueSentenceIndex', 'keyPointIndex'] as const;
 const seededDecisionKeys = ['creativeSeed', 'namespace', 'orderedCandidateIds', 'integerWeights', 'selectedId'] as const;
@@ -500,7 +555,17 @@ export function validateFactualAuthorityReferenceV1_2(value: unknown): readonly 
   if (hasExactKeys(value, productTruthFactAuthorityReferenceKeys) && value.authority === 'PRODUCT_TRUTH_FACT') {
     return nonBlank(value.factId) ? [] : ['fact_id'];
   }
+  if (hasExactKeys(value, productTruthClaimAuthorityReferenceKeys) && value.authority === 'PRODUCT_TRUTH_CLAIM') {
+    return nonBlank(value.claimId) ? [] : ['claim_id'];
+  }
   return ['shape'];
+}
+
+function isGroundedProductTruthAuthorityReference(value: unknown): boolean {
+  return (hasExactKeys(value, productTruthFactAuthorityReferenceKeys)
+      && value.authority === 'PRODUCT_TRUTH_FACT' && nonBlank(value.factId))
+    || (hasExactKeys(value, productTruthClaimAuthorityReferenceKeys)
+      && value.authority === 'PRODUCT_TRUTH_CLAIM' && nonBlank(value.claimId));
 }
 
 function validateAuthorityReferences(value: unknown): readonly string[] {
@@ -518,6 +583,10 @@ export function validateReferenceBindingV1_2(value: unknown): readonly string[] 
   if (!nonBlank(value.assetId) || !nonBlank(value.productVariantId)) issues.push('identity');
   if (!enumValue(value.purpose, REFERENCE_PURPOSES_V1_2)) issues.push('purpose');
   issues.push(...validateAuthorityReferences(value.authorityReferences));
+  if (value.purpose === 'FUNCTIONAL_STATE_REFERENCE' && Array.isArray(value.authorityReferences)
+    && value.authorityReferences.some(reference => !isGroundedProductTruthAuthorityReference(reference))) {
+    issues.push('product_truth_authority');
+  }
   return issues;
 }
 
@@ -576,8 +645,7 @@ export function validateAffordanceBindingV1_2(value: unknown): readonly string[]
   if (!nonBlank(value.affordanceId)) issues.push('binding');
   issues.push(...validateAuthorityReferences(value.authorityReferences));
   if (Array.isArray(value.authorityReferences)
-    && value.authorityReferences.some(reference => !hasExactKeys(reference, productTruthFactAuthorityReferenceKeys)
-      || reference.authority !== 'PRODUCT_TRUTH_FACT')) issues.push('product_truth_authority');
+    && value.authorityReferences.some(reference => !isGroundedProductTruthAuthorityReference(reference))) issues.push('product_truth_authority');
   return issues;
 }
 
@@ -671,13 +739,17 @@ export function validateSfxBeatV2(value: unknown): readonly string[] {
 export function validateActionBeatV1_2(value: unknown): readonly string[] {
   if (!hasExactKeys(value, actionBeatKeys)) return ['shape'];
   const issues: string[] = [];
+  const actionId = value.actionId;
+  const actionIdValid = enumValue(actionId, ACTION_IDS_V1_2);
+  const canonicalFamily = actionIdValid ? ACTION_FAMILY_BY_ID_V1_2[actionId] : undefined;
   if ((value.beat !== 'A' && value.beat !== 'B') || (value.order !== 1 && value.order !== 2)
-    || !enumValue(value.actionId, ACTION_IDS_V1_2) || !enumValue(value.actionFamily, ['SIMPLE_PRESENTATION', 'FUNCTIONAL'] as const)
+    || !actionIdValid || !enumValue(value.actionFamily, ['SIMPLE_PRESENTATION', 'FUNCTIONAL'] as const)
     || !nonBlank(value.semanticPairId) || !nonBlank(value.semanticGoal)) issues.push('identity');
+  if (canonicalFamily !== undefined && value.actionFamily !== canonicalFamily) issues.push('action_family');
   addNested(issues, 'hand', validateHandRequirementV1_2(value.handRequirement));
   if (!Array.isArray(value.affordanceBindings)) issues.push('affordances');
   else {
-    if (value.actionFamily === 'FUNCTIONAL' && value.affordanceBindings.length === 0) issues.push('affordances');
+    if (canonicalFamily === 'FUNCTIONAL' && value.affordanceBindings.length === 0) issues.push('affordances');
     value.affordanceBindings.forEach((binding, index) => addNested(issues, `affordance_${index}`, validateAffordanceBindingV1_2(binding)));
   }
   if (!enumValue(value.capability, ['UNTESTED', 'SAFE', 'RISKY', 'AVOID'] as const)) issues.push('capability');
