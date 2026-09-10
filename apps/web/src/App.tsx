@@ -7,8 +7,7 @@ import {
   type MochiProjectInput,
   type ProductEvidence,
   type ProductInput,
-  type VoiceGender,
-  type VoiceRegion
+  type VoiceGender
 } from '@mochi/contracts';
 import { analyzeProductEvidence, ProductEvidenceClientError, type ProductEvidenceClientErrorCode } from './product-evidence-client';
 import { compileProduction, connectGemini, createFinalizedScript, createProductFoundation, createSceneBlueprint, deliveryManifest, deliveryOutput, disconnectGemini, recordDelivery, replaceFailedCandidate, runFinalAcceptance, runSequence, runtimeStatus, uploadCandidate, ProductionClientError, type BlueprintSceneView, type DeliveryManifest, type DeliveryOutputName, type FinalAcceptanceView, type FinalizedScriptSceneView, type LayerDiagnostic, type LayerStatus, type ProductionLayer, type RuntimeStatus, type SceneView, type SequenceView } from './production-client';
@@ -133,9 +132,7 @@ export function App() {
   const [shootingContext, setShootingContext] = useState('AUTO_PRODUCT_FIT');
   const [reviewerPersona, setReviewerPersona] = useState('AUTHENTIC POV ON-HAND REVIEWER; NO REVIEWER FACE; REAL BUYER-LIKE INTERACTION');
   const [tone, setTone] = useState('AUTO_ROLE_APPROPRIATE_V1');
-  const [voiceStyle, setVoiceStyle] = useState('review');
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('FEMALE');
-  const [voiceRegion, setVoiceRegion] = useState<VoiceRegion>('SOUTH');
   const [referenceAssets, setReferenceAssets] = useState<readonly ReferenceAssetState[]>([]);
   const [analysisState, setAnalysisState] = useState<AnalysisState>('IDLE');
   const [productEvidence, setProductEvidence] = useState<ProductEvidence | null>(null);
@@ -188,7 +185,7 @@ export function App() {
   });
   const buildProjectInput = (): MochiProjectInput => ({
     schemaVersion: SCHEMA_VERSION, projectId, product: buildProductInput(),
-    creativeDirection: { audience, shootingContext, reviewerPersona, tone, voiceStyle, voiceGender, voiceRegion }
+    creativeDirection: { audience, shootingContext, reviewerPersona, tone, voiceStyle: 'review', voiceGender, voiceRegion: 'SOUTH' }
   });
 
   const handleReferenceSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -277,12 +274,8 @@ export function App() {
             <label>Shooting Context<select aria-label="Shooting Context" value={shootingContext} onChange={event => updateCreativeValue(shootingContext,setShootingContext,event.target.value)}><option value="AUTO_PRODUCT_FIT">Tự động theo sản phẩm</option><option value="INDOOR_TABLE_REVIEW">Trong nhà / bàn review</option><option value="HOME_LIFESTYLE">Không gian gia đình</option><option value="OUTDOOR_CASUAL">Ngoài trời</option><option value="FESTIVE_CONTEXT">Không gian lễ hội</option></select></label>
             <label>Reviewer Persona<select aria-label="Reviewer Persona" value={reviewerPersona} onChange={event=>updateCreativeValue(reviewerPersona,setReviewerPersona,event.target.value)}><option value="AUTHENTIC POV ON-HAND REVIEWER; NO REVIEWER FACE; REAL BUYER-LIKE INTERACTION">Authentic buyer-like reviewer</option><option value="PRACTICAL POV ON-HAND REVIEWER; NO REVIEWER FACE; DETAIL-FOCUSED INTERACTION">Practical detail-focused reviewer</option></select></label>
             <label>Tone<select aria-label="Tone" value={tone} onChange={event=>updateCreativeValue(tone,setTone,event.target.value)}><option value="AUTO_ROLE_APPROPRIATE_V1">Automatic by scene role</option><option value="CALM_INFORMATIVE">Calm and informative</option><option value="WARM_CONVERSATIONAL">Warm and conversational</option></select></label>
-            <label>Voice Style<select aria-label="Voice Style" value={voiceStyle} onChange={event=>updateCreativeValue(voiceStyle,setVoiceStyle,event.target.value)}><option value="review">Review</option><option value="conversational">Conversational</option></select></label>
           </div>
-          <div className="voice-choice-groups">
-            <fieldset className="voice-gender-cards"><legend>Voice Gender</legend><button type="button" aria-pressed={voiceGender==='FEMALE'} className={voiceGender==='FEMALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(voiceGender,setVoiceGender,'FEMALE')}>NỮ</button><button type="button" aria-pressed={voiceGender==='MALE'} className={voiceGender==='MALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(voiceGender,setVoiceGender,'MALE')}>NAM</button></fieldset>
-            <fieldset className="voice-gender-cards"><legend>Voice Region</legend><button type="button" aria-pressed={voiceRegion==='SOUTH'} className={voiceRegion==='SOUTH'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceRegion>(voiceRegion,setVoiceRegion,'SOUTH')}>SOUTH</button><button type="button" aria-pressed={voiceRegion==='NORTH'} className={voiceRegion==='NORTH'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceRegion>(voiceRegion,setVoiceRegion,'NORTH')}>NORTH</button></fieldset>
-          </div>
+          <fieldset className="voice-gender-cards"><legend>Voice Gender</legend><button type="button" aria-pressed={voiceGender==='FEMALE'} className={voiceGender==='FEMALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(voiceGender,setVoiceGender,'FEMALE')}>NỮ</button><button type="button" aria-pressed={voiceGender==='MALE'} className={voiceGender==='MALE'?'voice-card active':'voice-card'} onClick={()=>updateCreativeValue<VoiceGender>(voiceGender,setVoiceGender,'MALE')}>NAM</button></fieldset>
         </section>
       </form>
       <ProductionWorkspace readyInput={readyInput} references={referenceAssets} files={filesByAssetId.current} runtime={runtime} factualRevision={factualRevision} creativeRevision={creativeRevision} analyzeFoundation={analyzeFoundation} onWorkflowChange={setProductionWorkflow} />

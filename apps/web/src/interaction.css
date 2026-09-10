@@ -1,9 +1,3 @@
-.voice-choice-groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-}
-
 .voice-gender-cards {
   border: 0;
   display: flex;
