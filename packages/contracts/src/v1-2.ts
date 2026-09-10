@@ -27,11 +27,25 @@ export const REFERENCE_PURPOSES_V1_2 = [
 ] as const;
 export type ReferencePurposeV1_2 = typeof REFERENCE_PURPOSES_V1_2[number];
 
+export interface ProductNameAuthorityReferenceV1_2 {
+  readonly authority: 'PRODUCT_NAME';
+  readonly exactProductName: string;
+}
+
+export interface ProductTruthFactAuthorityReferenceV1_2 {
+  readonly authority: 'PRODUCT_TRUTH_FACT';
+  readonly factId: string;
+}
+
+export type FactualAuthorityReferenceV1_2 =
+  | ProductNameAuthorityReferenceV1_2
+  | ProductTruthFactAuthorityReferenceV1_2;
+
 export interface ReferenceBindingV1_2 {
   readonly assetId: string;
   readonly purpose: ReferencePurposeV1_2;
   readonly productVariantId: string;
-  readonly truthRefIds: readonly string[];
+  readonly authorityReferences: readonly FactualAuthorityReferenceV1_2[];
 }
 
 export interface CommercialScoreV1_2 {
@@ -47,7 +61,7 @@ export interface SemanticPairV1_2 {
   readonly pairId: string;
   readonly order: 1 | 2;
   readonly insightId: string;
-  readonly truthRefIds: readonly string[];
+  readonly authorityReferences: readonly FactualAuthorityReferenceV1_2[];
   readonly semanticGoal: string;
   readonly actionBeat: ActionBeatLabelV1_2;
   readonly dialogueSentenceIndex: 1 | 2;
@@ -63,23 +77,48 @@ export interface SeededDecisionTraceV1_2 {
 }
 
 export const ACTION_IDS_V1_2 = [
-  'REACH',
   'PICK_UP',
-  'HOLD',
+  'HOLD_STEADY',
   'MOVE_CLOSER',
+  'MOVE_AWAY',
+  'RAISE_SLIGHTLY',
+  'LOWER_SLIGHTLY',
+  'TILT_LEFT_RIGHT',
+  'TILT_UP_DOWN',
   'ROTATE_SLOW',
+  'FLIP_FRONT_BACK',
   'PLACE_DOWN',
-  'OPEN',
-  'CLOSE',
+  'SET_UPRIGHT',
+  'OPEN_SIMPLE',
+  'CLOSE_SIMPLE',
   'REMOVE_CAP',
   'REPLACE_CAP',
-  'PRESS',
-  'SWITCH_ON',
-  'SWITCH_OFF',
-  'POUR',
-  'DISPENSE',
-  'APPLY',
-  'ASSEMBLE'
+  'PRESS_BUTTON',
+  'TOGGLE_SWITCH',
+  'SLIDE_CONTROL',
+  'TWIST_CONTROL',
+  'PULL_TAB',
+  'PUSH_PART',
+  'PULL_PART',
+  'EXTEND_SIMPLE',
+  'RETRACT_SIMPLE',
+  'FOLD_SIMPLE',
+  'UNFOLD_SIMPLE',
+  'INSERT_SIMPLE',
+  'REMOVE_PART_SIMPLE',
+  'ATTACH_SIMPLE',
+  'DETACH_SIMPLE',
+  'POUR_SIMPLE',
+  'DISPENSE_SIMPLE',
+  'APPLY_SIMPLE',
+  'SCOOP_SIMPLE',
+  'WIPE_SIMPLE',
+  'ROLL_SIMPLE',
+  'SPIN_SIMPLE',
+  'ASSEMBLE_SIMPLE',
+  'SEPARATE_SIMPLE',
+  'LOAD_SIMPLE',
+  'UNLOAD_SIMPLE'
 ] as const;
 export type ActionIdV1_2 = typeof ACTION_IDS_V1_2[number];
 export type ActionFamilyV1_2 = 'SIMPLE_PRESENTATION' | 'FUNCTIONAL';
@@ -122,15 +161,17 @@ export interface HandRequirementV1_2 {
 
 export interface AffordanceBindingV1_2 {
   readonly affordanceId: string;
-  readonly truthRefIds: readonly string[];
+  readonly authorityReferences: readonly ProductTruthFactAuthorityReferenceV1_2[];
 }
 
 export type FunctionalClosureStateV2 = 'UNKNOWN' | 'OPEN' | 'CLOSED' | 'NOT_APPLICABLE';
-export type FunctionalCapStateV2 = 'UNKNOWN' | 'ATTACHED' | 'REMOVED' | 'NOT_APPLICABLE';
-export type FunctionalSwitchStateV2 = 'UNKNOWN' | 'ON' | 'OFF' | 'NOT_APPLICABLE';
-export type FunctionalActuatorStateV2 = 'UNKNOWN' | 'IDLE' | 'PRESSED' | 'NOT_APPLICABLE';
-export type FunctionalAssemblyStateV2 = 'UNKNOWN' | 'ASSEMBLED' | 'DISASSEMBLED' | 'NOT_APPLICABLE';
-export type FunctionalContentsStateV2 = 'UNKNOWN' | 'RETAINED' | 'PARTIALLY_DISPENSED' | 'DISPENSED' | 'EMPTY' | 'NOT_APPLICABLE';
+export type FunctionalCapStateV2 = 'UNKNOWN' | 'CAP_ATTACHED' | 'CAP_REMOVED' | 'NOT_APPLICABLE';
+export type FunctionalActivationStateV2 = 'UNKNOWN' | 'ACTIVATED' | 'DEACTIVATED' | 'NOT_APPLICABLE';
+export type FunctionalExtensionStateV2 = 'UNKNOWN' | 'EXTENDED' | 'RETRACTED' | 'NOT_APPLICABLE';
+export type FunctionalFoldStateV2 = 'UNKNOWN' | 'FOLDED' | 'UNFOLDED' | 'NOT_APPLICABLE';
+export type FunctionalPartAttachmentStateV2 = 'UNKNOWN' | 'PART_ATTACHED' | 'PART_DETACHED' | 'NOT_APPLICABLE';
+export type FunctionalContentStateV2 = 'UNKNOWN' | 'CONTENT_RETAINED' | 'CONTENT_DISPENSED' | 'CONTENT_TRANSFERRED' | 'NOT_APPLICABLE';
+export type FunctionalApplicationStateV2 = 'UNKNOWN' | 'NOT_APPLIED' | 'APPLIED' | 'NOT_APPLICABLE';
 
 export interface PhysicalStateV2 {
   readonly productVariantId: string;
@@ -145,10 +186,12 @@ export interface PhysicalStateV2 {
 export interface FunctionalStateV2 {
   readonly closure: FunctionalClosureStateV2;
   readonly cap: FunctionalCapStateV2;
-  readonly switch: FunctionalSwitchStateV2;
-  readonly actuator: FunctionalActuatorStateV2;
-  readonly assembly: FunctionalAssemblyStateV2;
-  readonly contents: FunctionalContentsStateV2;
+  readonly activation: FunctionalActivationStateV2;
+  readonly extension: FunctionalExtensionStateV2;
+  readonly fold: FunctionalFoldStateV2;
+  readonly partAttachment: FunctionalPartAttachmentStateV2;
+  readonly content: FunctionalContentStateV2;
+  readonly application: FunctionalApplicationStateV2;
 }
 
 export interface FunctionalPhysicalStateV2 {
@@ -168,13 +211,14 @@ export interface ActionTimingV1_2 {
   readonly targetDurationSeconds: number;
 }
 
-export type CameraDistanceV2 = 'CLOSE' | 'MEDIUM';
-export type CameraAngleV2 = 'FRONT' | 'THREE_QUARTER' | 'TOP_DOWN';
-export type CameraBehaviorV2 = 'STATIC_HANDHELD' | 'SUBTLE_PUSH_IN' | 'SUBTLE_REFRAME' | 'SUBTLE_HANDHELD_DRIFT';
+export type CameraDistanceV2 = 'DETAIL' | 'CLOSE' | 'MEDIUM';
+export type CameraAngleV2 = 'FRONT' | 'THREE_QUARTER_LEFT' | 'THREE_QUARTER_RIGHT' | 'SIDE' | 'TOP_DOWN' | 'SLIGHT_LOW' | 'OVER_HAND';
+export type CameraFocusTargetV2 = 'FULL_PRODUCT' | 'FEATURE_DETAIL' | 'INTERACTION_POINT' | 'PRODUCT_LABEL' | 'FUNCTION_RESULT' | 'MATERIAL_SURFACE' | 'HAND_PRODUCT_CONTACT';
+export type CameraBehaviorV2 = 'STABLE_HANDHELD' | 'SUBTLE_PUSH_IN' | 'SUBTLE_PULL_BACK' | 'SUBTLE_PARALLAX_LEFT' | 'SUBTLE_PARALLAX_RIGHT' | 'MICRO_REFRAME' | 'FOLLOW_ACTION' | 'NATURAL_AUTOFOCUS_SETTLE';
 export interface CameraFocusV2 {
   readonly distance: CameraDistanceV2;
   readonly angle: CameraAngleV2;
-  readonly focusTarget: string;
+  readonly focusTarget: CameraFocusTargetV2;
   readonly cameraBehavior: CameraBehaviorV2;
   readonly actionVisible: true;
   readonly continuousTake: true;
@@ -365,16 +409,18 @@ export interface FourSceneAuditResultV1_2 {
 }
 
 const commercialScoreKeys = ['purchaseTrigger', 'productAppeal', 'visualDemonstrability', 'relevanceUsefulness', 'distinctiveness'] as const;
-const referenceBindingKeys = ['assetId', 'purpose', 'productVariantId', 'truthRefIds'] as const;
-const semanticPairKeys = ['pairId', 'order', 'insightId', 'truthRefIds', 'semanticGoal', 'actionBeat', 'dialogueSentenceIndex', 'keyPointIndex'] as const;
+const productNameAuthorityReferenceKeys = ['authority', 'exactProductName'] as const;
+const productTruthFactAuthorityReferenceKeys = ['authority', 'factId'] as const;
+const referenceBindingKeys = ['assetId', 'purpose', 'productVariantId', 'authorityReferences'] as const;
+const semanticPairKeys = ['pairId', 'order', 'insightId', 'authorityReferences', 'semanticGoal', 'actionBeat', 'dialogueSentenceIndex', 'keyPointIndex'] as const;
 const seededDecisionKeys = ['creativeSeed', 'namespace', 'orderedCandidateIds', 'integerWeights', 'selectedId'] as const;
 const policyKeys = ['policyVersion', 'actionIds', 'defaultCapability', 'authorizedEligibility', 'blockedCapabilities', 'requireSupportedAffordances', 'requireAllPerActionGates', 'requireSequenceCompatibility', 'neverPromotesUntestedToSafe', 'maxSceneReplanAttempts'] as const;
 const eligibilityKeys = ['productionEligibility', 'truthEligible', 'affordanceEligible', 'stateEligible', 'handEligible', 'timingEligible', 'cameraEligible', 'humanRealismEligible', 'riskEligible'] as const;
 const handRequirementKeys = ['handCount', 'hands', 'declared'] as const;
-const affordanceBindingKeys = ['affordanceId', 'truthRefIds'] as const;
+const affordanceBindingKeys = ['affordanceId', 'authorityReferences'] as const;
 const stateKeys = ['physical', 'functional'] as const;
 const physicalStateKeys = ['productVariantId', 'productPlacement', 'productOrientation', 'gripContact', 'activeHands', 'visibleComponents', 'containedMaterial'] as const;
-const functionalStateKeys = ['closure', 'cap', 'switch', 'actuator', 'assembly', 'contents'] as const;
+const functionalStateKeys = ['closure', 'cap', 'activation', 'extension', 'fold', 'partAttachment', 'content', 'application'] as const;
 const resolvedStateKeys = ['start', 'mid', 'end'] as const;
 const timingKeys = ['startSeconds', 'endSeconds', 'targetDurationSeconds'] as const;
 const cameraFocusKeys = ['distance', 'angle', 'focusTarget', 'cameraBehavior', 'actionVisible', 'continuousTake', 'stateHidingCut'] as const;
@@ -434,10 +480,36 @@ function addNested(issues: string[], prefix: string, nested: readonly string[]):
   for (const issue of nested) issues.push(`${prefix}.${issue}`);
 }
 
+function hasOnlyMatchingProductNameAuthorities(value: unknown, productName: unknown): boolean {
+  if (!Array.isArray(value) || typeof productName !== 'string') return false;
+  const nameAuthorities = value.filter(reference => hasExactKeys(reference, productNameAuthorityReferenceKeys)
+    && reference.authority === 'PRODUCT_NAME');
+  return nameAuthorities.length > 0 && nameAuthorities.every(reference => reference.exactProductName === productName);
+}
+
 export function validateCommercialScoreV1_2(value: unknown): readonly string[] {
   if (!hasExactKeys(value, commercialScoreKeys)) return ['shape'];
   return commercialScoreKeys.every(key => Number.isInteger(value[key]) && (value[key] as number) >= 0 && (value[key] as number) <= 100)
     ? [] : ['score'];
+}
+
+export function validateFactualAuthorityReferenceV1_2(value: unknown): readonly string[] {
+  if (hasExactKeys(value, productNameAuthorityReferenceKeys) && value.authority === 'PRODUCT_NAME') {
+    return nonBlank(value.exactProductName) ? [] : ['exact_product_name'];
+  }
+  if (hasExactKeys(value, productTruthFactAuthorityReferenceKeys) && value.authority === 'PRODUCT_TRUTH_FACT') {
+    return nonBlank(value.factId) ? [] : ['fact_id'];
+  }
+  return ['shape'];
+}
+
+function validateAuthorityReferences(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length === 0) return ['authority_references'];
+  const issues: string[] = [];
+  value.forEach((reference, index) => addNested(issues, `authority_${index}`, validateFactualAuthorityReferenceV1_2(reference)));
+  const identities = value.map(reference => JSON.stringify(canonicalValue(reference)));
+  if (new Set(identities).size !== identities.length) issues.push('duplicate_authority');
+  return issues;
 }
 
 export function validateReferenceBindingV1_2(value: unknown): readonly string[] {
@@ -445,7 +517,7 @@ export function validateReferenceBindingV1_2(value: unknown): readonly string[] 
   const issues: string[] = [];
   if (!nonBlank(value.assetId) || !nonBlank(value.productVariantId)) issues.push('identity');
   if (!enumValue(value.purpose, REFERENCE_PURPOSES_V1_2)) issues.push('purpose');
-  if (!allNonBlankStrings(value.truthRefIds) || value.truthRefIds.length === 0 || !uniqueStrings(value.truthRefIds)) issues.push('truth_refs');
+  issues.push(...validateAuthorityReferences(value.authorityReferences));
   return issues;
 }
 
@@ -453,7 +525,7 @@ export function validateSemanticPairV1_2(value: unknown): readonly string[] {
   if (!hasExactKeys(value, semanticPairKeys)) return ['shape'];
   const issues: string[] = [];
   if (!nonBlank(value.pairId) || !nonBlank(value.insightId) || !nonBlank(value.semanticGoal)) issues.push('identity');
-  if (!allNonBlankStrings(value.truthRefIds) || value.truthRefIds.length === 0 || !uniqueStrings(value.truthRefIds)) issues.push('truth_refs');
+  issues.push(...validateAuthorityReferences(value.authorityReferences));
   if ((value.order !== 1 && value.order !== 2) || (value.actionBeat !== 'A' && value.actionBeat !== 'B')
     || (value.dialogueSentenceIndex !== 1 && value.dialogueSentenceIndex !== 2)
     || (value.keyPointIndex !== 1 && value.keyPointIndex !== 2)) issues.push('mapping');
@@ -500,8 +572,13 @@ export function validateHandRequirementV1_2(value: unknown): readonly string[] {
 
 export function validateAffordanceBindingV1_2(value: unknown): readonly string[] {
   if (!hasExactKeys(value, affordanceBindingKeys)) return ['shape'];
-  return nonBlank(value.affordanceId) && allNonBlankStrings(value.truthRefIds) && value.truthRefIds.length > 0 && uniqueStrings(value.truthRefIds)
-    ? [] : ['binding'];
+  const issues: string[] = [];
+  if (!nonBlank(value.affordanceId)) issues.push('binding');
+  issues.push(...validateAuthorityReferences(value.authorityReferences));
+  if (Array.isArray(value.authorityReferences)
+    && value.authorityReferences.some(reference => !hasExactKeys(reference, productTruthFactAuthorityReferenceKeys)
+      || reference.authority !== 'PRODUCT_TRUTH_FACT')) issues.push('product_truth_authority');
+  return issues;
 }
 
 export function validateFunctionalPhysicalStateV2(value: unknown): readonly string[] {
@@ -525,11 +602,13 @@ export function validateFunctionalPhysicalStateV2(value: unknown): readonly stri
   } else {
     const functional = value.functional;
     if (!enumValue(functional.closure, ['UNKNOWN', 'OPEN', 'CLOSED', 'NOT_APPLICABLE'] as const)) issues.push('closure');
-    if (!enumValue(functional.cap, ['UNKNOWN', 'ATTACHED', 'REMOVED', 'NOT_APPLICABLE'] as const)) issues.push('cap');
-    if (!enumValue(functional.switch, ['UNKNOWN', 'ON', 'OFF', 'NOT_APPLICABLE'] as const)) issues.push('switch');
-    if (!enumValue(functional.actuator, ['UNKNOWN', 'IDLE', 'PRESSED', 'NOT_APPLICABLE'] as const)) issues.push('actuator');
-    if (!enumValue(functional.assembly, ['UNKNOWN', 'ASSEMBLED', 'DISASSEMBLED', 'NOT_APPLICABLE'] as const)) issues.push('assembly');
-    if (!enumValue(functional.contents, ['UNKNOWN', 'RETAINED', 'PARTIALLY_DISPENSED', 'DISPENSED', 'EMPTY', 'NOT_APPLICABLE'] as const)) issues.push('contents');
+    if (!enumValue(functional.cap, ['UNKNOWN', 'CAP_ATTACHED', 'CAP_REMOVED', 'NOT_APPLICABLE'] as const)) issues.push('cap');
+    if (!enumValue(functional.activation, ['UNKNOWN', 'ACTIVATED', 'DEACTIVATED', 'NOT_APPLICABLE'] as const)) issues.push('activation');
+    if (!enumValue(functional.extension, ['UNKNOWN', 'EXTENDED', 'RETRACTED', 'NOT_APPLICABLE'] as const)) issues.push('extension');
+    if (!enumValue(functional.fold, ['UNKNOWN', 'FOLDED', 'UNFOLDED', 'NOT_APPLICABLE'] as const)) issues.push('fold');
+    if (!enumValue(functional.partAttachment, ['UNKNOWN', 'PART_ATTACHED', 'PART_DETACHED', 'NOT_APPLICABLE'] as const)) issues.push('part_attachment');
+    if (!enumValue(functional.content, ['UNKNOWN', 'CONTENT_RETAINED', 'CONTENT_DISPENSED', 'CONTENT_TRANSFERRED', 'NOT_APPLICABLE'] as const)) issues.push('content');
+    if (!enumValue(functional.application, ['UNKNOWN', 'NOT_APPLIED', 'APPLIED', 'NOT_APPLICABLE'] as const)) issues.push('application');
   }
   return issues;
 }
@@ -553,10 +632,10 @@ export function validateActionTimingV1_2(value: unknown): readonly string[] {
 
 export function validateCameraFocusV2(value: unknown): readonly string[] {
   if (!hasExactKeys(value, cameraFocusKeys)) return ['shape'];
-  if (!enumValue(value.distance, ['CLOSE', 'MEDIUM'] as const)
-    || !enumValue(value.angle, ['FRONT', 'THREE_QUARTER', 'TOP_DOWN'] as const)
-    || !nonBlank(value.focusTarget)
-    || !enumValue(value.cameraBehavior, ['STATIC_HANDHELD', 'SUBTLE_PUSH_IN', 'SUBTLE_REFRAME', 'SUBTLE_HANDHELD_DRIFT'] as const)
+  if (!enumValue(value.distance, ['DETAIL', 'CLOSE', 'MEDIUM'] as const)
+    || !enumValue(value.angle, ['FRONT', 'THREE_QUARTER_LEFT', 'THREE_QUARTER_RIGHT', 'SIDE', 'TOP_DOWN', 'SLIGHT_LOW', 'OVER_HAND'] as const)
+    || !enumValue(value.focusTarget, ['FULL_PRODUCT', 'FEATURE_DETAIL', 'INTERACTION_POINT', 'PRODUCT_LABEL', 'FUNCTION_RESULT', 'MATERIAL_SURFACE', 'HAND_PRODUCT_CONTACT'] as const)
+    || !enumValue(value.cameraBehavior, ['STABLE_HANDHELD', 'SUBTLE_PUSH_IN', 'SUBTLE_PULL_BACK', 'SUBTLE_PARALLAX_LEFT', 'SUBTLE_PARALLAX_RIGHT', 'MICRO_REFRAME', 'FOLLOW_ACTION', 'NATURAL_AUTOFOCUS_SETTLE'] as const)
     || value.actionVisible !== true || value.continuousTake !== true || value.stateHidingCut !== false) return ['camera'];
   return [];
 }
@@ -596,8 +675,11 @@ export function validateActionBeatV1_2(value: unknown): readonly string[] {
     || !enumValue(value.actionId, ACTION_IDS_V1_2) || !enumValue(value.actionFamily, ['SIMPLE_PRESENTATION', 'FUNCTIONAL'] as const)
     || !nonBlank(value.semanticPairId) || !nonBlank(value.semanticGoal)) issues.push('identity');
   addNested(issues, 'hand', validateHandRequirementV1_2(value.handRequirement));
-  if (!Array.isArray(value.affordanceBindings) || value.affordanceBindings.length === 0) issues.push('affordances');
-  else value.affordanceBindings.forEach((binding, index) => addNested(issues, `affordance_${index}`, validateAffordanceBindingV1_2(binding)));
+  if (!Array.isArray(value.affordanceBindings)) issues.push('affordances');
+  else {
+    if (value.actionFamily === 'FUNCTIONAL' && value.affordanceBindings.length === 0) issues.push('affordances');
+    value.affordanceBindings.forEach((binding, index) => addNested(issues, `affordance_${index}`, validateAffordanceBindingV1_2(binding)));
+  }
   if (!enumValue(value.capability, ['UNTESTED', 'SAFE', 'RISKY', 'AVOID'] as const)) issues.push('capability');
   addNested(issues, 'eligibility', validateActionEligibilityEvidenceV1_2(value.eligibility));
   const eligibility = value.eligibility;
@@ -705,7 +787,11 @@ function validateSceneMappings(scene: Record<string, unknown>, issues: string[])
       || point.keyPointIndex !== expectedOrder || point.actionBeat !== expectedBeat || point.sentenceIndex !== expectedOrder || point.pairId !== pair.pairId
       || point.sourceSentenceText !== sentence.text) issues.push(`mapping_${expectedOrder}`);
     if (hasExactKeys(beat.timing, timingKeys) && hasExactKeys(sentence.timing, dialogueTimingKeys)
-      && (sentence.timing.startSeconds !== beat.timing.startSeconds || sentence.timing.endSeconds !== beat.timing.endSeconds)) issues.push(`sentence_timing_${expectedOrder}`);
+      && (typeof sentence.timing.startSeconds !== 'number' || typeof sentence.timing.endSeconds !== 'number'
+        || typeof beat.timing.startSeconds !== 'number' || typeof beat.timing.endSeconds !== 'number'
+        || sentence.timing.startSeconds < beat.timing.startSeconds || sentence.timing.endSeconds > beat.timing.endSeconds)) {
+      issues.push(`sentence_timing_${expectedOrder}`);
+    }
   }
 }
 
@@ -733,10 +819,14 @@ export function validateSceneExecutionContractV2(value: unknown): readonly strin
     scene.referenceBindings.forEach((binding, index) => {
       addNested(issues, `reference_${index}`, validateReferenceBindingV1_2(binding));
       if (!hasExactKeys(binding, referenceBindingKeys)) return;
-      if (binding.purpose === 'CANONICAL_REVIEWED_PRODUCT_IDENTITY') canonicalCount += 1;
+      if (binding.purpose === 'CANONICAL_REVIEWED_PRODUCT_IDENTITY') {
+        canonicalCount += 1;
+        if (!hasOnlyMatchingProductNameAuthorities(binding.authorityReferences, scene.productName)) issues.push('canonical_reference_product_name_authority');
+      }
       if (seen.has(binding.assetId as string)) issues.push('duplicate_reference');
       seen.add(binding.assetId as string);
-      if (hasExactKeys(scene.lineage, lineageKeys) && binding.productVariantId !== scene.lineage.productVariantId) issues.push('reference_variant');
+      if (binding.purpose !== 'SUPPORTING_VARIANT' && hasExactKeys(scene.lineage, lineageKeys)
+        && binding.productVariantId !== scene.lineage.productVariantId) issues.push('reference_variant');
     });
     if (canonicalCount === 0) issues.push('canonical_reference_required');
   }
@@ -764,9 +854,12 @@ export function validateSceneExecutionContractV2(value: unknown): readonly strin
     }
   }
   if (scene.index === 1 && Array.isArray(scene.dialogueSentences) && scene.dialogueSentences.length === 2
-    && Array.isArray(scene.keyPoints) && scene.keyPoints.length === 2) {
+    && Array.isArray(scene.keyPoints) && scene.keyPoints.length === 2 && Array.isArray(scene.semanticPairs) && scene.semanticPairs.length === 2) {
     const sentence = scene.dialogueSentences[0];
     const point = scene.keyPoints[0];
+    const pair = scene.semanticPairs[0];
+    if (!hasExactKeys(pair, semanticPairKeys)
+      || !hasOnlyMatchingProductNameAuthorities(pair.authorityReferences, scene.productName)) issues.push('scene1_product_name_authority');
     if (!hasExactKeys(sentence, dialogueSentenceKeys) || sentence.containsExactProductName !== true
       || typeof sentence.text !== 'string' || typeof scene.productName !== 'string' || !sentence.text.includes(scene.productName)) issues.push('scene1_product_name_sentence');
     if (!hasExactKeys(point, keyPointKeys) || point.text !== scene.productName) issues.push('scene1_product_name_key_point');
@@ -789,8 +882,8 @@ function cameraDiversityIssues(scenes: readonly Record<string, unknown>[]): read
     }
   }
   if (cameras.length !== 8) return ['camera_diversity'];
-  return ['distance', 'angle', 'focusTarget', 'cameraBehavior'].some(key => new Set(cameras.map(camera => camera[key])).size < 2)
-    ? ['camera_diversity'] : [];
+  const recipes = new Set(cameras.map(camera => JSON.stringify(canonicalValue(camera))));
+  return recipes.size === 1 ? ['camera_diversity'] : [];
 }
 
 export function validateFourSceneExecutionSetV2(value: unknown): readonly string[] {

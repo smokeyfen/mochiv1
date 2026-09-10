@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  ACTION_IDS_V1_2,
   FINALIZED_SCRIPT_V1_2,
   FOUR_SCENE_EXECUTION_SET_V2,
   HUMAN_REALISM_V2,
@@ -15,10 +16,16 @@ import {
   STATE_ENGINE_V2,
   TWO_BEAT_ACTION_SEQUENCE_V1_2,
   auditFourSceneExecutionSetV2,
+  validateActionBeatV1_2,
   validateActionCapabilityMapV1_2,
+  validateAffordanceBindingV1_2,
+  validateCameraFocusV2,
   validateCommercialScoreV1_2,
+  validateFactualAuthorityReferenceV1_2,
   validateFourSceneExecutionSetV2,
+  validateFunctionalPhysicalStateV2,
   validateProductionEligibilityPolicyV1_2,
+  validateReferenceBindingV1_2,
   validateSceneExecutionContractV2
 } from './index.ts';
 
@@ -38,11 +45,13 @@ function state(sequence: number) {
     },
     functional: {
       closure: sequence < 4 ? 'CLOSED' : 'OPEN',
-      cap: sequence < 4 ? 'ATTACHED' : 'REMOVED',
-      switch: 'NOT_APPLICABLE',
-      actuator: 'NOT_APPLICABLE',
-      assembly: 'ASSEMBLED',
-      contents: 'RETAINED'
+      cap: sequence < 4 ? 'CAP_ATTACHED' : 'CAP_REMOVED',
+      activation: 'NOT_APPLICABLE',
+      extension: 'NOT_APPLICABLE',
+      fold: 'NOT_APPLICABLE',
+      partAttachment: 'NOT_APPLICABLE',
+      content: 'CONTENT_RETAINED',
+      application: 'NOT_APPLICABLE'
     }
   };
 }
@@ -50,9 +59,9 @@ function state(sequence: number) {
 function camera(sceneIndex: number, beat: 'A' | 'B') {
   return {
     distance: sceneIndex % 2 === 0 ? 'CLOSE' : 'MEDIUM',
-    angle: beat === 'A' ? 'FRONT' : 'THREE_QUARTER',
-    focusTarget: beat === 'A' ? 'product identity' : 'visible action result',
-    cameraBehavior: beat === 'A' ? 'STATIC_HANDHELD' : 'SUBTLE_REFRAME',
+    angle: beat === 'A' ? 'FRONT' : 'THREE_QUARTER_RIGHT',
+    focusTarget: beat === 'A' ? 'FULL_PRODUCT' : 'FUNCTION_RESULT',
+    cameraBehavior: beat === 'A' ? 'STABLE_HANDHELD' : 'MICRO_REFRAME',
     actionVisible: true,
     continuousTake: true,
     stateHidingCut: false
@@ -103,7 +112,7 @@ function scene(index: number) {
   const start = state((index - 1) * 2);
   const mid = state((index - 1) * 2 + 1);
   const end = state(index * 2);
-  const actionA = index === 1 ? 'PICK_UP' : 'HOLD';
+  const actionA = index === 1 ? 'PICK_UP' : 'HOLD_STEADY';
   const actionB = index === 4 ? 'REMOVE_CAP' : 'ROTATE_SLOW';
   const pairA = `scene-${index}-pair-1`;
   const pairB = `scene-${index}-pair-2`;
@@ -138,8 +147,8 @@ function scene(index: number) {
     semanticGoal,
     handRequirement: { handCount: 'ONE', hands: ['RIGHT'], declared: true },
     affordanceBindings: actionId === 'REMOVE_CAP'
-      ? [{ affordanceId: 'cap-removal', truthRefIds: ['truth-cap'] }]
-      : [{ affordanceId: 'bounded-presentation', truthRefIds: ['truth-identity'] }],
+      ? [{ affordanceId: 'cap-removal', authorityReferences: [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'packaging:0' }] }]
+      : [],
     capability: 'UNTESTED',
     eligibility,
     inputState,
@@ -178,11 +187,31 @@ function scene(index: number) {
       assetId: 'asset-canonical',
       purpose: 'CANONICAL_REVIEWED_PRODUCT_IDENTITY',
       productVariantId: 'variant-reviewed',
-      truthRefIds: ['truth-identity']
+      authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: productName }]
     }],
     semanticPairs: [
-      { pairId: pairA, order: 1, insightId: `insight-${index}-a`, truthRefIds: ['truth-identity'], semanticGoal: `show benefit ${index}a`, actionBeat: 'A', dialogueSentenceIndex: 1, keyPointIndex: 1 },
-      { pairId: pairB, order: 2, insightId: `insight-${index}-b`, truthRefIds: ['truth-feature'], semanticGoal: `show benefit ${index}b`, actionBeat: 'B', dialogueSentenceIndex: 2, keyPointIndex: 2 }
+      {
+        pairId: pairA,
+        order: 1,
+        insightId: `insight-${index}-a`,
+        authorityReferences: index === 1
+          ? [{ authority: 'PRODUCT_NAME', exactProductName: productName }]
+          : [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }],
+        semanticGoal: `show benefit ${index}a`,
+        actionBeat: 'A',
+        dialogueSentenceIndex: 1,
+        keyPointIndex: 1
+      },
+      {
+        pairId: pairB,
+        order: 2,
+        insightId: `insight-${index}-b`,
+        authorityReferences: [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'packaging:0' }],
+        semanticGoal: `show benefit ${index}b`,
+        actionBeat: 'B',
+        dialogueSentenceIndex: 2,
+        keyPointIndex: 2
+      }
     ],
     states: { start, mid, end },
     actionBeats: [
@@ -210,8 +239,8 @@ function scene(index: number) {
       evidence: 'continuous visible handoff'
     },
     dialogueSentences: [
-      { sentenceIndex: 1, pairId: pairA, actionBeat: 'A', text: sentenceA, language: 'vi-VN', containsExactProductName: index === 1, timing: { startSeconds: 0, endSeconds: 4, spokenUnitCount: 8 } },
-      { sentenceIndex: 2, pairId: pairB, actionBeat: 'B', text: sentenceB, language: 'vi-VN', containsExactProductName: false, timing: { startSeconds: 4, endSeconds: 8, spokenUnitCount: 8 } }
+      { sentenceIndex: 1, pairId: pairA, actionBeat: 'A', text: sentenceA, language: 'vi-VN', containsExactProductName: index === 1, timing: { startSeconds: 0.25, endSeconds: 3.5, spokenUnitCount: 8 } },
+      { sentenceIndex: 2, pairId: pairB, actionBeat: 'B', text: sentenceB, language: 'vi-VN', containsExactProductName: false, timing: { startSeconds: 4.25, endSeconds: 7.75, spokenUnitCount: 8 } }
     ],
     keyPoints: [
       { keyPointIndex: 1, pairId: pairA, actionBeat: 'A', sentenceIndex: 1, text: index === 1 ? productName : `Điểm hữu ích cảnh ${index}`, sourceSentenceText: sentenceA, derivedFromDialogue: true },
@@ -261,6 +290,102 @@ test('V1.2 exports its frozen versions and separate bounded authorization vocabu
   assert.ok(validateActionCapabilityMapV1_2({ ...capabilities, REMOVE_CAP: 'SAFE', providerId: 'forbidden' }).length > 0);
 });
 
+test('V1.2 exposes only the canonical expanded Primary Action IDs', () => {
+  assert.deepEqual(ACTION_IDS_V1_2, [
+    'PICK_UP', 'HOLD_STEADY', 'MOVE_CLOSER', 'MOVE_AWAY', 'RAISE_SLIGHTLY',
+    'LOWER_SLIGHTLY', 'TILT_LEFT_RIGHT', 'TILT_UP_DOWN', 'ROTATE_SLOW',
+    'FLIP_FRONT_BACK', 'PLACE_DOWN', 'SET_UPRIGHT', 'OPEN_SIMPLE', 'CLOSE_SIMPLE',
+    'REMOVE_CAP', 'REPLACE_CAP', 'PRESS_BUTTON', 'TOGGLE_SWITCH', 'SLIDE_CONTROL',
+    'TWIST_CONTROL', 'PULL_TAB', 'PUSH_PART', 'PULL_PART', 'EXTEND_SIMPLE',
+    'RETRACT_SIMPLE', 'FOLD_SIMPLE', 'UNFOLD_SIMPLE', 'INSERT_SIMPLE',
+    'REMOVE_PART_SIMPLE', 'ATTACH_SIMPLE', 'DETACH_SIMPLE', 'POUR_SIMPLE',
+    'DISPENSE_SIMPLE', 'APPLY_SIMPLE', 'SCOOP_SIMPLE', 'WIPE_SIMPLE', 'ROLL_SIMPLE',
+    'SPIN_SIMPLE', 'ASSEMBLE_SIMPLE', 'SEPARATE_SIMPLE', 'LOAD_SIMPLE', 'UNLOAD_SIMPLE'
+  ]);
+});
+
+test('factual authority references distinguish exact Product Name from Product Truth facts and fail closed', () => {
+  assert.deepEqual(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_NAME', exactProductName: productName }), []);
+  assert.deepEqual(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }), []);
+  assert.ok(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_NAME', factId: 'geometry:0' }).length > 0);
+  assert.ok(validateFactualAuthorityReferenceV1_2({ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0', providerId: 'forbidden' }).length > 0);
+
+  const value = scene(1);
+  assert.deepEqual(validateSceneExecutionContractV2(value), []);
+  value.semanticPairs[0]!.authorityReferences = [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'geometry:0' }];
+  assert.ok(validateSceneExecutionContractV2(value).includes('scene1_product_name_authority'));
+});
+
+test('State Engine V2 represents the bounded functional states required by the expanded action vocabulary', () => {
+  const value = state(0);
+  value.functional = {
+    closure: 'OPEN',
+    cap: 'CAP_REMOVED',
+    activation: 'ACTIVATED',
+    extension: 'EXTENDED',
+    fold: 'UNFOLDED',
+    partAttachment: 'PART_DETACHED',
+    content: 'CONTENT_TRANSFERRED',
+    application: 'APPLIED'
+  };
+  assert.deepEqual(validateFunctionalPhysicalStateV2(value), []);
+  value.functional.content = 'TRANSFERRED';
+  assert.ok(validateFunctionalPhysicalStateV2(value).includes('content'));
+});
+
+test('Camera/Focus V2 accepts the approved bounded grammar and rejects free-form focus targets', () => {
+  const base = camera(1, 'A');
+  for (const distance of ['DETAIL', 'CLOSE', 'MEDIUM']) {
+    assert.deepEqual(validateCameraFocusV2({ ...base, distance }), [], `distance ${distance}`);
+  }
+  for (const angle of ['FRONT', 'THREE_QUARTER_LEFT', 'THREE_QUARTER_RIGHT', 'SIDE', 'TOP_DOWN', 'SLIGHT_LOW', 'OVER_HAND']) {
+    assert.deepEqual(validateCameraFocusV2({ ...base, angle }), [], `angle ${angle}`);
+  }
+  for (const focusTarget of ['FULL_PRODUCT', 'FEATURE_DETAIL', 'INTERACTION_POINT', 'PRODUCT_LABEL', 'FUNCTION_RESULT', 'MATERIAL_SURFACE', 'HAND_PRODUCT_CONTACT']) {
+    assert.deepEqual(validateCameraFocusV2({ ...base, focusTarget }), [], `focus ${focusTarget}`);
+  }
+  for (const cameraBehavior of ['STABLE_HANDHELD', 'SUBTLE_PUSH_IN', 'SUBTLE_PULL_BACK', 'SUBTLE_PARALLAX_LEFT', 'SUBTLE_PARALLAX_RIGHT', 'MICRO_REFRAME', 'FOLLOW_ACTION', 'NATURAL_AUTOFOCUS_SETTLE']) {
+    assert.deepEqual(validateCameraFocusV2({ ...base, cameraBehavior }), [], `behavior ${cameraBehavior}`);
+  }
+  assert.ok(validateCameraFocusV2({ ...base, focusTarget: 'product identity' }).length > 0);
+});
+
+test('presentation actions need no pseudo-affordance while functional actions require Product Truth-backed affordances', () => {
+  const presentation = scene(1).actionBeats[0]!;
+  assert.deepEqual(validateActionBeatV1_2(presentation), []);
+
+  const functional = scene(4).actionBeats[1]!;
+  assert.deepEqual(validateActionBeatV1_2(functional), []);
+  functional.affordanceBindings = [];
+  assert.ok(validateActionBeatV1_2(functional).includes('affordances'));
+
+  functional.affordanceBindings = [{
+    affordanceId: 'cap-removal',
+    authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: productName }]
+  }];
+  assert.ok(validateAffordanceBindingV1_2(functional.affordanceBindings[0]!).includes('product_truth_authority'));
+});
+
+test('dialogue timing windows may be smaller than their corresponding beats but may not escape them', () => {
+  const value = scene(1);
+  assert.notEqual(value.dialogueSentences[0]!.timing.startSeconds, value.actionBeats[0]!.timing.startSeconds);
+  assert.deepEqual(validateSceneExecutionContractV2(value), []);
+  value.dialogueSentences[1]!.timing.startSeconds = 3.99;
+  assert.ok(validateSceneExecutionContractV2(value).includes('sentence_timing_2'));
+});
+
+test('a supporting variant may differ without mutating the canonical reviewed product reference', () => {
+  const value = scene(1);
+  value.referenceBindings.push({
+    assetId: 'asset-supported-variant',
+    purpose: 'SUPPORTING_VARIANT',
+    productVariantId: 'variant-supported-other',
+    authorityReferences: [{ authority: 'PRODUCT_TRUTH_FACT', factId: 'packaging:1' }]
+  });
+  assert.deepEqual(validateReferenceBindingV1_2(value.referenceBindings[1]), []);
+  assert.deepEqual(validateSceneExecutionContractV2(value), []);
+});
+
 test('Scene Execution Contract V2 accepts an exact two-beat START/MID/END representation', () => {
   const value = scene(1);
   assert.deepEqual(validateSceneExecutionContractV2(value), []);
@@ -307,7 +432,7 @@ test('Scene Execution Contract V2 fails closed for every scene-local structural 
     ['hidden reset', value => { value.sequenceCompatibility.noHiddenReset = false; }],
     ['teleportation', value => { value.sequenceCompatibility.noTeleportation = false; }],
     ['state-hiding cut', value => { value.actionBeats[0]!.cameraFocus.stateHidingCut = true; }],
-    ['reference variant mutation', value => { value.referenceBindings[0]!.productVariantId = 'other-variant'; }],
+    ['canonical reference variant mutation', value => { value.referenceBindings[0]!.productVariantId = 'other-variant'; }],
     ['seed mutation', value => { value.seededDecisionTraces[0]!.creativeSeed = 'ffffffffffffffffffffffffffffffff'; }],
     ['extra top-level field', value => { Object.assign(value, { provider: 'forbidden' }); }]
   ];
@@ -335,7 +460,10 @@ test('four-scene audit is all-or-nothing and rejects cross-scene lineage and con
     ['mixed source lineage', value => { value.scenes[2]!.lineage.sourceEvidenceVersion = 'other-evidence'; }],
     ['mixed creative seed', value => { value.scenes[2]!.creativeSeed = 'ffffffffffffffffffffffffffffffff'; }],
     ['adjacent physical state', value => { value.scenes[1]!.states.start.physical.productOrientation = 'BACK'; }],
-    ['adjacent functional state', value => { value.scenes[1]!.states.start.functional.cap = 'REMOVED'; }],
+    ['adjacent functional state', value => {
+      value.scenes[1]!.states.start.functional.cap = 'CAP_REMOVED';
+      value.scenes[1]!.actionBeats[0]!.inputState.functional.cap = 'CAP_REMOVED';
+    }],
     ['canonical reference mutation', value => { value.scenes[2]!.referenceBindings[0]!.assetId = 'other-canonical'; }],
     ['missing camera diversity', value => {
       const first = clone(value.scenes[0]!.actionBeats[0]!.cameraFocus);
@@ -350,4 +478,17 @@ test('four-scene audit is all-or-nothing and rejects cross-scene lineage and con
     assert.equal(result.status, 'FAIL', name);
     assert.ok(result.issues.length > 0, name);
   }
+});
+
+test('four-scene structural camera diversity does not require every camera dimension to vary', () => {
+  const value = validSet();
+  for (const item of value.scenes) {
+    for (const beat of item.actionBeats) {
+      beat.cameraFocus.distance = 'CLOSE';
+      beat.cameraFocus.angle = 'FRONT';
+      beat.cameraFocus.focusTarget = 'FULL_PRODUCT';
+      beat.cameraFocus.cameraBehavior = beat.beat === 'A' ? 'STABLE_HANDHELD' : 'FOLLOW_ACTION';
+    }
+  }
+  assert.equal(auditFourSceneExecutionSetV2(value).status, 'PASS');
 });
