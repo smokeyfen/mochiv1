@@ -13,7 +13,8 @@ import {
   buildProductEvidenceSchema,
   buildProductEvidenceInputText,
   buildProductEvidenceInstruction,
-  ProductEvidenceError
+  ProductEvidenceError,
+  safeProductEvidenceIssueCodes
 } from './index.ts';
 
 const product = (assetCount = 1): ProductInput => ({
@@ -292,6 +293,49 @@ test('invalid model output retains only stable validator issue categories', asyn
     assert.doesNotMatch(JSON.stringify(error.issueCodes), /private|7b4b3d|asset-/);
     return true;
   });
+});
+
+test('safe material diagnostic codes preserve base categories and the exact validator group vocabulary', () => {
+  assert.deepEqual(
+    safeProductEvidenceIssueCodes(['unsupported_visual_material:rubber']),
+    ['unsupported_visual_material', 'unsupported_visual_material_group_rubber']
+  );
+  assert.deepEqual(
+    safeProductEvidenceIssueCodes(['material_certainty_uncertainty_overlap:plastic']),
+    ['material_certainty_uncertainty_overlap', 'material_certainty_uncertainty_overlap_group_plastic']
+  );
+
+  const validatorMaterialGroups = [
+    'faux_fur', 'paper_cardboard', 'bamboo', 'wood', 'plastic', 'metal', 'fabric', 'leather',
+    'glass', 'ceramic', 'rubber', 'battery', 'internal_electrical'
+  ];
+  assert.deepEqual(
+    safeProductEvidenceIssueCodes(validatorMaterialGroups.map(group => `unsupported_visual_material:${group}`)),
+    ['unsupported_visual_material', ...validatorMaterialGroups.map(group => `unsupported_visual_material_group_${group}`)]
+  );
+  assert.deepEqual(
+    safeProductEvidenceIssueCodes([
+      ...validatorMaterialGroups.map(group => `unsupported_visual_material:${group}`),
+      'schema_version', 'product_id', 'product_id_mismatch', 'unsupported_visual_material:rubber'
+    ]),
+    [
+      'unsupported_visual_material', ...validatorMaterialGroups.map(group => `unsupported_visual_material_group_${group}`),
+      'schema_version', 'product_id'
+    ]
+  );
+});
+
+test('safe material diagnostic codes never expose unsafe, malformed, or unknown suffixes', () => {
+  assert.deepEqual(
+    safeProductEvidenceIssueCodes([
+      'unsupported_visual_material:rubber:asset-private-7b4b3d',
+      'unsupported_visual_material:asset-private-7b4b3d',
+      'unsupported_visual_material:unknown_material',
+      'material_certainty_uncertainty_overlap:plastic:claim-private-7b4b3d',
+      'material_certainty_uncertainty_overlap:unknown_material'
+    ]),
+    ['unsupported_visual_material', 'material_certainty_uncertainty_overlap']
+  );
 });
 
 test('unknown evidence assets and evidence claims without assets fail closed', async () => {

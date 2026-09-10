@@ -55,6 +55,14 @@ const productEvidenceIssueCodes = new Set([
   'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset', 'material_certainty_uncertainty_overlap',
   'contradiction_statements', 'contradiction_reason', 'unknown_contradiction_asset', 'logical_asset_id_in_prose'
 ]);
+const productEvidenceMaterialDiagnosticGroups = [
+  'faux_fur', 'paper_cardboard', 'bamboo', 'wood', 'plastic', 'metal', 'fabric', 'leather',
+  'glass', 'ceramic', 'rubber', 'battery', 'internal_electrical'
+] as const;
+for (const group of productEvidenceMaterialDiagnosticGroups) {
+  productEvidenceIssueCodes.add(`unsupported_visual_material_group_${group}`);
+  productEvidenceIssueCodes.add(`material_certainty_uncertainty_overlap_group_${group}`);
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -90,4 +90,38 @@ describe('analyzeProductEvidence', () => {
     await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unknown_canonical_asset'] });
     await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'PROVIDER_INVALID_RESPONSE', issueCodes: [] });
   });
+
+  it('accepts exact static material diagnostic detail codes', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: false,
+      error: {
+        code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT',
+        issueCodes: [
+          'unsupported_visual_material',
+          'unsupported_visual_material_group_rubber',
+          'material_certainty_uncertainty_overlap',
+          'material_certainty_uncertainty_overlap_group_plastic'
+        ]
+      }
+    }), { status: 502 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({
+      code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT',
+      issueCodes: [
+        'unsupported_visual_material',
+        'unsupported_visual_material_group_rubber',
+        'material_certainty_uncertainty_overlap',
+        'material_certainty_uncertainty_overlap_group_plastic'
+      ]
+    });
+  });
+
+  it('rejects unknown and malformed material diagnostic detail codes fail-closed', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unsupported_visual_material_group_unknown'] } }), { status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'PRODUCT_EVIDENCE_INVALID_MODEL_OUTPUT', issueCodes: ['unsupported_visual_material_group_rubber:asset-private-7b4b3d'] } }), { status: 502 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'INVALID_RESPONSE', issueCodes: [] });
+    await expect(analyzeProductEvidence(request())).rejects.toMatchObject({ code: 'INVALID_RESPONSE', issueCodes: [] });
+  });
 });

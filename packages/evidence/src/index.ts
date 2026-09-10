@@ -30,6 +30,15 @@ const PRODUCT_EVIDENCE_ISSUE_CODES = new Set([
   'unknown_claim_asset', 'uncertainty_subject', 'uncertainty_reason', 'unknown_uncertainty_asset', 'material_certainty_uncertainty_overlap',
   'contradiction_statements', 'contradiction_reason', 'unknown_contradiction_asset', 'logical_asset_id_in_prose'
 ]);
+/** Exact fixed material-group IDs emitted by the validator; no user/model values are allowed here. */
+const MATERIAL_DIAGNOSTIC_GROUPS = new Set([
+  'faux_fur', 'paper_cardboard', 'bamboo', 'wood', 'plastic', 'metal', 'fabric', 'leather',
+  'glass', 'ceramic', 'rubber', 'battery', 'internal_electrical'
+]);
+const MATERIAL_DIAGNOSTIC_PREFIXES = new Map([
+  ['unsupported_visual_material', 'unsupported_visual_material_group'],
+  ['material_certainty_uncertainty_overlap', 'material_certainty_uncertainty_overlap_group']
+]);
 
 export class ProductEvidenceError extends Error {
   readonly code: ProductEvidenceErrorCode;
@@ -228,7 +237,17 @@ export async function analyzeProductEvidence(
 
 /** Drops validator values such as logical IDs while retaining only stable categories. */
 export function safeProductEvidenceIssueCodes(issues: readonly string[]): readonly ProductEvidenceIssueCode[] {
-  return [...new Set(issues.map(issue => issue.split(':', 1)[0]!).filter(issue => PRODUCT_EVIDENCE_ISSUE_CODES.has(issue)))].slice(0, 16);
+  const safeCodes = new Set<ProductEvidenceIssueCode>();
+  for (const issue of issues) {
+    const [baseCode, materialGroup, ...extraParts] = issue.split(':');
+    if (baseCode === undefined || !PRODUCT_EVIDENCE_ISSUE_CODES.has(baseCode)) continue;
+    safeCodes.add(baseCode);
+    const detailPrefix = MATERIAL_DIAGNOSTIC_PREFIXES.get(baseCode);
+    if (detailPrefix !== undefined && extraParts.length === 0 && materialGroup !== undefined && MATERIAL_DIAGNOSTIC_GROUPS.has(materialGroup)) {
+      safeCodes.add(`${detailPrefix}_${materialGroup}`);
+    }
+  }
+  return [...safeCodes].slice(0, 16);
 }
 
 function validateRuntimeMedia(product: ProductInput, media: readonly IntelligenceMediaInput[]): void {
