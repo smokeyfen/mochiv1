@@ -1737,3 +1737,7 @@ export function assertValidScenePlan(scene: ScenePlan): void {
   const issues = validateScenePlan(scene);
   if (issues.length > 0) throw new ContractValidationError(issues);
 }
+
+// Node's source-TypeScript test runner requires the explicit .ts specifier.
+// @ts-ignore @mochi/contracts intentionally executes source TypeScript directly.
+export * from './v1-2.ts';
