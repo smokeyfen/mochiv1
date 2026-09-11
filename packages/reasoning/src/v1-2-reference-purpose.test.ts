@@ -6,6 +6,7 @@ import type { IntelligenceMediaInput, IntelligenceProvider, StructuredIntelligen
 import {
   ReferencePurposeErrorV1_2,
   assessReferencePurposesV1_2,
+  validateReferencePurposesForContextV1_2,
   type ReferencePurposeDecisionV1_2
 } from './index.ts';
 
@@ -95,6 +96,7 @@ test('assesses every canonical asset exactly once and separates canonical identi
   const result = await assessReferencePurposesV1_2(input, fingerprints(), media(), mock.intelligence);
 
   assert.deepEqual(result.canonicalAssetIds, ['asset-a', 'asset-b']);
+  assert.deepEqual(result.referenceFingerprints, fingerprints());
   assert.deepEqual(result.references.map(reference => [reference.assetId, reference.purpose]), [
     ['asset-a', 'CANONICAL_REVIEWED_PRODUCT_IDENTITY'],
     ['asset-b', 'FUNCTIONAL_STATE_REFERENCE']
@@ -110,6 +112,76 @@ test('assesses every canonical asset exactly once and separates canonical identi
   assert.doesNotMatch(mock.requests[0]?.inputText ?? '', /creativeDirection|audience|shootingContext|dataBase64/);
   assert.equal(('creativeDirection' as string) in result, false);
   assert.equal(JSON.stringify(input), before);
+});
+
+test('preserves exact trusted fingerprint lineage and detects a changed old artifact', async () => {
+  const trusted = fingerprints();
+  const result = await assessReferencePurposesV1_2(context(), trusted, media(), provider(decision()).intelligence);
+  assert.deepEqual(result.referenceFingerprints, trusted);
+  assert.notEqual(result.referenceFingerprints, trusted);
+
+  const changed = structuredClone(result);
+  changed.referenceFingerprints = [
+    { ...changed.referenceFingerprints[0]!, sha256: '0'.repeat(64) },
+    changed.referenceFingerprints[1]!
+  ];
+  assert.deepEqual(validateReferencePurposesForContextV1_2(context(), changed, trusted), ['fingerprint_binding']);
+});
+
+test('artifact validation rejects malformed, reordered, duplicate, wrong-asset, wrong-MIME, and invalid-hash fingerprint bindings', async () => {
+  const trusted = fingerprints();
+  const result = await assessReferencePurposesV1_2(context(), trusted, media(), provider(decision()).intelligence);
+  const invalidBindings: readonly unknown[] = [
+    result.referenceFingerprints.slice(0, 1),
+    [result.referenceFingerprints[1], result.referenceFingerprints[0]],
+    [result.referenceFingerprints[0], result.referenceFingerprints[0]],
+    [{ ...result.referenceFingerprints[0]!, assetId: 'unknown' }, result.referenceFingerprints[1]],
+    [{ ...result.referenceFingerprints[0]!, mimeType: 'image/png' }, result.referenceFingerprints[1]],
+    [{ ...result.referenceFingerprints[0]!, sha256: 'not-a-sha256' }, result.referenceFingerprints[1]]
+  ];
+
+  for (const referenceFingerprints of invalidBindings) {
+    assert.equal(validateReferencePurposesForContextV1_2(context(), {
+      ...result,
+      referenceFingerprints
+    }, trusted).includes('fingerprint_binding'), true);
+  }
+});
+
+test('artifact validation rejects arbitrary other-variant IDs and canonical reviewed-identity mutation', async () => {
+  const supportedOther = decision();
+  supportedOther.assetPurposes = [
+    supportedOther.assetPurposes[0]!,
+    {
+      ...supportedOther.assetPurposes[1]!,
+      purpose: 'SUPPORTING_VARIANT',
+      variantCompatibility: 'SUPPORTED_OTHER_VARIANT',
+      factIds: [],
+      claimIds: []
+    }
+  ];
+  const result = await assessReferencePurposesV1_2(
+    context(), fingerprints(), media(), provider(supportedOther).intelligence
+  );
+  const arbitrarySupportingId = structuredClone(result);
+  arbitrarySupportingId.references = arbitrarySupportingId.references.map((reference, index) => index === 1
+    ? { ...reference, productVariantId: 'provider-authored-other-variant' }
+    : reference);
+  assert.equal(
+    validateReferencePurposesForContextV1_2(context(), arbitrarySupportingId, fingerprints())
+      .includes('reference_identity_conflict'),
+    true
+  );
+
+  const mutatedCanonical = structuredClone(result);
+  mutatedCanonical.references = mutatedCanonical.references.map((reference, index) => index === 0
+    ? { ...reference, productVariantId: result.references[1]!.productVariantId }
+    : reference);
+  assert.equal(
+    validateReferencePurposesForContextV1_2(context(), mutatedCanonical, fingerprints())
+      .includes('reference_identity_conflict'),
+    true
+  );
 });
 
 test('wrong, reordered, missing, duplicate, relabeled, stale, or MIME-inconsistent inputs fail before intelligence', async () => {
@@ -147,6 +219,7 @@ test('provider decisions are complete enum/ID-only assessments and conflict, amb
     { assetPurposes: [{ ...base.assetPurposes[0], variantCompatibility: 'CONFLICT' }, base.assetPurposes[1]] },
     { assetPurposes: [{ ...base.assetPurposes[0], variantCompatibility: 'AMBIGUOUS' }, base.assetPurposes[1]] },
     { assetPurposes: [{ ...base.assetPurposes[0], summary: 'invented prose' }, base.assetPurposes[1]] },
+    { assetPurposes: [base.assetPurposes[0], { ...base.assetPurposes[1], referenceFingerprints: fingerprints() }] },
     { assetPurposes: [{ ...base.assetPurposes[0], purpose: 'SUPPORTING_VARIANT' }, base.assetPurposes[1]] },
     { assetPurposes: [base.assetPurposes[0], { ...base.assetPurposes[1], claimIds: ['unknown-claim'] }] }
   ];
@@ -154,6 +227,67 @@ test('provider decisions are complete enum/ID-only assessments and conflict, amb
     await assert.rejects(
       assessReferencePurposesV1_2(context(), fingerprints(), media(), provider(output).intelligence),
       (error: unknown) => error instanceof ReferencePurposeErrorV1_2
+    );
+  }
+});
+
+test('represents a supported other variant without changing canonical reviewed identity', async () => {
+  const output = decision();
+  output.assetPurposes = [
+    output.assetPurposes[0]!,
+    {
+      ...output.assetPurposes[1]!,
+      purpose: 'SUPPORTING_VARIANT',
+      variantCompatibility: 'SUPPORTED_OTHER_VARIANT',
+      factIds: [],
+      claimIds: []
+    }
+  ];
+  const result = await assessReferencePurposesV1_2(context(), fingerprints(), media(), provider(output).intelligence);
+
+  assert.equal(result.reviewedVariantId, 'reviewed:serum-1');
+  assert.equal(result.references[0]?.productVariantId, 'reviewed:serum-1');
+  assert.equal(
+    result.references[1]?.productVariantId,
+    'supported-other:6cbd35824380b0b79220365eb95963f9480991a1a7ea2f42c8c8fe5150bd96c1'
+  );
+  assert.notEqual(result.references[1]?.productVariantId, result.reviewedVariantId);
+});
+
+test('only SUPPORTING_VARIANT accepts SUPPORTED_OTHER_VARIANT while conflict and ambiguity remain fail closed', async () => {
+  for (const purpose of [
+    'CANONICAL_REVIEWED_PRODUCT_IDENTITY',
+    'SUPPORTING_FEATURE',
+    'SUPPORTING_FUNCTION',
+    'FUNCTIONAL_STATE_REFERENCE'
+  ] as const) {
+    const output = decision();
+    output.assetPurposes = [
+      output.assetPurposes[0]!,
+      {
+        ...output.assetPurposes[1]!,
+        purpose,
+        variantCompatibility: 'SUPPORTED_OTHER_VARIANT',
+        factIds: purpose === 'SUPPORTING_FEATURE' ? ['geometry:0'] : [],
+        claimIds: purpose === 'CANONICAL_REVIEWED_PRODUCT_IDENTITY' ? [] : ['claim-1']
+      }
+    ];
+    await assert.rejects(
+      assessReferencePurposesV1_2(context(), fingerprints(), media(), provider(output).intelligence),
+      (error: unknown) => error instanceof ReferencePurposeErrorV1_2 && error.code === 'INVALID_MODEL_OUTPUT'
+    );
+  }
+
+  for (const variantCompatibility of ['CONFLICT', 'AMBIGUOUS'] as const) {
+    const output = decision();
+    output.assetPurposes = [
+      output.assetPurposes[0]!,
+      { ...output.assetPurposes[1]!, purpose: 'SUPPORTING_VARIANT', variantCompatibility }
+    ];
+    await assert.rejects(
+      assessReferencePurposesV1_2(context(), fingerprints(), media(), provider(output).intelligence),
+      (error: unknown) => error instanceof ReferencePurposeErrorV1_2
+        && error.code === (variantCompatibility === 'CONFLICT' ? 'REFERENCE_CONFLICT' : 'REFERENCE_AMBIGUOUS')
     );
   }
 });

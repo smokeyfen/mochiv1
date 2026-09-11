@@ -48,6 +48,10 @@ function purposes(): ReferencePurposesV1_2 {
     productId: 'product-1',
     sourceEvidenceVersion: 'evidence-v1',
     canonicalAssetIds: ['asset-a', 'asset-b'],
+    referenceFingerprints: [
+      { assetId: 'asset-a', mimeType: 'image/jpeg', sha256: 'a'.repeat(64) },
+      { assetId: 'asset-b', mimeType: 'image/png', sha256: 'b'.repeat(64) }
+    ],
     reviewedVariantId: 'reviewed:product-1',
     references: [
       { assetId: 'asset-a', purpose: 'CANONICAL_REVIEWED_PRODUCT_IDENTITY', productVariantId: 'reviewed:product-1', authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: 'Tên Sản Phẩm Chính Xác' }] },
@@ -100,6 +104,50 @@ test('an unrelated valid fact remains plannable when another fact is uncertain',
   assert.equal(result.status, 'PASS');
   assert.equal(result.plannableItems.some(item => item.exactText === 'Bottle is blue.'), true);
   assert.equal(result.plannableItems.some(item => item.exactText === 'Bottle has a removable cap.'), false);
+});
+
+test('blocks a paraphrased contradiction by shared evidence asset while preserving an unaffected fact', () => {
+  const input = context();
+  input.productTruth.unresolvedContradictions = [{
+    statements: ['The cap appears permanently fixed.', 'The cap may detach.'],
+    assetIds: ['asset-a'],
+    reason: 'The same reference does not establish cap attachment.'
+  }];
+  const result = evaluatePlannableTruthV1_2(input, purposes());
+
+  assert.equal(result.plannableItems.some(item => item.exactText === 'Bottle has a removable cap.'), false);
+  assert.equal(result.plannableItems.some(item => item.exactText === 'Bottle is blue.'), true);
+  assert.deepEqual(result.blockedItems.find(item => item.sourceId === 'geometry:0')?.reasonCodes, [
+    'UNRESOLVED_CONTRADICTION'
+  ]);
+});
+
+test('blocks asset-backed reference claims on same-asset uncertainty without suppressing unrelated user input', () => {
+  const input = context();
+  input.productTruth.allowedClaims = [
+    ...input.productTruth.allowedClaims,
+    {
+      claimId: 'claim-reference',
+      text: 'The closure twists free.',
+      source: 'REFERENCE_EVIDENCE',
+      evidenceAssetIds: ['asset-a']
+    }
+  ];
+  input.productTruth.unresolvedUncertainties = [{
+    subject: 'Cap attachment mechanism',
+    assetIds: ['asset-a'],
+    reason: 'The threading is not visible.'
+  }];
+  const result = evaluatePlannableTruthV1_2(input, purposes());
+
+  assert.deepEqual(result.blockedItems.find(item => item.sourceId === 'claim-reference')?.reasonCodes, [
+    'UNSAFE_UNCERTAINTY'
+  ]);
+  assert.deepEqual(result.blockedItems.find(item => item.sourceId === 'geometry:0')?.reasonCodes, [
+    'UNSAFE_UNCERTAINTY'
+  ]);
+  assert.equal(result.plannableItems.some(item => item.exactText === 'The bottle can dispense liquid.'), true);
+  assert.equal(result.plannableItems.some(item => item.exactText === 'Bottle is blue.'), true);
 });
 
 test('reference identity conflict and invalid R2 source binding fail with stable bounded reasons', () => {

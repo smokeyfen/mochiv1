@@ -79,11 +79,13 @@ export {
 export {
   PLANNABLE_TRUTH_V1_2,
   evaluatePlannableTruthV1_2,
+  validateReferencePurposesForContextV1_2,
   type BlockedPlannableTruthItemV1_2,
   type PlannableTruthBlockReasonV1_2,
   type PlannableTruthItemV1_2,
   type PlannableTruthReasonCodeV1_2,
   type PlannableTruthResultV1_2,
+  type ReferenceContentFingerprintV1_2,
   type ReferencePurposesV1_2
 } from './v1-2/plannable-truth.ts';
 export {
@@ -93,7 +95,6 @@ export {
   buildReferencePurposeDecisionSchemaV1_2,
   buildReferencePurposeInputTextV1_2,
   buildReferencePurposeInstructionV1_2,
-  type ReferenceContentFingerprintV1_2,
   type ReferencePurposeAssetDecisionV1_2,
   type ReferencePurposeDecisionV1_2,
   type ReferencePurposeErrorCodeV1_2,

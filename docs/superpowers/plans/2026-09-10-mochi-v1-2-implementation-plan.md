@@ -130,9 +130,10 @@ git commit -m "feat(contracts): add MOCHI V1.2 namespace"
 
 - Produce `assessReferencePurposesV1_2(context, fingerprints, media, intelligence): Promise<ReferencePurposesV1_2>` as an enum-only provider-neutral assessment plus deterministic compiler. `fingerprints` comes from the trusted R1 receipt/L1 composition boundary and contains exact ordered asset ID/MIME/SHA-256 values.
 - Produce `evaluatePlannableTruthV1_2(context, referencePurposes): PlannableTruthResultV1_2`.
-- Produce `compileProductInsightBankV1_2(context): ProductInsightBankV1_2` and `rankProductInsightsV1_2(bank): readonly RankedProductInsightV1_2[]`.
-- Produce `compileProductAffordanceProfileV1_2(context, referencePurposes): ProductAffordanceProfileV1_2`.
+- Produce `compileProductInsightBankV1_2(context, intelligence): Promise<ProductInsightBankV1_2>` and `rankProductInsightsV1_2(bank): readonly RankedProductInsightV1_2[]`.
+- Produce `compileProductAffordanceProfileV1_2(context, referencePurposes, intelligence): Promise<ProductAffordanceProfileV1_2>`.
 - Every insight/affordance consumes only exact Product Truth IDs/text and validated reference assessment; none accepts Creative Direction or media bytes.
+- Reference-purpose assessment, commercial insight scoring, and affordance semantic classification each use one bounded intelligence call. Plannable Truth evaluation and insight ranking use zero intelligence calls.
 
 - [ ] **Step 1: Write failing grounding tests**
 
@@ -150,8 +151,8 @@ Reuse `R2CommittedProductContext` and existing R2 validators. Model judgments ma
 ```ts
 export function evaluatePlannableTruthV1_2(context: R2CommittedProductContext, purposes: ReferencePurposesV1_2): PlannableTruthResultV1_2;
 export function assessReferencePurposesV1_2(context: R2CommittedProductContext, fingerprints: readonly ReferenceContentFingerprintV1_2[], media: readonly IntelligenceMediaInput[], intelligence: IntelligenceProvider): Promise<ReferencePurposesV1_2>;
-export function compileProductInsightBankV1_2(context: R2CommittedProductContext): ProductInsightBankV1_2;
-export function compileProductAffordanceProfileV1_2(context: R2CommittedProductContext, purposes: ReferencePurposesV1_2): ProductAffordanceProfileV1_2;
+export function compileProductInsightBankV1_2(context: R2CommittedProductContext, intelligence: IntelligenceProvider): Promise<ProductInsightBankV1_2>;
+export function compileProductAffordanceProfileV1_2(context: R2CommittedProductContext, purposes: ReferencePurposesV1_2, intelligence: IntelligenceProvider): Promise<ProductAffordanceProfileV1_2>;
 ```
 
 - [ ] **Step 4: Verify R1/R2 are unchanged**

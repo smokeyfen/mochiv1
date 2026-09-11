@@ -36,6 +36,10 @@ function purposes(): ReferencePurposesV1_2 {
   return {
     referencePurposeVersion: 'REFERENCE_PURPOSES_V1_2', productId: 'product-1', sourceEvidenceVersion: 'evidence-v1',
     canonicalAssetIds: ['asset-a', 'asset-b'], reviewedVariantId: 'reviewed:product-1',
+    referenceFingerprints: [
+      { assetId: 'asset-a', mimeType: 'image/jpeg', sha256: 'a'.repeat(64) },
+      { assetId: 'asset-b', mimeType: 'image/png', sha256: 'b'.repeat(64) }
+    ],
     references: [
       { assetId: 'asset-a', purpose: 'CANONICAL_REVIEWED_PRODUCT_IDENTITY', productVariantId: 'reviewed:product-1', authorityReferences: [{ authority: 'PRODUCT_NAME', exactProductName: 'Pump Bottle' }] },
       { assetId: 'asset-b', purpose: 'SUPPORTING_FUNCTION', productVariantId: 'reviewed:product-1', authorityReferences: [{ authority: 'PRODUCT_TRUTH_CLAIM', claimId: 'claim-1' }] }
@@ -126,7 +130,7 @@ test('unknown authority, unsupported kind, prose, duplicates, reordering, and in
 
 test('contradicted or uncertain truth cannot authorize a functional affordance', async () => {
   const input = context();
-  input.productTruth.unresolvedContradictions = [{ statements: ['Bottle has a removable cap.', 'Bottle has no cap.'], assetIds: ['asset-a'], reason: 'Conflict.' }];
+  input.productTruth.unresolvedContradictions = [{ statements: ['The cap appears permanently fixed.', 'The cap may detach.'], assetIds: ['asset-a'], reason: 'Conflict.' }];
   const output = decision();
   output.authorityAssessments = output.authorityAssessments.slice(1);
   const profile = await compileProductAffordanceProfileV1_2(input, purposes(), provider(output).intelligence);

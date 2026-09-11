@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   SCHEMA_VERSION,
   deriveReferenceLimitationCodes,
@@ -25,11 +26,18 @@ export type PlannableTruthBlockReasonV1_2 =
   | 'PROHIBITED_INFERENCE'
   | 'R2_EXCLUDED';
 
+export interface ReferenceContentFingerprintV1_2 {
+  readonly assetId: string;
+  readonly mimeType: string;
+  readonly sha256: string;
+}
+
 export interface ReferencePurposesV1_2 {
   readonly referencePurposeVersion: 'REFERENCE_PURPOSES_V1_2';
   readonly productId: string;
   readonly sourceEvidenceVersion: string;
   readonly canonicalAssetIds: readonly string[];
+  readonly referenceFingerprints: readonly ReferenceContentFingerprintV1_2[];
   readonly reviewedVariantId: string;
   readonly references: readonly ReferenceBindingV1_2[];
 }
@@ -61,6 +69,7 @@ type GroundedSource = {
   readonly id: string;
   readonly text: string;
   readonly evidenceAssetIds: readonly string[];
+  readonly riskBinding: 'ASSET_BACKED' | 'TEXT_ONLY';
   readonly authorityReference: GroundedProductTruthAuthorityReferenceV1_2;
 };
 
@@ -170,26 +179,89 @@ function authorityIsKnown(context: R2CommittedProductContext, reference: Factual
   return context.productTruth.allowedClaims.some(claim => claim.claimId === reference.claimId);
 }
 
+function isReferenceFingerprint(value: unknown): value is ReferenceContentFingerprintV1_2 {
+  return hasExactKeys(value, ['assetId', 'mimeType', 'sha256'])
+    && nonBlank(value.assetId)
+    && typeof value.mimeType === 'string'
+    && /^image\/(jpeg|png|gif|webp)$/.test(value.mimeType)
+    && typeof value.sha256 === 'string'
+    && /^[0-9a-f]{64}$/.test(value.sha256);
+}
+
+function validFingerprintSequence(
+  canonicalAssetIds: readonly string[],
+  value: unknown
+): value is readonly ReferenceContentFingerprintV1_2[] {
+  return Array.isArray(value)
+    && value.length === canonicalAssetIds.length
+    && value.every((fingerprint, index) => isReferenceFingerprint(fingerprint)
+      && fingerprint.assetId === canonicalAssetIds[index])
+    && new Set(value.map(fingerprint => fingerprint.assetId)).size === value.length;
+}
+
+function sameFingerprints(
+  left: readonly ReferenceContentFingerprintV1_2[],
+  right: readonly ReferenceContentFingerprintV1_2[]
+): boolean {
+  return left.length === right.length && left.every((value, index) => {
+    const expected = right[index];
+    return expected !== undefined && value.assetId === expected.assetId
+      && value.mimeType === expected.mimeType && value.sha256 === expected.sha256;
+  });
+}
+
+export function deriveSupportingProductVariantIdV1_2(
+  context: Pick<R2CommittedProductContext, 'productId' | 'sourceEvidenceVersion'>,
+  fingerprint: ReferenceContentFingerprintV1_2
+): string {
+  const digest = createHash('sha256').update([
+    'MOCHI_V1_2_SUPPORTED_OTHER_VARIANT',
+    context.productId,
+    context.sourceEvidenceVersion,
+    fingerprint.assetId,
+    fingerprint.mimeType,
+    fingerprint.sha256
+  ].join('\0')).digest('hex');
+  return `supported-other:${digest}`;
+}
+
 export function validateReferencePurposesForContextV1_2(
   context: R2CommittedProductContext,
-  purposes: unknown
+  purposes: unknown,
+  trustedFingerprints?: readonly ReferenceContentFingerprintV1_2[]
 ): readonly string[] {
-  if (!hasExactKeys(purposes, ['referencePurposeVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'reviewedVariantId', 'references'])) return ['shape'];
+  if (!hasExactKeys(purposes, ['referencePurposeVersion', 'productId', 'sourceEvidenceVersion', 'canonicalAssetIds', 'referenceFingerprints', 'reviewedVariantId', 'references'])) return ['shape'];
   const issues: string[] = [];
   if (purposes.referencePurposeVersion !== 'REFERENCE_PURPOSES_V1_2' || purposes.productId !== context.productId
     || purposes.sourceEvidenceVersion !== context.sourceEvidenceVersion || !stringArray(purposes.canonicalAssetIds)
     || !sameStrings(purposes.canonicalAssetIds, context.canonicalAssetIds) || purposes.reviewedVariantId !== `reviewed:${context.productId}`) issues.push('source');
+  const referenceFingerprints = validFingerprintSequence(context.canonicalAssetIds, purposes.referenceFingerprints)
+    ? purposes.referenceFingerprints
+    : undefined;
+  if (referenceFingerprints === undefined
+    || (trustedFingerprints !== undefined && (!validFingerprintSequence(context.canonicalAssetIds, trustedFingerprints)
+      || !sameFingerprints(referenceFingerprints, trustedFingerprints)))) issues.push('fingerprint_binding');
   if (!Array.isArray(purposes.references) || purposes.references.length !== context.canonicalAssetIds.length) return [...issues, 'references'];
   const ids: string[] = [];
   let canonicalCount = 0;
-  for (const candidate of purposes.references) {
+  for (let index = 0; index < purposes.references.length; index += 1) {
+    const candidate = purposes.references[index];
     if (validateReferenceBindingV1_2(candidate).length > 0) {
       issues.push('reference_binding');
       continue;
     }
     const reference = candidate as ReferenceBindingV1_2;
     ids.push(reference.assetId);
-    if (reference.productVariantId !== purposes.reviewedVariantId) issues.push('reference_identity_conflict');
+    const fingerprint = referenceFingerprints?.[index];
+    const expectedSupportingVariantId = fingerprint === undefined
+      ? undefined
+      : deriveSupportingProductVariantIdV1_2(context, fingerprint);
+    if (reference.purpose === 'SUPPORTING_VARIANT') {
+      if (reference.productVariantId !== purposes.reviewedVariantId
+        && reference.productVariantId !== expectedSupportingVariantId) issues.push('reference_identity_conflict');
+    } else if (reference.productVariantId !== purposes.reviewedVariantId) {
+      issues.push('reference_identity_conflict');
+    }
     if (reference.purpose === 'CANONICAL_REVIEWED_PRODUCT_IDENTITY') {
       canonicalCount += 1;
       if (reference.authorityReferences.length !== 1 || reference.authorityReferences[0]?.authority !== 'PRODUCT_NAME'
@@ -222,12 +294,16 @@ export function groundedSourcesV1_2(context: R2CommittedProductContext): readonl
       id: fact.factId,
       text: fact.text,
       evidenceAssetIds: fact.evidenceAssetIds,
+      riskBinding: fact.evidenceAssetIds.length > 0 ? 'ASSET_BACKED' as const : 'TEXT_ONLY' as const,
       authorityReference: { authority: 'PRODUCT_TRUTH_FACT' as const, factId: fact.factId }
     })),
     ...context.productTruth.allowedClaims.map(claim => ({
       id: claim.claimId,
       text: claim.text,
       evidenceAssetIds: claim.evidenceAssetIds,
+      riskBinding: claim.source === 'REFERENCE_EVIDENCE' && claim.evidenceAssetIds.length > 0
+        ? 'ASSET_BACKED' as const
+        : 'TEXT_ONLY' as const,
       authorityReference: { authority: 'PRODUCT_TRUTH_CLAIM' as const, claimId: claim.claimId }
     }))
   ];
@@ -239,12 +315,14 @@ export function blockReasonsForGroundedSourceV1_2(
 ): readonly Exclude<PlannableTruthBlockReasonV1_2, 'R2_EXCLUDED'>[] {
   const reasons: Exclude<PlannableTruthBlockReasonV1_2, 'R2_EXCLUDED'>[] = [];
   const contradicted = context.productTruth.unresolvedContradictions.some(contradiction =>
-    contradiction.statements.some(statement => textMatchesRisk(source.text, statement))
-    && (source.evidenceAssetIds.length === 0 || intersects(source.evidenceAssetIds, contradiction.assetIds))
+    source.riskBinding === 'ASSET_BACKED'
+      ? intersects(source.evidenceAssetIds, contradiction.assetIds)
+      : contradiction.statements.some(statement => textMatchesRisk(source.text, statement))
   );
   const uncertain = context.productTruth.unresolvedUncertainties.some(uncertainty =>
-    (textMatchesRisk(source.text, uncertainty.subject) || textMatchesRisk(source.text, uncertainty.reason))
-    && (source.evidenceAssetIds.length === 0 || intersects(source.evidenceAssetIds, uncertainty.assetIds))
+    source.riskBinding === 'ASSET_BACKED'
+      ? intersects(source.evidenceAssetIds, uncertainty.assetIds)
+      : textMatchesRisk(source.text, uncertainty.subject) || textMatchesRisk(source.text, uncertainty.reason)
   );
   const prohibited = context.productTruth.prohibitedInferences.some(inference => textMatchesRisk(source.text, inference));
   if (contradicted) reasons.push('UNRESOLVED_CONTRADICTION');

@@ -118,7 +118,7 @@ test('out-of-range, fractional, incomplete, duplicate, unknown, reordered, or pr
 
 test('compiler excludes risk-blocked authority instead of assigning arbitrary commercial scores', async () => {
   const input = context();
-  input.productTruth.unresolvedContradictions = [{ statements: ['Bottle has a cap.', 'Bottle has no cap.'], assetIds: ['asset-a'], reason: 'Conflict.' }];
+  input.productTruth.unresolvedContradictions = [{ statements: ['The closure appears permanently fixed.', 'The closure may detach.'], assetIds: ['asset-a'], reason: 'Conflict.' }];
   const output = { insightScores: [decision().insightScores[0], decision().insightScores[2]] };
   const bank = await compileProductInsightBankV1_2(input, provider(output).intelligence);
   assert.deepEqual(bank.insights.map(insight => insight.insightId), ['product-name', 'claim:claim-1']);
